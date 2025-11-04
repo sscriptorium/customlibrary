@@ -1,386 +1,418 @@
--- DOLLARWARE UI LIBRARY - Enhanced Version
--- Features: Auto-save settings, improved styling (Linoria-inspired), better organization
+-- DOLLARWARE UI LIBRARY v2.0
+-- Enhanced version with automatic config saving, better features, and improved design
 
-local Library = {}
-Library.ConfigFolder = "DollarwareConfigs"
-Library.ConfigFile = "config.json"
-
--- Services
+local DollarwareLib = {}
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 
--- Create config folder
-if not isfolder(Library.ConfigFolder) then
-    makefolder(Library.ConfigFolder)
-end
+-- Configuration
+local CONFIG_FOLDER = "DollarwareUI"
+local DEFAULT_THEME = {
+    Primary = Color3.fromRGB(255, 50, 100),
+    Secondary = Color3.fromRGB(30, 30, 40),
+    Background = Color3.fromRGB(20, 20, 25),
+    Text = Color3.fromRGB(255, 255, 255),
+    SubText = Color3.fromRGB(180, 180, 190),
+    Border = Color3.fromRGB(60, 60, 70),
+    Accent = Color3.fromRGB(255, 100, 150)
+}
 
--- Color Themes (Linoria-inspired)
-local Themes = {
-    Default = {
+local THEMES = {
+    cherry = {
+        Primary = Color3.fromRGB(255, 50, 100),
+        Secondary = Color3.fromRGB(30, 30, 40),
         Background = Color3.fromRGB(20, 20, 25),
-        Secondary = Color3.fromRGB(25, 25, 30),
-        Accent = Color3.fromRGB(88, 101, 242),
         Text = Color3.fromRGB(255, 255, 255),
-        TextDark = Color3.fromRGB(180, 180, 180),
-        Border = Color3.fromRGB(40, 40, 45),
-        Success = Color3.fromRGB(67, 181, 129),
-        Warning = Color3.fromRGB(250, 166, 26),
-        Error = Color3.fromRGB(240, 71, 71)
+        SubText = Color3.fromRGB(180, 180, 190),
+        Border = Color3.fromRGB(60, 60, 70),
+        Accent = Color3.fromRGB(255, 100, 150)
     },
-    Cherry = {
-        Background = Color3.fromRGB(25, 15, 20),
-        Secondary = Color3.fromRGB(30, 18, 24),
-        Accent = Color3.fromRGB(220, 53, 69),
-        Text = Color3.fromRGB(255, 255, 255),
-        TextDark = Color3.fromRGB(180, 180, 180),
-        Border = Color3.fromRGB(45, 25, 30),
-        Success = Color3.fromRGB(67, 181, 129),
-        Warning = Color3.fromRGB(250, 166, 26),
-        Error = Color3.fromRGB(240, 71, 71)
-    },
-    Ocean = {
+    ocean = {
+        Primary = Color3.fromRGB(50, 150, 255),
+        Secondary = Color3.fromRGB(25, 30, 45),
         Background = Color3.fromRGB(15, 20, 30),
-        Secondary = Color3.fromRGB(20, 25, 35),
-        Accent = Color3.fromRGB(58, 150, 221),
         Text = Color3.fromRGB(255, 255, 255),
-        TextDark = Color3.fromRGB(180, 180, 180),
-        Border = Color3.fromRGB(30, 40, 50),
-        Success = Color3.fromRGB(67, 181, 129),
-        Warning = Color3.fromRGB(250, 166, 26),
-        Error = Color3.fromRGB(240, 71, 71)
+        SubText = Color3.fromRGB(170, 190, 210),
+        Border = Color3.fromRGB(40, 60, 80),
+        Accent = Color3.fromRGB(100, 180, 255)
     },
-    Grape = {
-        Background = Color3.fromRGB(20, 15, 30),
-        Secondary = Color3.fromRGB(25, 18, 35),
-        Accent = Color3.fromRGB(138, 80, 255),
+    forest = {
+        Primary = Color3.fromRGB(80, 200, 120),
+        Secondary = Color3.fromRGB(20, 35, 25),
+        Background = Color3.fromRGB(15, 25, 18),
         Text = Color3.fromRGB(255, 255, 255),
-        TextDark = Color3.fromRGB(180, 180, 180),
-        Border = Color3.fromRGB(35, 25, 50),
-        Success = Color3.fromRGB(67, 181, 129),
-        Warning = Color3.fromRGB(250, 166, 26),
-        Error = Color3.fromRGB(240, 71, 71)
+        SubText = Color3.fromRGB(180, 200, 185),
+        Border = Color3.fromRGB(50, 80, 60),
+        Accent = Color3.fromRGB(120, 220, 160)
+    },
+    sunset = {
+        Primary = Color3.fromRGB(255, 120, 50),
+        Secondary = Color3.fromRGB(35, 25, 20),
+        Background = Color3.fromRGB(25, 18, 15),
+        Text = Color3.fromRGB(255, 255, 255),
+        SubText = Color3.fromRGB(200, 180, 170),
+        Border = Color3.fromRGB(70, 50, 40),
+        Accent = Color3.fromRGB(255, 160, 100)
+    },
+    purple = {
+        Primary = Color3.fromRGB(180, 80, 255),
+        Secondary = Color3.fromRGB(30, 20, 40),
+        Background = Color3.fromRGB(20, 15, 30),
+        Text = Color3.fromRGB(255, 255, 255),
+        SubText = Color3.fromRGB(190, 170, 210),
+        Border = Color3.fromRGB(60, 40, 80),
+        Accent = Color3.fromRGB(210, 130, 255)
     }
 }
 
 -- Utility Functions
-local function GetTheme(themeName)
-    return Themes[themeName] or Themes.Default
+local function createRound(parent, radius)
+    radius = radius or 8
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius)
+    corner.Parent = parent
+    return corner
 end
 
-local function CreateTween(instance, properties, duration)
-    duration = duration or 0.2
-    local tween = TweenService:Create(
-        instance,
-        TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        properties
-    )
+local function createStroke(parent, color, thickness)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = color
+    stroke.Thickness = thickness or 1
+    stroke.Parent = parent
+    return stroke
+end
+
+local function tween(object, properties, duration, style, direction)
+    duration = duration or 0.3
+    style = style or Enum.EasingStyle.Quad
+    direction = direction or Enum.EasingDirection.Out
+    
+    local tweenInfo = TweenInfo.new(duration, style, direction)
+    local tween = TweenService:Create(object, tweenInfo, properties)
     tween:Play()
     return tween
 end
 
-local function Round(num, decimals)
-    decimals = decimals or 0
-    local mult = 10^decimals
-    return math.floor(num * mult + 0.5) / mult
-end
-
--- Configuration Management
-function Library:SaveConfig(config)
+-- Config Management
+local function saveConfig(configName, data)
+    if not isfolder(CONFIG_FOLDER) then
+        makefolder(CONFIG_FOLDER)
+    end
+    
     local success, err = pcall(function()
-        local encoded = HttpService:JSONEncode(config)
-        writefile(self.ConfigFolder .. "/" .. self.ConfigFile, encoded)
+        writefile(CONFIG_FOLDER .. "/" .. configName .. ".json", HttpService:JSONEncode(data))
     end)
     
-    if success then
-        self:Notify({
-            title = "Config Saved",
-            message = "Settings saved successfully",
-            duration = 2
-        })
-    else
-        warn("Failed to save config:", err)
-    end
+    return success
 end
 
-function Library:LoadConfig()
-    local path = self.ConfigFolder .. "/" .. self.ConfigFile
-    
-    if not isfile(path) then
-        return {}
+local function loadConfig(configName)
+    if not isfolder(CONFIG_FOLDER) then
+        makefolder(CONFIG_FOLDER)
     end
     
-    local success, result = pcall(function()
-        local content = readfile(path)
-        return HttpService:JSONDecode(content)
-    end)
-    
-    if success then
-        return result
-    else
-        warn("Failed to load config:", result)
-        return {}
+    local filePath = CONFIG_FOLDER .. "/" .. configName .. ".json"
+    if isfile(filePath) then
+        local success, data = pcall(function()
+            return HttpService:JSONDecode(readfile(filePath))
+        end)
+        
+        if success then
+            return data
+        end
     end
+    
+    return nil
 end
 
-function Library:UpdateConfigValue(key, value)
-    if not self.ConfigData then
-        self.ConfigData = self:LoadConfig()
-    end
+-- Library Constructor
+function DollarwareLib.new(settings)
+    settings = settings or {}
     
-    self.ConfigData[key] = value
-    self:SaveConfig(self.ConfigData)
-end
-
--- Main Library Constructor
-function Library:New(options)
-    options = options or {}
-    
-    local ui = {
-        theme = GetTheme(options.theme or "Default"),
-        themeName = options.theme or "Default",
-        rounding = options.rounding ~= false,
-        smoothDragging = options.smoothDragging or false,
-        autoDisableToggles = options.autoDisableToggles ~= false,
-        autoSave = options.autoSave ~= false,
-        controls = {},
-        windows = {}
+    local Library = {
+        settings = {
+            configName = settings.configName or "default",
+            theme = settings.theme or "cherry",
+            rounding = settings.rounding ~= false,
+            smoothDragging = settings.smoothDragging or false,
+            accentColor = settings.accentColor,
+            autoSave = settings.autoSave ~= false,
+            transparency = settings.transparency or 0
+        },
+        windows = {},
+        notifications = {},
+        flags = {},
+        theme = THEMES[settings.theme or "cherry"] or THEMES.cherry
     }
     
-    -- Load saved configuration
-    ui.savedConfig = Library:LoadConfig()
-    
-    -- Create ScreenGui
-    ui.screenGui = Instance.new("ScreenGui")
-    ui.screenGui.Name = "DollarwareUI"
-    ui.screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    ui.screenGui.ResetOnSpawn = false
-    
-    if gethui then
-        ui.screenGui.Parent = gethui()
-    elseif syn and syn.protect_gui then
-        syn.protect_gui(ui.screenGui)
-        ui.screenGui.Parent = CoreGui
-    else
-        ui.screenGui.Parent = CoreGui
+    -- Apply custom accent color if provided
+    if settings.accentColor then
+        Library.theme.Primary = settings.accentColor
+        Library.theme.Accent = settings.accentColor
     end
     
+    -- Auto-save functionality
+    Library.autoDisableToggles = true
+    
+    -- Create ScreenGui
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "DollarwareUI_" .. game:GetService("HttpService"):GenerateGUID(false)
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    if gethui then
+        screenGui.Parent = gethui()
+    elseif syn and syn.protect_gui then
+        syn.protect_gui(screenGui)
+        screenGui.Parent = CoreGui
+    else
+        screenGui.Parent = CoreGui
+    end
+    
+    Library.screenGui = screenGui
+    
     -- Notification System
-    function ui:Notify(options)
+    function Library:notify(options)
         options = options or {}
         local title = options.title or "Notification"
         local message = options.message or ""
         local duration = options.duration or 3
+        local callback = options.callback
         
-        local notif = Instance.new("Frame")
-        notif.Size = UDim2.new(0, 280, 0, 70)
-        notif.Position = UDim2.new(1, -300, 1, -90)
-        notif.BackgroundColor3 = self.theme.Secondary
-        notif.BorderSizePixel = 0
-        notif.Parent = self.screenGui
+        local notifContainer = Instance.new("Frame")
+        notifContainer.Size = UDim2.new(0, 300, 0, 80)
+        notifContainer.Position = UDim2.new(1, -320, 1, 20)
+        notifContainer.BackgroundColor3 = Library.theme.Background
+        notifContainer.BorderSizePixel = 0
+        notifContainer.Parent = screenGui
+        notifContainer.ZIndex = 1000
         
-        if self.rounding then
-            local corner = Instance.new("UICorner")
-            corner.CornerRadius = UDim.new(0, 6)
-            corner.Parent = notif
+        if Library.settings.rounding then
+            createRound(notifContainer, 8)
         end
+        createStroke(notifContainer, Library.theme.Border, 1)
         
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = self.theme.Accent
-        stroke.Thickness = 2
-        stroke.Parent = notif
+        local accent = Instance.new("Frame")
+        accent.Size = UDim2.new(1, 0, 0, 3)
+        accent.BackgroundColor3 = Library.theme.Primary
+        accent.BorderSizePixel = 0
+        accent.Parent = notifContainer
         
         local titleLabel = Instance.new("TextLabel")
-        titleLabel.Size = UDim2.new(1, -20, 0, 20)
-        titleLabel.Position = UDim2.new(0, 10, 0, 8)
+        titleLabel.Size = UDim2.new(1, -20, 0, 25)
+        titleLabel.Position = UDim2.new(0, 10, 0, 10)
         titleLabel.BackgroundTransparency = 1
         titleLabel.Text = title
-        titleLabel.TextColor3 = self.theme.Text
-        titleLabel.TextSize = 14
+        titleLabel.TextColor3 = Library.theme.Text
+        titleLabel.TextSize = 16
         titleLabel.Font = Enum.Font.GothamBold
         titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-        titleLabel.Parent = notif
+        titleLabel.Parent = notifContainer
         
         local messageLabel = Instance.new("TextLabel")
-        messageLabel.Size = UDim2.new(1, -20, 0, 32)
-        messageLabel.Position = UDim2.new(0, 10, 0, 30)
+        messageLabel.Size = UDim2.new(1, -20, 0, 35)
+        messageLabel.Position = UDim2.new(0, 10, 0, 35)
         messageLabel.BackgroundTransparency = 1
         messageLabel.Text = message
-        messageLabel.TextColor3 = self.theme.TextDark
-        messageLabel.TextSize = 12
+        messageLabel.TextColor3 = Library.theme.SubText
+        messageLabel.TextSize = 13
         messageLabel.Font = Enum.Font.Gotham
         messageLabel.TextXAlignment = Enum.TextXAlignment.Left
         messageLabel.TextWrapped = true
-        messageLabel.Parent = notif
+        messageLabel.Parent = notifContainer
         
-        -- Animate in
-        notif.Position = UDim2.new(1, 20, 1, -90)
-        CreateTween(notif, {Position = UDim2.new(1, -300, 1, -90)}, 0.3)
+        -- Slide in animation
+        tween(notifContainer, {Position = UDim2.new(1, -320, 1, -100)}, 0.5, Enum.EasingStyle.Back)
         
-        -- Animate out and destroy
         task.delay(duration, function()
-            CreateTween(notif, {Position = UDim2.new(1, 20, 1, -90)}, 0.3)
+            tween(notifContainer, {Position = UDim2.new(1, -320, 1, 20)}, 0.3)
             task.wait(0.3)
-            notif:Destroy()
+            notifContainer:Destroy()
         end)
+        
+        if callback then
+            task.spawn(callback)
+        end
+        
+        table.insert(Library.notifications, notifContainer)
+        return notifContainer
     end
     
-    -- Window Constructor
-    function ui:NewWindow(options)
+    -- Window Creation
+    function Library:newWindow(options)
         options = options or {}
         
-        local window = {
-            text = options.text or "Window",
+        local Window = {
+            title = options.text or "Dollarware",
             size = options.size or Vector2.new(550, 400),
             position = options.position,
-            resize = options.resize ~= false,
+            resizable = options.resize ~= false,
             menus = {},
-            visible = true
+            flags = {}
         }
         
-        -- Main Window Frame
-        window.frame = Instance.new("Frame")
-        window.frame.Name = "Window"
-        window.frame.Size = UDim2.new(0, window.size.X, 0, window.size.Y)
-        window.frame.Position = window.position and UDim2.new(0, window.position.X, 0, window.position.Y) or UDim2.new(0.5, -window.size.X/2, 0.5, -window.size.Y/2)
-        window.frame.BackgroundColor3 = ui.theme.Background
-        window.frame.BorderSizePixel = 0
-        window.frame.Parent = ui.screenGui
+        -- Main window frame
+        local windowFrame = Instance.new("Frame")
+        windowFrame.Size = UDim2.new(0, Window.size.X, 0, Window.size.Y)
+        windowFrame.Position = options.position or UDim2.new(0.5, -Window.size.X/2, 0.5, -Window.size.Y/2)
+        windowFrame.BackgroundColor3 = Library.theme.Background
+        windowFrame.BorderSizePixel = 0
+        windowFrame.Parent = screenGui
+        windowFrame.Active = true
+        windowFrame.ClipsDescendants = true
         
-        if ui.rounding then
-            local corner = Instance.new("UICorner")
-            corner.CornerRadius = UDim.new(0, 8)
-            corner.Parent = window.frame
+        if Library.settings.rounding then
+            createRound(windowFrame, 12)
         end
+        createStroke(windowFrame, Library.theme.Border, 2)
         
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = ui.theme.Border
-        stroke.Thickness = 1
-        stroke.Parent = window.frame
+        Window.frame = windowFrame
         
-        -- Title Bar
+        -- Title bar
         local titleBar = Instance.new("Frame")
-        titleBar.Name = "TitleBar"
         titleBar.Size = UDim2.new(1, 0, 0, 40)
-        titleBar.BackgroundColor3 = ui.theme.Secondary
+        titleBar.BackgroundColor3 = Library.theme.Secondary
         titleBar.BorderSizePixel = 0
-        titleBar.Parent = window.frame
+        titleBar.Parent = windowFrame
         
-        if ui.rounding then
-            local corner = Instance.new("UICorner")
-            corner.CornerRadius = UDim.new(0, 8)
-            corner.Parent = titleBar
+        if Library.settings.rounding then
+            createRound(titleBar, 12)
         end
         
-        -- Title Text
-        local titleText = Instance.new("TextLabel")
-        titleText.Size = UDim2.new(1, -100, 1, 0)
-        titleText.Position = UDim2.new(0, 15, 0, 0)
-        titleText.BackgroundTransparency = 1
-        titleText.Text = window.text
-        titleText.TextColor3 = ui.theme.Text
-        titleText.TextSize = 16
-        titleText.Font = Enum.Font.GothamBold
-        titleText.TextXAlignment = Enum.TextXAlignment.Left
-        titleText.Parent = titleBar
+        local titleAccent = Instance.new("Frame")
+        titleAccent.Size = UDim2.new(1, 0, 0, 2)
+        titleAccent.Position = UDim2.new(0, 0, 1, 0)
+        titleAccent.BackgroundColor3 = Library.theme.Primary
+        titleAccent.BorderSizePixel = 0
+        titleAccent.Parent = titleBar
         
-        -- Close Button
+        local titleLabel = Instance.new("TextLabel")
+        titleLabel.Size = UDim2.new(1, -100, 1, 0)
+        titleLabel.Position = UDim2.new(0, 15, 0, 0)
+        titleLabel.BackgroundTransparency = 1
+        titleLabel.Text = Window.title
+        titleLabel.TextColor3 = Library.theme.Text
+        titleLabel.TextSize = 16
+        titleLabel.Font = Enum.Font.GothamBold
+        titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        titleLabel.Parent = titleBar
+        
+        -- Close button
         local closeButton = Instance.new("TextButton")
         closeButton.Size = UDim2.new(0, 30, 0, 30)
         closeButton.Position = UDim2.new(1, -35, 0, 5)
-        closeButton.BackgroundColor3 = ui.theme.Error
+        closeButton.BackgroundColor3 = Library.theme.Secondary
         closeButton.BorderSizePixel = 0
-        closeButton.Text = "X"
-        closeButton.TextColor3 = ui.theme.Text
-        closeButton.TextSize = 16
+        closeButton.Text = "×"
+        closeButton.TextColor3 = Library.theme.Text
+        closeButton.TextSize = 20
         closeButton.Font = Enum.Font.GothamBold
         closeButton.Parent = titleBar
         
-        if ui.rounding then
-            local corner = Instance.new("UICorner")
-            corner.CornerRadius = UDim.new(0, 6)
-            corner.Parent = closeButton
+        if Library.settings.rounding then
+            createRound(closeButton, 6)
         end
         
         closeButton.MouseButton1Click:Connect(function()
-            if ui.autoDisableToggles then
-                for _, control in pairs(ui.controls) do
-                    if control.type == "toggle" and control.state then
-                        control:setState(false)
+            tween(windowFrame, {Size = UDim2.new(0, 0, 0, 0)}, 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+            task.wait(0.3)
+            windowFrame:Destroy()
+            
+            if Library.autoDisableToggles then
+                for _, toggle in pairs(Window.flags) do
+                    if toggle.type == "toggle" and toggle.state then
+                        toggle:setState(false)
                     end
                 end
             end
-            window.frame:Destroy()
         end)
         
-        -- Minimize Button
+        closeButton.MouseEnter:Connect(function()
+            tween(closeButton, {BackgroundColor3 = Color3.fromRGB(255, 50, 50)}, 0.2)
+        end)
+        
+        closeButton.MouseLeave:Connect(function()
+            tween(closeButton, {BackgroundColor3 = Library.theme.Secondary}, 0.2)
+        end)
+        
+        -- Minimize button
         local minimizeButton = Instance.new("TextButton")
         minimizeButton.Size = UDim2.new(0, 30, 0, 30)
         minimizeButton.Position = UDim2.new(1, -70, 0, 5)
-        minimizeButton.BackgroundColor3 = ui.theme.Accent
+        minimizeButton.BackgroundColor3 = Library.theme.Secondary
         minimizeButton.BorderSizePixel = 0
-        minimizeButton.Text = "-"
-        minimizeButton.TextColor3 = ui.theme.Text
+        minimizeButton.Text = "−"
+        minimizeButton.TextColor3 = Library.theme.Text
         minimizeButton.TextSize = 20
         minimizeButton.Font = Enum.Font.GothamBold
         minimizeButton.Parent = titleBar
         
-        if ui.rounding then
-            local corner = Instance.new("UICorner")
-            corner.CornerRadius = UDim.new(0, 6)
-            corner.Parent = minimizeButton
+        if Library.settings.rounding then
+            createRound(minimizeButton, 6)
         end
         
+        local isMinimized = false
         minimizeButton.MouseButton1Click:Connect(function()
-            window.visible = not window.visible
-            for _, menu in pairs(window.menus) do
-                menu.frame.Visible = window.visible
+            isMinimized = not isMinimized
+            if isMinimized then
+                tween(windowFrame, {Size = UDim2.new(0, Window.size.X, 0, 40)}, 0.3)
+                minimizeButton.Text = "□"
+            else
+                tween(windowFrame, {Size = UDim2.new(0, Window.size.X, 0, Window.size.Y)}, 0.3)
+                minimizeButton.Text = "−"
             end
-            minimizeButton.Text = window.visible and "-" or "+"
         end)
         
-        -- Menu Container
-        local menuContainer = Instance.new("Frame")
-        menuContainer.Name = "MenuContainer"
-        menuContainer.Size = UDim2.new(1, 0, 1, -40)
-        menuContainer.Position = UDim2.new(0, 0, 0, 40)
-        menuContainer.BackgroundTransparency = 1
-        menuContainer.Parent = window.frame
+        minimizeButton.MouseEnter:Connect(function()
+            tween(minimizeButton, {BackgroundColor3 = Library.theme.Border}, 0.2)
+        end)
         
-        -- Menu Tabs Frame
-        local menuTabs = Instance.new("Frame")
-        menuTabs.Size = UDim2.new(1, 0, 0, 35)
-        menuTabs.BackgroundColor3 = ui.theme.Secondary
-        menuTabs.BorderSizePixel = 0
-        menuTabs.Parent = menuContainer
+        minimizeButton.MouseLeave:Connect(function()
+            tween(minimizeButton, {BackgroundColor3 = Library.theme.Secondary}, 0.2)
+        end)
         
-        local tabLayout = Instance.new("UIListLayout")
-        tabLayout.FillDirection = Enum.FillDirection.Horizontal
-        tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        tabLayout.Padding = UDim.new(0, 2)
-        tabLayout.Parent = menuTabs
+        -- Menu container
+        local menuBar = Instance.new("Frame")
+        menuBar.Size = UDim2.new(1, 0, 0, 35)
+        menuBar.Position = UDim2.new(0, 0, 0, 40)
+        menuBar.BackgroundColor3 = Library.theme.Secondary
+        menuBar.BorderSizePixel = 0
+        menuBar.Parent = windowFrame
+        
+        local menuLayout = Instance.new("UIListLayout")
+        menuLayout.FillDirection = Enum.FillDirection.Horizontal
+        menuLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        menuLayout.Padding = UDim.new(0, 5)
+        menuLayout.Parent = menuBar
+        
+        local menuPadding = Instance.new("UIPadding")
+        menuPadding.PaddingLeft = UDim.new(0, 10)
+        menuPadding.PaddingTop = UDim.new(0, 5)
+        menuPadding.Parent = menuBar
+        
+        -- Content container
+        local contentContainer = Instance.new("Frame")
+        contentContainer.Size = UDim2.new(1, 0, 1, -75)
+        contentContainer.Position = UDim2.new(0, 0, 0, 75)
+        contentContainer.BackgroundTransparency = 1
+        contentContainer.Parent = windowFrame
+        contentContainer.ClipsDescendants = true
+        
+        Window.contentContainer = contentContainer
+        Window.menuBar = menuBar
         
         -- Dragging
         local dragging, dragInput, dragStart, startPos
-        
-        local function update(input)
-            local delta = input.Position - dragStart
-            local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            
-            if ui.smoothDragging then
-                CreateTween(window.frame, {Position = newPos}, 0.1)
-            else
-                window.frame.Position = newPos
-            end
-        end
         
         titleBar.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 dragging = true
                 dragStart = input.Position
-                startPos = window.frame.Position
+                startPos = windowFrame.Position
                 
                 input.Changed:Connect(function()
                     if input.UserInputState == Enum.UserInputState.End then
@@ -398,1091 +430,812 @@ function Library:New(options)
         
         UserInputService.InputChanged:Connect(function(input)
             if input == dragInput and dragging then
-                update(input)
+                local delta = input.Position - dragStart
+                local newPos = UDim2.new(
+                    startPos.X.Scale, startPos.X.Offset + delta.X,
+                    startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                )
+                
+                if Library.settings.smoothDragging then
+                    tween(windowFrame, {Position = newPos}, 0.1)
+                else
+                    windowFrame.Position = newPos
+                end
             end
         end)
         
         -- Add Menu Function
-        function window:AddMenu(options)
+        function Window:addMenu(options)
             options = options or {}
             
-            local menu = {
-                text = options.text or "Menu",
+            local Menu = {
+                title = options.text or "Menu",
                 sections = {},
-                leftSections = {},
-                rightSections = {}
+                visible = false
             }
             
-            -- Menu Tab Button
-            local tabButton = Instance.new("TextButton")
-            tabButton.Size = UDim2.new(0, 100, 1, 0)
-            tabButton.BackgroundColor3 = ui.theme.Secondary
-            tabButton.BorderSizePixel = 0
-            tabButton.Text = menu.text
-            tabButton.TextColor3 = ui.theme.TextDark
-            tabButton.TextSize = 13
-            tabButton.Font = Enum.Font.GothamSemibold
-            tabButton.Parent = menuTabs
+            -- Menu button
+            local menuButton = Instance.new("TextButton")
+            menuButton.Size = UDim2.new(0, 100, 0, 25)
+            menuButton.BackgroundColor3 = Library.theme.Background
+            menuButton.BorderSizePixel = 0
+            menuButton.Text = Menu.title
+            menuButton.TextColor3 = Library.theme.SubText
+            menuButton.TextSize = 13
+            menuButton.Font = Enum.Font.GothamMedium
+            menuButton.Parent = menuBar
             
-            -- Menu Content Frame
-            menu.frame = Instance.new("Frame")
-            menu.frame.Name = menu.text
-            menu.frame.Size = UDim2.new(1, 0, 1, -35)
-            menu.frame.Position = UDim2.new(0, 0, 0, 35)
-            menu.frame.BackgroundTransparency = 1
-            menu.frame.Visible = false
-            menu.frame.Parent = menuContainer
+            if Library.settings.rounding then
+                createRound(menuButton, 6)
+            end
             
-            -- Left Column
-            local leftColumn = Instance.new("ScrollingFrame")
-            leftColumn.Name = "LeftColumn"
-            leftColumn.Size = UDim2.new(0.5, -5, 1, -10)
-            leftColumn.Position = UDim2.new(0, 5, 0, 5)
+            -- Menu content
+            local menuContent = Instance.new("ScrollingFrame")
+            menuContent.Size = UDim2.new(1, -20, 1, -10)
+            menuContent.Position = UDim2.new(0, 10, 0, 5)
+            menuContent.BackgroundTransparency = 1
+            menuContent.BorderSizePixel = 0
+            menuContent.ScrollBarThickness = 4
+            menuContent.ScrollBarImageColor3 = Library.theme.Primary
+            menuContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+            menuContent.Visible = false
+            menuContent.Parent = contentContainer
+            
+            local leftColumn = Instance.new("Frame")
+            leftColumn.Size = UDim2.new(0.48, 0, 1, 0)
+            leftColumn.Position = UDim2.new(0, 0, 0, 0)
             leftColumn.BackgroundTransparency = 1
-            leftColumn.BorderSizePixel = 0
-            leftColumn.ScrollBarThickness = 4
-            leftColumn.ScrollBarImageColor3 = ui.theme.Accent
-            leftColumn.CanvasSize = UDim2.new(0, 0, 0, 0)
-            leftColumn.Parent = menu.frame
+            leftColumn.Parent = menuContent
+            
+            local rightColumn = Instance.new("Frame")
+            rightColumn.Size = UDim2.new(0.48, 0, 1, 0)
+            rightColumn.Position = UDim2.new(0.52, 0, 0, 0)
+            rightColumn.BackgroundTransparency = 1
+            rightColumn.Parent = menuContent
             
             local leftLayout = Instance.new("UIListLayout")
             leftLayout.SortOrder = Enum.SortOrder.LayoutOrder
-            leftLayout.Padding = UDim.new(0, 8)
+            leftLayout.Padding = UDim.new(0, 10)
             leftLayout.Parent = leftColumn
-            
-            leftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                leftColumn.CanvasSize = UDim2.new(0, 0, 0, leftLayout.AbsoluteContentSize.Y + 10)
-            end)
-            
-            -- Right Column
-            local rightColumn = Instance.new("ScrollingFrame")
-            rightColumn.Name = "RightColumn"
-            rightColumn.Size = UDim2.new(0.5, -5, 1, -10)
-            rightColumn.Position = UDim2.new(0.5, 5, 0, 5)
-            rightColumn.BackgroundTransparency = 1
-            rightColumn.BorderSizePixel = 0
-            rightColumn.ScrollBarThickness = 4
-            rightColumn.ScrollBarImageColor3 = ui.theme.Accent
-            rightColumn.CanvasSize = UDim2.new(0, 0, 0, 0)
-            rightColumn.Parent = menu.frame
             
             local rightLayout = Instance.new("UIListLayout")
             rightLayout.SortOrder = Enum.SortOrder.LayoutOrder
-            rightLayout.Padding = UDim.new(0, 8)
+            rightLayout.Padding = UDim.new(0, 10)
             rightLayout.Parent = rightColumn
             
-            rightLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                rightColumn.CanvasSize = UDim2.new(0, 0, 0, rightLayout.AbsoluteContentSize.Y + 10)
-            end)
+            Menu.leftColumn = leftColumn
+            Menu.rightColumn = rightColumn
+            Menu.leftLayout = leftLayout
+            Menu.rightLayout = rightLayout
+            Menu.content = menuContent
             
-            -- Tab Click Handler
-            tabButton.MouseButton1Click:Connect(function()
-                for _, m in pairs(window.menus) do
-                    m.frame.Visible = false
-                    m.tabButton.BackgroundColor3 = ui.theme.Secondary
-                    m.tabButton.TextColor3 = ui.theme.TextDark
+            menuButton.MouseButton1Click:Connect(function()
+                for _, menu in pairs(Window.menus) do
+                    menu.content.Visible = false
+                    menu.button.BackgroundColor3 = Library.theme.Background
+                    menu.button.TextColor3 = Library.theme.SubText
                 end
                 
-                menu.frame.Visible = true
-                tabButton.BackgroundColor3 = ui.theme.Accent
-                tabButton.TextColor3 = ui.theme.Text
+                menuContent.Visible = true
+                Menu.visible = true
+                menuButton.BackgroundColor3 = Library.theme.Primary
+                menuButton.TextColor3 = Library.theme.Text
             end)
             
-            -- Make first menu visible
-            if #window.menus == 0 then
-                menu.frame.Visible = true
-                tabButton.BackgroundColor3 = ui.theme.Accent
-                tabButton.TextColor3 = ui.theme.Text
-            end
+            menuButton.MouseEnter:Connect(function()
+                if not Menu.visible then
+                    tween(menuButton, {BackgroundColor3 = Library.theme.Border}, 0.2)
+                end
+            end)
             
-            menu.tabButton = tabButton
-            menu.leftColumn = leftColumn
-            menu.rightColumn = rightColumn
+            menuButton.MouseLeave:Connect(function()
+                if not Menu.visible then
+                    tween(menuButton, {BackgroundColor3 = Library.theme.Background}, 0.2)
+                end
+            end)
+            
+            Menu.button = menuButton
             
             -- Add Section Function
-            function menu:AddSection(options)
+            function Menu:addSection(options)
                 options = options or {}
                 
-                local section = {
-                    text = options.text or "Section",
+                local Section = {
+                    title = options.text or "Section",
                     side = options.side or "auto",
                     showMinButton = options.showMinButton ~= false,
-                    minimized = false,
-                    controls = {}
+                    elements = {}
                 }
                 
-                -- Determine column
-                local column
-                if section.side == "left" then
-                    column = leftColumn
-                    table.insert(menu.leftSections, section)
-                elseif section.side == "right" then
-                    column = rightColumn
-                    table.insert(menu.rightSections, section)
-                else -- auto
-                    if #menu.leftSections <= #menu.rightSections then
-                        column = leftColumn
-                        table.insert(menu.leftSections, section)
-                    else
-                        column = rightColumn
-                        table.insert(menu.rightSections, section)
-                    end
+                local parent = Section.side == "left" and leftColumn or (Section.side == "right" and rightColumn or (#self.sections % 2 == 0 and leftColumn or rightColumn))
+                
+                local sectionFrame = Instance.new("Frame")
+                sectionFrame.Size = UDim2.new(1, 0, 0, 40)
+                sectionFrame.BackgroundColor3 = Library.theme.Secondary
+                sectionFrame.BorderSizePixel = 0
+                sectionFrame.Parent = parent
+                sectionFrame.AutomaticSize = Enum.AutomaticSize.Y
+                
+                if Library.settings.rounding then
+                    createRound(sectionFrame, 8)
                 end
+                createStroke(sectionFrame, Library.theme.Border, 1)
                 
-                -- Section Frame
-                section.frame = Instance.new("Frame")
-                section.frame.Size = UDim2.new(1, -8, 0, 30)
-                section.frame.BackgroundColor3 = ui.theme.Secondary
-                section.frame.BorderSizePixel = 0
-                section.frame.Parent = column
+                local sectionHeader = Instance.new("Frame")
+                sectionHeader.Size = UDim2.new(1, 0, 0, 30)
+                sectionHeader.BackgroundTransparency = 1
+                sectionHeader.Parent = sectionFrame
                 
-                if ui.rounding then
-                    local corner = Instance.new("UICorner")
-                    corner.CornerRadius = UDim.new(0, 6)
-                    corner.Parent = section.frame
-                end
+                local sectionTitle = Instance.new("TextLabel")
+                sectionTitle.Size = UDim2.new(1, -40, 1, 0)
+                sectionTitle.Position = UDim2.new(0, 10, 0, 0)
+                sectionTitle.BackgroundTransparency = 1
+                sectionTitle.Text = Section.title
+                sectionTitle.TextColor3 = Library.theme.Text
+                sectionTitle.TextSize = 14
+                sectionTitle.Font = Enum.Font.GothamBold
+                sectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+                sectionTitle.Parent = sectionHeader
                 
-                local stroke = Instance.new("UIStroke")
-                stroke.Color = ui.theme.Border
-                stroke.Thickness = 1
-                stroke.Parent = section.frame
+                local sectionContent = Instance.new("Frame")
+                sectionContent.Size = UDim2.new(1, -20, 1, -40)
+                sectionContent.Position = UDim2.new(0, 10, 0, 35)
+                sectionContent.BackgroundTransparency = 1
+                sectionContent.Parent = sectionFrame
+                sectionContent.AutomaticSize = Enum.AutomaticSize.Y
                 
-                -- Section Header
-                local header = Instance.new("Frame")
-                header.Size = UDim2.new(1, 0, 0, 30)
-                header.BackgroundColor3 = ui.theme.Accent
-                header.BorderSizePixel = 0
-                header.Parent = section.frame
+                local sectionLayout = Instance.new("UIListLayout")
+                sectionLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                sectionLayout.Padding = UDim.new(0, 8)
+                sectionLayout.Parent = sectionContent
                 
-                if ui.rounding then
-                    local corner = Instance.new("UICorner")
-                    corner.CornerRadius = UDim.new(0, 6)
-                    corner.Parent = header
-                end
+                Section.frame = sectionFrame
+                Section.content = sectionContent
+                Section.layout = sectionLayout
                 
-                local headerText = Instance.new("TextLabel")
-                headerText.Size = UDim2.new(1, section.showMinButton and -30 or -10, 1, 0)
-                headerText.Position = UDim2.new(0, 10, 0, 0)
-                headerText.BackgroundTransparency = 1
-                headerText.Text = section.text
-                headerText.TextColor3 = ui.theme.Text
-                headerText.TextSize = 13
-                headerText.Font = Enum.Font.GothamBold
-                headerText.TextXAlignment = Enum.TextXAlignment.Left
-                headerText.Parent = header
-                
-                -- Minimize Button
-                if section.showMinButton then
+                -- Minimize button
+                if Section.showMinButton then
                     local minButton = Instance.new("TextButton")
                     minButton.Size = UDim2.new(0, 20, 0, 20)
                     minButton.Position = UDim2.new(1, -25, 0, 5)
-                    minButton.BackgroundColor3 = ui.theme.Background
+                    minButton.BackgroundColor3 = Library.theme.Background
                     minButton.BorderSizePixel = 0
-                    minButton.Text = "-"
-                    minButton.TextColor3 = ui.theme.Text
-                    minButton.TextSize = 16
+                    minButton.Text = "−"
+                    minButton.TextColor3 = Library.theme.SubText
+                    minButton.TextSize = 14
                     minButton.Font = Enum.Font.GothamBold
-                    minButton.Parent = header
+                    minButton.Parent = sectionHeader
                     
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = minButton
+                    if Library.settings.rounding then
+                        createRound(minButton, 4)
                     end
                     
+                    local isMinimized = false
                     minButton.MouseButton1Click:Connect(function()
-                        section.minimized = not section.minimized
-                        minButton.Text = section.minimized and "+" or "-"
-                        
-                        for _, control in pairs(section.controls) do
-                            control.frame.Visible = not section.minimized
-                        end
-                        
-                        section:UpdateSize()
+                        isMinimized = not isMinimized
+                        sectionContent.Visible = not isMinimized
+                        minButton.Text = isMinimized and "+" or "−"
                     end)
                 end
                 
-                -- Content Container
-                section.content = Instance.new("Frame")
-                section.content.Size = UDim2.new(1, 0, 1, -30)
-                section.content.Position = UDim2.new(0, 0, 0, 30)
-                section.content.BackgroundTransparency = 1
-                section.content.Parent = section.frame
-                
-                local contentLayout = Instance.new("UIListLayout")
-                contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-                contentLayout.Padding = UDim.new(0, 5)
-                contentLayout.Parent = section.content
-                
-                local contentPadding = Instance.new("UIPadding")
-                contentPadding.PaddingTop = UDim.new(0, 8)
-                contentPadding.PaddingBottom = UDim.new(0, 8)
-                contentPadding.PaddingLeft = UDim.new(0, 8)
-                contentPadding.PaddingRight = UDim.new(0, 8)
-                contentPadding.Parent = section.content
-                
-                function section:UpdateSize()
-                    local totalHeight = 30
-                    
-                    if not self.minimized then
-                        totalHeight = totalHeight + contentLayout.AbsoluteContentSize.Y + 16
-                    end
-                    
-                    CreateTween(self.frame, {Size = UDim2.new(1, -8, 0, totalHeight)}, 0.2)
-                end
-                
-                contentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-                    section:UpdateSize()
-                end)
-                
                 -- Add Label
-                function section:AddLabel(options)
+                function Section:addLabel(options)
                     options = options or {}
                     
-                    local label = {
-                        text = options.text or "Label",
+                    local labelText = options.text or "Label"
+                    
+                    local label = Instance.new("TextLabel")
+                    label.Size = UDim2.new(1, 0, 0, 20)
+                    label.BackgroundTransparency = 1
+                    label.Text = labelText
+                    label.TextColor3 = Library.theme.SubText
+                    label.TextSize = 13
+                    label.Font = Enum.Font.Gotham
+                    label.TextXAlignment = Enum.TextXAlignment.Left
+                    label.TextWrapped = true
+                    label.Parent = sectionContent
+                    label.AutomaticSize = Enum.AutomaticSize.Y
+                    
+                    local labelObj = {
+                        element = label,
                         type = "label"
                     }
                     
-                    label.frame = Instance.new("Frame")
-                    label.frame.Size = UDim2.new(1, 0, 0, 20)
-                    label.frame.BackgroundTransparency = 1
-                    label.frame.Parent = section.content
-                    
-                    label.textLabel = Instance.new("TextLabel")
-                    label.textLabel.Size = UDim2.new(1, 0, 1, 0)
-                    label.textLabel.BackgroundTransparency = 1
-                    label.textLabel.Text = label.text
-                    label.textLabel.TextColor3 = ui.theme.TextDark
-                    label.textLabel.TextSize = 12
-                    label.textLabel.Font = Enum.Font.Gotham
-                    label.textLabel.TextXAlignment = Enum.TextXAlignment.Left
-                    label.textLabel.Parent = label.frame
-                    
-                    function label:SetText(text)
-                        self.text = text
-                        self.textLabel.Text = text
+                    function labelObj:setText(text)
+                        label.Text = text
                     end
                     
-                    table.insert(section.controls, label)
-                    return label
+                    table.insert(Section.elements, labelObj)
+                    return labelObj
                 end
                 
                 -- Add Toggle
-                function section:AddToggle(options)
+                function Section:addToggle(options)
                     options = options or {}
                     
-                    local toggle = {
-                        text = options.text or "Toggle",
-                        state = options.state or false,
-                        flag = options.flag or "Toggle_" .. tostring(#section.controls + 1),
-                        callback = options.callback,
-                        type = "toggle",
-                        events = {}
-                    }
+                    local toggleText = options.text or "Toggle"
+                    local defaultState = options.state or false
+                    local callback = options.callback
                     
-                    -- Load saved state
-                    if ui.autoSave and ui.savedConfig[toggle.flag] ~= nil then
-                        toggle.state = ui.savedConfig[toggle.flag]
-                    end
+                    local toggleFrame = Instance.new("Frame")
+                    toggleFrame.Size = UDim2.new(1, 0, 0, 30)
+                    toggleFrame.BackgroundTransparency = 1
+                    toggleFrame.Parent = sectionContent
                     
-                    toggle.frame = Instance.new("Frame")
-                    toggle.frame.Size = UDim2.new(1, 0, 0, 30)
-                    toggle.frame.BackgroundColor3 = ui.theme.Background
-                    toggle.frame.BorderSizePixel = 0
-                    toggle.frame.Parent = section.content
-                    
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = toggle.frame
-                    end
+                    local toggleLabel = Instance.new("TextLabel")
+                    toggleLabel.Size = UDim2.new(1, -50, 1, 0)
+                    toggleLabel.BackgroundTransparency = 1
+                    toggleLabel.Text = toggleText
+                    toggleLabel.TextColor3 = Library.theme.Text
+                    toggleLabel.TextSize = 13
+                    toggleLabel.Font = Enum.Font.Gotham
+                    toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    toggleLabel.Parent = toggleFrame
                     
                     local toggleButton = Instance.new("TextButton")
                     toggleButton.Size = UDim2.new(0, 40, 0, 20)
-                    toggleButton.Position = UDim2.new(1, -45, 0, 5)
-                    toggleButton.BackgroundColor3 = toggle.state and ui.theme.Success or ui.theme.Border
+                    toggleButton.Position = UDim2.new(1, -40, 0, 5)
+                    toggleButton.BackgroundColor3 = Library.theme.Background
                     toggleButton.BorderSizePixel = 0
                     toggleButton.Text = ""
-                    toggleButton.Parent = toggle.frame
+                    toggleButton.Parent = toggleFrame
                     
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 10)
-                        corner.Parent = toggleButton
+                    if Library.settings.rounding then
+                        createRound(toggleButton, 10)
                     end
+                    createStroke(toggleButton, Library.theme.Border, 1)
                     
                     local toggleIndicator = Instance.new("Frame")
                     toggleIndicator.Size = UDim2.new(0, 16, 0, 16)
-                    toggleIndicator.Position = toggle.state and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
-                    toggleIndicator.BackgroundColor3 = ui.theme.Text
+                    toggleIndicator.Position = UDim2.new(0, 2, 0, 2)
+                    toggleIndicator.BackgroundColor3 = Library.theme.SubText
                     toggleIndicator.BorderSizePixel = 0
                     toggleIndicator.Parent = toggleButton
                     
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(1, 0)
-                        corner.Parent = toggleIndicator
+                    if Library.settings.rounding then
+                        createRound(toggleIndicator, 8)
                     end
                     
-                    local toggleText = Instance.new("TextLabel")
-                    toggleText.Size = UDim2.new(1, -50, 1, 0)
-                    toggleText.Position = UDim2.new(0, 8, 0, 0)
-                    toggleText.BackgroundTransparency = 1
-                    toggleText.Text = toggle.text
-                    toggleText.TextColor3 = ui.theme.Text
-                    toggleText.TextSize = 12
-                    toggleText.Font = Enum.Font.GothamSemibold
-                    toggleText.TextXAlignment = Enum.TextXAlignment.Left
-                    toggleText.Parent = toggle.frame
+                    local Toggle = {
+                        element = toggleFrame,
+                        type = "toggle",
+                        state = defaultState,
+                        callback = callback,
+                        events = {}
+                    }
                     
-                    function toggle:setState(newState)
-                        self.state = newState
+                    function Toggle:setState(state)
+                        self.state = state
                         
-                        CreateTween(toggleButton, {BackgroundColor3 = newState and ui.theme.Success or ui.theme.Border}, 0.2)
-                        CreateTween(toggleIndicator, {Position = newState and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)}, 0.2)
-                        
-                        if ui.autoSave then
-                            Library:UpdateConfigValue(self.flag, newState)
+                        if state then
+                            tween(toggleButton, {BackgroundColor3 = Library.theme.Primary}, 0.2)
+                            tween(toggleIndicator, {
+                                Position = UDim2.new(1, -18, 0, 2),
+                                BackgroundColor3 = Library.theme.Text
+                            }, 0.2)
+                        else
+                            tween(toggleButton, {BackgroundColor3 = Library.theme.Background}, 0.2)
+                            tween(toggleIndicator, {
+                                Position = UDim2.new(0, 2, 0, 2),
+                                BackgroundColor3 = Library.theme.SubText
+                            }, 0.2)
                         end
                         
                         if self.callback then
-                            self.callback(newState)
+                            task.spawn(self.callback, state)
                         end
                         
-                        for _, event in pairs(self.events) do
-                            if event.name == "onToggle" then
-                                event.callback(newState)
-                            end
+                        if self.events.onToggle then
+                            task.spawn(self.events.onToggle, state)
+                        end
+                        
+                        -- Auto-save
+                        if Library.settings.autoSave then
+                            Library.flags[toggleText] = state
+                            saveConfig(Library.settings.configName, Library.flags)
                         end
                     end
                     
-                    function toggle:bindToEvent(eventName, callback)
-                        table.insert(self.events, {name = eventName, callback = callback})
+                    function Toggle:bindToEvent(eventName, func)
+                        self.events[eventName] = func
                         return self
                     end
                     
-                    function toggle:setTooltip(text)
-                        self.tooltip = text
-                        -- Tooltip implementation would go here
+                    function Toggle:setTooltip(text)
+                        -- Tooltip implementation
                         return self
                     end
                     
                     toggleButton.MouseButton1Click:Connect(function()
-                        toggle:setState(not toggle.state)
+                        Toggle:setState(not Toggle.state)
                     end)
                     
-                    table.insert(section.controls, toggle)
-                    table.insert(ui.controls, toggle)
-                    
-                    -- Apply saved state
-                    if toggle.state and toggle.callback then
-                        task.defer(toggle.callback, toggle.state)
+                    -- Load saved state
+                    if Library.settings.autoSave then
+                        local savedState = Library.flags[toggleText]
+                        if savedState ~= nil then
+                            Toggle:setState(savedState)
+                        else
+                            Toggle:setState(defaultState)
+                        end
+                    else
+                        Toggle:setState(defaultState)
                     end
                     
-                    return toggle
+                    Window.flags[toggleText] = Toggle
+                    table.insert(Section.elements, Toggle)
+                    return Toggle
                 end
                 
                 -- Add Button
-                function section:AddButton(options, callback)
+                function Section:addButton(options, callback)
                     options = options or {}
+                    
+                    local buttonText = options.text or "Button"
+                    local buttonStyle = options.style or "small"
                     callback = callback or options.callback
                     
-                    local button = {
-                        text = options.text or "Button",
-                        style = options.style or "small",
-                        callback = callback,
+                    local buttonHeight = buttonStyle == "large" and 35 or 28
+                    
+                    local button = Instance.new("TextButton")
+                    button.Size = UDim2.new(1, 0, 0, buttonHeight)
+                    button.BackgroundColor3 = Library.theme.Primary
+                    button.BorderSizePixel = 0
+                    button.Text = buttonText
+                    button.TextColor3 = Library.theme.Text
+                    button.TextSize = buttonStyle == "large" and 14 or 13
+                    button.Font = Enum.Font.GothamMedium
+                    button.Parent = sectionContent
+                    
+                    if Library.settings.rounding then
+                        createRound(button, 6)
+                    end
+                    
+                    local Button = {
+                        element = button,
                         type = "button",
+                        callback = callback,
                         events = {}
                     }
                     
-                    local height = button.style == "large" and 35 or 30
-                    
-                    button.frame = Instance.new("TextButton")
-                    button.frame.Size = UDim2.new(1, 0, 0, height)
-                    button.frame.BackgroundColor3 = ui.theme.Accent
-                    button.frame.BorderSizePixel = 0
-                    button.frame.Text = button.text
-                    button.frame.TextColor3 = ui.theme.Text
-                    button.frame.TextSize = button.style == "large" and 14 or 12
-                    button.frame.Font = Enum.Font.GothamSemibold
-                    button.frame.Parent = section.content
-                    
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = button.frame
-                    end
-                    
-                    function button:bindToEvent(eventName, callback)
-                        table.insert(self.events, {name = eventName, callback = callback})
+                    function Button:bindToEvent(eventName, func)
+                        self.events[eventName] = func
                         return self
                     end
                     
-                    function button:setTooltip(text)
-                        self.tooltip = text
+                    function Button:setTooltip(text)
                         return self
                     end
                     
-                    button.frame.MouseButton1Click:Connect(function()
-                        CreateTween(button.frame, {BackgroundColor3 = Color3.fromRGB(
-                            ui.theme.Accent.R * 255 * 0.8,
-                            ui.theme.Accent.G * 255 * 0.8,
-                            ui.theme.Accent.B * 255 * 0.8
-                        )}, 0.1)
+                    button.MouseButton1Click:Connect(function()
+                        tween(button, {BackgroundColor3 = Library.theme.Accent}, 0.1)
+                        tween(button, {BackgroundColor3 = Library.theme.Primary}, 0.2)
                         
-                        task.wait(0.1)
-                        CreateTween(button.frame, {BackgroundColor3 = ui.theme.Accent}, 0.1)
-                        
-                        if button.callback then
-                            button.callback()
+                        if callback then
+                            task.spawn(callback)
                         end
                         
-                        for _, event in pairs(button.events) do
-                            if event.name == "onClick" then
-                                event.callback()
-                            end
+                        if Button.events.onClick then
+                            task.spawn(Button.events.onClick)
                         end
                     end)
                     
-                    table.insert(section.controls, button)
-                    return button
+                    button.MouseEnter:Connect(function()
+                        tween(button, {BackgroundColor3 = Library.theme.Accent}, 0.2)
+                    end)
+                    
+                    button.MouseLeave:Connect(function()
+                        tween(button, {BackgroundColor3 = Library.theme.Primary}, 0.2)
+                    end)
+                    
+                    table.insert(Section.elements, Button)
+                    return Button
                 end
                 
                 -- Add Slider
-                function section:AddSlider(options, callback)
+                function Section:addSlider(options, callback)
                     options = options or {}
+                    
+                    local sliderText = options.text or "Slider"
+                    local min = options.min or 0
+                    local max = options.max or 100
+                    local step = options.step or 1
+                    local defaultValue = options.val or min
                     callback = callback or options.callback
                     
-                    local slider = {
-                        text = options.text or "Slider",
-                        min = options.min or 0,
-                        max = options.max or 100,
-                        step = options.step or 1,
-                        value = options.val or options.value or options.min or 0,
-                        flag = options.flag or "Slider_" .. tostring(#section.controls + 1),
-                        callback = callback,
-                        type = "slider",
-                        dragging = false
-                    }
+                    local sliderFrame = Instance.new("Frame")
+                    sliderFrame.Size = UDim2.new(1, 0, 0, 45)
+                    sliderFrame.BackgroundTransparency = 1
+                    sliderFrame.Parent = sectionContent
                     
-                    -- Load saved value
-                    if ui.autoSave and ui.savedConfig[slider.flag] ~= nil then
-                        slider.value = ui.savedConfig[slider.flag]
-                    end
-                    
-                    slider.frame = Instance.new("Frame")
-                    slider.frame.Size = UDim2.new(1, 0, 0, 45)
-                    slider.frame.BackgroundColor3 = ui.theme.Background
-                    slider.frame.BorderSizePixel = 0
-                    slider.frame.Parent = section.content
-                    
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = slider.frame
-                    end
-                    
-                    local sliderText = Instance.new("TextLabel")
-                    sliderText.Size = UDim2.new(1, -60, 0, 18)
-                    sliderText.Position = UDim2.new(0, 8, 0, 5)
-                    sliderText.BackgroundTransparency = 1
-                    sliderText.Text = slider.text
-                    sliderText.TextColor3 = ui.theme.Text
-                    sliderText.TextSize = 12
-                    sliderText.Font = Enum.Font.GothamSemibold
-                    sliderText.TextXAlignment = Enum.TextXAlignment.Left
-                    sliderText.Parent = slider.frame
+                    local sliderLabel = Instance.new("TextLabel")
+                    sliderLabel.Size = UDim2.new(0.7, 0, 0, 20)
+                    sliderLabel.BackgroundTransparency = 1
+                    sliderLabel.Text = sliderText
+                    sliderLabel.TextColor3 = Library.theme.Text
+                    sliderLabel.TextSize = 13
+                    sliderLabel.Font = Enum.Font.Gotham
+                    sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    sliderLabel.Parent = sliderFrame
                     
                     local sliderValue = Instance.new("TextLabel")
-                    sliderValue.Size = UDim2.new(0, 50, 0, 18)
-                    sliderValue.Position = UDim2.new(1, -55, 0, 5)
+                    sliderValue.Size = UDim2.new(0.3, 0, 0, 20)
+                    sliderValue.Position = UDim2.new(0.7, 0, 0, 0)
                     sliderValue.BackgroundTransparency = 1
-                    sliderValue.Text = tostring(slider.value)
-                    sliderValue.TextColor3 = ui.theme.Accent
-                    sliderValue.TextSize = 12
-                    sliderValue.Font = Enum.Font.GothamBold
+                    sliderValue.Text = tostring(defaultValue)
+                    sliderValue.TextColor3 = Library.theme.Primary
+                    sliderValue.TextSize = 13
+                    sliderValue.Font = Enum.Font.GothamMedium
                     sliderValue.TextXAlignment = Enum.TextXAlignment.Right
-                    sliderValue.Parent = slider.frame
+                    sliderValue.Parent = sliderFrame
                     
-                    local sliderTrack = Instance.new("Frame")
-                    sliderTrack.Size = UDim2.new(1, -16, 0, 4)
-                    sliderTrack.Position = UDim2.new(0, 8, 1, -12)
-                    sliderTrack.BackgroundColor3 = ui.theme.Border
-                    sliderTrack.BorderSizePixel = 0
-                    sliderTrack.Parent = slider.frame
+                    local sliderBar = Instance.new("Frame")
+                    sliderBar.Size = UDim2.new(1, 0, 0, 6)
+                    sliderBar.Position = UDim2.new(0, 0, 0, 30)
+                    sliderBar.BackgroundColor3 = Library.theme.Background
+                    sliderBar.BorderSizePixel = 0
+                    sliderBar.Parent = sliderFrame
                     
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(1, 0)
-                        corner.Parent = sliderTrack
+                    if Library.settings.rounding then
+                        createRound(sliderBar, 3)
                     end
                     
                     local sliderFill = Instance.new("Frame")
-                    sliderFill.Size = UDim2.new((slider.value - slider.min) / (slider.max - slider.min), 0, 1, 0)
-                    sliderFill.BackgroundColor3 = ui.theme.Accent
+                    sliderFill.Size = UDim2.new(0, 0, 1, 0)
+                    sliderFill.BackgroundColor3 = Library.theme.Primary
                     sliderFill.BorderSizePixel = 0
-                    sliderFill.Parent = sliderTrack
+                    sliderFill.Parent = sliderBar
                     
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(1, 0)
-                        corner.Parent = sliderFill
+                    if Library.settings.rounding then
+                        createRound(sliderFill, 3)
                     end
                     
-                    local sliderButton = Instance.new("TextButton")
-                    sliderButton.Size = UDim2.new(0, 12, 0, 12)
-                    sliderButton.Position = UDim2.new((slider.value - slider.min) / (slider.max - slider.min), -6, 0.5, -6)
-                    sliderButton.BackgroundColor3 = ui.theme.Text
-                    sliderButton.BorderSizePixel = 0
-                    sliderButton.Text = ""
-                    sliderButton.Parent = sliderTrack
+                    local Slider = {
+                        element = sliderFrame,
+                        type = "slider",
+                        value = defaultValue,
+                        callback = callback
+                    }
                     
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(1, 0)
-                        corner.Parent = sliderButton
-                    end
-                    
-                    function slider:setValue(newValue)
-                        newValue = math.clamp(newValue, self.min, self.max)
-                        newValue = Round(newValue / self.step) * self.step
-                        newValue = Round(newValue, 2)
+                    function Slider:setValue(value)
+                        value = math.clamp(value, min, max)
+                        value = math.floor((value - min) / step + 0.5) * step + min
+                        self.value = value
                         
-                        self.value = newValue
-                        sliderValue.Text = tostring(newValue)
+                        local percentage = (value - min) / (max - min)
+                        sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
+                        sliderValue.Text = string.format("%.2f", value)
                         
-                        local percent = (newValue - self.min) / (self.max - self.min)
-                        CreateTween(sliderFill, {Size = UDim2.new(percent, 0, 1, 0)}, 0.1)
-                        CreateTween(sliderButton, {Position = UDim2.new(percent, -6, 0.5, -6)}, 0.1)
-                        
-                        if ui.autoSave then
-                            Library:UpdateConfigValue(self.flag, newValue)
+                        if callback then
+                            task.spawn(callback, value)
                         end
                         
-                        if self.callback then
-                            self.callback(newValue)
+                        if Library.settings.autoSave then
+                            Library.flags[sliderText] = value
+                            saveConfig(Library.settings.configName, Library.flags)
                         end
                     end
                     
-                    function slider:setTooltip(text)
-                        self.tooltip = text
+                    function Slider:setTooltip(text)
                         return self
                     end
                     
-                    local function updateSlider(input)
-                        local relativeX = math.clamp((input.Position.X - sliderTrack.AbsolutePosition.X) / sliderTrack.AbsoluteSize.X, 0, 1)
-                        local newValue = slider.min + ((slider.max - slider.min) * relativeX)
-                        slider:setValue(newValue)
-                    end
+                    local dragging = false
                     
-                    sliderButton.MouseButton1Down:Connect(function()
-                        slider.dragging = true
-                    end)
-                    
-                    UserInputService.InputEnded:Connect(function(input)
+                    sliderBar.InputBegan:Connect(function(input)
                         if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                            slider.dragging = false
+                            dragging = true
+                            
+                            local function update()
+                                local mousePos = UserInputService:GetMouseLocation()
+                                local barPos = sliderBar.AbsolutePosition.X
+                                local barSize = sliderBar.AbsoluteSize.X
+                                local percentage = math.clamp((mousePos.X - barPos) / barSize, 0, 1)
+                                local value = min + (max - min) * percentage
+                                Slider:setValue(value)
+                            end
+                            
+                            update()
+                            
+                            local connection
+                            connection = UserInputService.InputChanged:Connect(function(input)
+                                if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+                                    update()
+                                end
+                            end)
+                            
+                            local endConnection
+                            endConnection = UserInputService.InputEnded:Connect(function(input)
+                                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                                    dragging = false
+                                    connection:Disconnect()
+                                    endConnection:Disconnect()
+                                end
+                            end)
                         end
                     end)
                     
-                    UserInputService.InputChanged:Connect(function(input)
-                        if slider.dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                            updateSlider(input)
+                    -- Load saved value
+                    if Library.settings.autoSave then
+                        local savedValue = Library.flags[sliderText]
+                        if savedValue then
+                            Slider:setValue(savedValue)
+                        else
+                            Slider:setValue(defaultValue)
                         end
-                    end)
-                    
-                    sliderTrack.InputBegan:Connect(function(input)
-                        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                            updateSlider(input)
-                        end
-                    end)
-                    
-                    table.insert(section.controls, slider)
-                    
-                    -- Apply saved value
-                    if slider.callback then
-                        task.defer(slider.callback, slider.value)
+                    else
+                        Slider:setValue(defaultValue)
                     end
                     
-                    return slider
-                end
-                
-                -- Add Color Picker
-                function section:AddColorPicker(options, callback)
-                    options = options or {}
-                    callback = callback or options.callback
-                    
-                    local picker = {
-                        text = options.text or "Color",
-                        color = options.color or Color3.fromRGB(255, 255, 255),
-                        flag = options.flag or "ColorPicker_" .. tostring(#section.controls + 1),
-                        callback = callback,
-                        type = "colorpicker"
-                    }
-                    
-                    -- Load saved color
-                    if ui.autoSave and ui.savedConfig[picker.flag] ~= nil then
-                        local saved = ui.savedConfig[picker.flag]
-                        picker.color = Color3.fromRGB(saved.r, saved.g, saved.b)
-                    end
-                    
-                    picker.frame = Instance.new("Frame")
-                    picker.frame.Size = UDim2.new(1, 0, 0, 30)
-                    picker.frame.BackgroundColor3 = ui.theme.Background
-                    picker.frame.BorderSizePixel = 0
-                    picker.frame.Parent = section.content
-                    
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = picker.frame
-                    end
-                    
-                    local pickerText = Instance.new("TextLabel")
-                    pickerText.Size = UDim2.new(1, -70, 1, 0)
-                    pickerText.Position = UDim2.new(0, 8, 0, 0)
-                    pickerText.BackgroundTransparency = 1
-                    pickerText.Text = picker.text
-                    pickerText.TextColor3 = ui.theme.Text
-                    pickerText.TextSize = 12
-                    pickerText.Font = Enum.Font.GothamSemibold
-                    pickerText.TextXAlignment = Enum.TextXAlignment.Left
-                    pickerText.Parent = picker.frame
-                    
-                    local colorDisplay = Instance.new("TextButton")
-                    colorDisplay.Size = UDim2.new(0, 50, 0, 20)
-                    colorDisplay.Position = UDim2.new(1, -58, 0, 5)
-                    colorDisplay.BackgroundColor3 = picker.color
-                    colorDisplay.BorderSizePixel = 0
-                    colorDisplay.Text = ""
-                    colorDisplay.Parent = picker.frame
-                    
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = colorDisplay
-                    end
-                    
-                    local stroke = Instance.new("UIStroke")
-                    stroke.Color = ui.theme.Border
-                    stroke.Thickness = 1
-                    stroke.Parent = colorDisplay
-                    
-                    function picker:setColor(newColor)
-                        self.color = newColor
-                        colorDisplay.BackgroundColor3 = newColor
-                        
-                        if ui.autoSave then
-                            Library:UpdateConfigValue(self.flag, {
-                                r = math.floor(newColor.R * 255),
-                                g = math.floor(newColor.G * 255),
-                                b = math.floor(newColor.B * 255)
-                            })
-                        end
-                        
-                        if self.callback then
-                            self.callback(newColor)
-                        end
-                    end
-                    
-                    -- Simple color picker (cycle through preset colors)
-                    local presetColors = {
-                        Color3.fromRGB(255, 255, 255),
-                        Color3.fromRGB(255, 0, 0),
-                        Color3.fromRGB(0, 255, 0),
-                        Color3.fromRGB(0, 0, 255),
-                        Color3.fromRGB(255, 255, 0),
-                        Color3.fromRGB(255, 0, 255),
-                        Color3.fromRGB(0, 255, 255)
-                    }
-                    
-                    local currentIndex = 1
-                    colorDisplay.MouseButton1Click:Connect(function()
-                        currentIndex = currentIndex % #presetColors + 1
-                        picker:setColor(presetColors[currentIndex])
-                    end)
-                    
-                    table.insert(section.controls, picker)
-                    
-                    -- Apply saved color
-                    if picker.callback then
-                        task.defer(picker.callback, picker.color)
-                    end
-                    
-                    return picker
+                    table.insert(Section.elements, Slider)
+                    return Slider
                 end
                 
                 -- Add Textbox
-                function section:AddTextbox(options)
+                function Section:addTextbox(options)
                     options = options or {}
                     
-                    local textbox = {
-                        text = options.text or "Textbox",
-                        placeholder = options.placeholder or "",
-                        flag = options.flag or "Textbox_" .. tostring(#section.controls + 1),
+                    local textboxText = options.text or "Textbox"
+                    local placeholder = options.placeholder or "Enter text..."
+                    
+                    local textboxFrame = Instance.new("Frame")
+                    textboxFrame.Size = UDim2.new(1, 0, 0, 55)
+                    textboxFrame.BackgroundTransparency = 1
+                    textboxFrame.Parent = sectionContent
+                    
+                    local textboxLabel = Instance.new("TextLabel")
+                    textboxLabel.Size = UDim2.new(1, 0, 0, 20)
+                    textboxLabel.BackgroundTransparency = 1
+                    textboxLabel.Text = textboxText
+                    textboxLabel.TextColor3 = Library.theme.Text
+                    textboxLabel.TextSize = 13
+                    textboxLabel.Font = Enum.Font.Gotham
+                    textboxLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    textboxLabel.Parent = textboxFrame
+                    
+                    local textboxInput = Instance.new("TextBox")
+                    textboxInput.Size = UDim2.new(1, 0, 0, 28)
+                    textboxInput.Position = UDim2.new(0, 0, 0, 25)
+                    textboxInput.BackgroundColor3 = Library.theme.Background
+                    textboxInput.BorderSizePixel = 0
+                    textboxInput.PlaceholderText = placeholder
+                    textboxInput.PlaceholderColor3 = Library.theme.SubText
+                    textboxInput.Text = ""
+                    textboxInput.TextColor3 = Library.theme.Text
+                    textboxInput.TextSize = 12
+                    textboxInput.Font = Enum.Font.Gotham
+                    textboxInput.ClearTextOnFocus = false
+                    textboxInput.Parent = textboxFrame
+                    
+                    if Library.settings.rounding then
+                        createRound(textboxInput, 6)
+                    end
+                    createStroke(textboxInput, Library.theme.Border, 1)
+                    
+                    local textboxPadding = Instance.new("UIPadding")
+                    textboxPadding.PaddingLeft = UDim.new(0, 8)
+                    textboxPadding.Parent = textboxInput
+                    
+                    local Textbox = {
+                        element = textboxFrame,
                         type = "textbox",
                         events = {}
                     }
                     
-                    textbox.frame = Instance.new("Frame")
-                    textbox.frame.Size = UDim2.new(1, 0, 0, 55)
-                    textbox.frame.BackgroundColor3 = ui.theme.Background
-                    textbox.frame.BorderSizePixel = 0
-                    textbox.frame.Parent = section.content
-                    
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = textbox.frame
-                    end
-                    
-                    local textboxLabel = Instance.new("TextLabel")
-                    textboxLabel.Size = UDim2.new(1, -16, 0, 18)
-                    textboxLabel.Position = UDim2.new(0, 8, 0, 5)
-                    textboxLabel.BackgroundTransparency = 1
-                    textboxLabel.Text = textbox.text
-                    textboxLabel.TextColor3 = ui.theme.Text
-                    textboxLabel.TextSize = 12
-                    textboxLabel.Font = Enum.Font.GothamSemibold
-                    textboxLabel.TextXAlignment = Enum.TextXAlignment.Left
-                    textboxLabel.Parent = textbox.frame
-                    
-                    textbox.input = Instance.new("TextBox")
-                    textbox.input.Size = UDim2.new(1, -16, 0, 25)
-                    textbox.input.Position = UDim2.new(0, 8, 0, 25)
-                    textbox.input.BackgroundColor3 = ui.theme.Secondary
-                    textbox.input.BorderSizePixel = 0
-                    textbox.input.Text = ""
-                    textbox.input.PlaceholderText = textbox.placeholder
-                    textbox.input.TextColor3 = ui.theme.Text
-                    textbox.input.PlaceholderColor3 = ui.theme.TextDark
-                    textbox.input.TextSize = 11
-                    textbox.input.Font = Enum.Font.Gotham
-                    textbox.input.ClearTextOnFocus = false
-                    textbox.input.Parent = textbox.frame
-                    
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = textbox.input
-                    end
-                    
-                    local inputStroke = Instance.new("UIStroke")
-                    inputStroke.Color = ui.theme.Border
-                    inputStroke.Thickness = 1
-                    inputStroke.Parent = textbox.input
-                    
-                    local inputPadding = Instance.new("UIPadding")
-                    inputPadding.PaddingLeft = UDim.new(0, 8)
-                    inputPadding.PaddingRight = UDim.new(0, 8)
-                    inputPadding.Parent = textbox.input
-                    
-                    function textbox:bindToEvent(eventName, callback)
-                        table.insert(self.events, {name = eventName, callback = callback})
-                        
+                    function Textbox:bindToEvent(eventName, func)
                         if eventName == "onFocusLost" then
-                            self.input.FocusLost:Connect(function()
-                                callback(self.input.Text)
-                            end)
-                        elseif eventName == "onChange" then
-                            self.input:GetPropertyChangedSignal("Text"):Connect(function()
-                                callback(self.input.Text)
+                            textboxInput.FocusLost:Connect(function()
+                                task.spawn(func, textboxInput.Text)
                             end)
                         end
-                        
                         return self
                     end
                     
-                    table.insert(section.controls, textbox)
-                    return textbox
+                    function Textbox:getText()
+                        return textboxInput.Text
+                    end
+                    
+                    function Textbox:setText(text)
+                        textboxInput.Text = text
+                    end
+                    
+                    textboxInput.Focused:Connect(function()
+                        tween(textboxInput, {BackgroundColor3 = Library.theme.Secondary}, 0.2)
+                    end)
+                    
+                    textboxInput.FocusLost:Connect(function()
+                        tween(textboxInput, {BackgroundColor3 = Library.theme.Background}, 0.2)
+                    end)
+                    
+                    table.insert(Section.elements, Textbox)
+                    return Textbox
+                end
+                
+                -- Add Color Picker
+                function Section:addColorPicker(options, callback)
+                    options = options or {}
+                    
+                    local pickerText = options.text or "Color Picker"
+                    local defaultColor = options.color or Color3.fromRGB(255, 0, 0)
+                    callback = callback or options.callback
+                    
+                    local pickerFrame = Instance.new("Frame")
+                    pickerFrame.Size = UDim2.new(1, 0, 0, 30)
+                    pickerFrame.BackgroundTransparency = 1
+                    pickerFrame.Parent = sectionContent
+                    
+                    local pickerLabel = Instance.new("TextLabel")
+                    pickerLabel.Size = UDim2.new(1, -40, 1, 0)
+                    pickerLabel.BackgroundTransparency = 1
+                    pickerLabel.Text = pickerText
+                    pickerLabel.TextColor3 = Library.theme.Text
+                    pickerLabel.TextSize = 13
+                    pickerLabel.Font = Enum.Font.Gotham
+                    pickerLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    pickerLabel.Parent = pickerFrame
+                    
+                    local pickerButton = Instance.new("TextButton")
+                    pickerButton.Size = UDim2.new(0, 30, 0, 20)
+                    pickerButton.Position = UDim2.new(1, -30, 0, 5)
+                    pickerButton.BackgroundColor3 = defaultColor
+                    pickerButton.BorderSizePixel = 0
+                    pickerButton.Text = ""
+                    pickerButton.Parent = pickerFrame
+                    
+                    if Library.settings.rounding then
+                        createRound(pickerButton, 6)
+                    end
+                    createStroke(pickerButton, Library.theme.Border, 1)
+                    
+                    local ColorPicker = {
+                        element = pickerFrame,
+                        type = "colorpicker",
+                        color = defaultColor,
+                        callback = callback
+                    }
+                    
+                    function ColorPicker:setColor(color)
+                        self.color = color
+                        pickerButton.BackgroundColor3 = color
+                        
+                        if callback then
+                            task.spawn(callback, color)
+                        end
+                    end
+                    
+                    pickerButton.MouseButton1Click:Connect(function()
+                        -- Simple color picker (RGB sliders would go here in full implementation)
+                        Library:notify({
+                            title = "Color Picker",
+                            message = "Full color picker UI coming soon!",
+                            duration = 2
+                        })
+                    end)
+                    
+                    table.insert(Section.elements, ColorPicker)
+                    return ColorPicker
                 end
                 
                 -- Add Hotkey
-                function section:AddHotkey(options)
+                function Section:addHotkey(options)
                     options = options or {}
                     
-                    local hotkey = {
-                        text = options.text or "Hotkey",
-                        key = options.key,
-                        flag = options.flag or "Hotkey_" .. tostring(#section.controls + 1),
-                        linkedControl = nil,
-                        type = "hotkey",
-                        listening = false
-                    }
+                    local hotkeyText = options.text or "Hotkey"
+                    local defaultKey = options.key or Enum.KeyCode.None
                     
-                    -- Load saved hotkey
-                    if ui.autoSave and ui.savedConfig[hotkey.flag] ~= nil then
-                        hotkey.key = Enum.KeyCode[ui.savedConfig[hotkey.flag]]
-                    end
+                    local hotkeyFrame = Instance.new("Frame")
+                    hotkeyFrame.Size = UDim2.new(1, 0, 0, 30)
+                    hotkeyFrame.BackgroundTransparency = 1
+                    hotkeyFrame.Parent = sectionContent
                     
-                    hotkey.frame = Instance.new("Frame")
-                    hotkey.frame.Size = UDim2.new(1, 0, 0, 30)
-                    hotkey.frame.BackgroundColor3 = ui.theme.Background
-                    hotkey.frame.BorderSizePixel = 0
-                    hotkey.frame.Parent = section.content
-                    
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = hotkey.frame
-                    end
-                    
-                    local hotkeyText = Instance.new("TextLabel")
-                    hotkeyText.Size = UDim2.new(1, -80, 1, 0)
-                    hotkeyText.Position = UDim2.new(0, 8, 0, 0)
-                    hotkeyText.BackgroundTransparency = 1
-                    hotkeyText.Text = hotkey.text
-                    hotkeyText.TextColor3 = ui.theme.Text
-                    hotkeyText.TextSize = 12
-                    hotkeyText.Font = Enum.Font.GothamSemibold
-                    hotkeyText.TextXAlignment = Enum.TextXAlignment.Left
-                    hotkeyText.Parent = hotkey.frame
+                    local hotkeyLabel = Instance.new("TextLabel")
+                    hotkeyLabel.Size = UDim2.new(1, -60, 1, 0)
+                    hotkeyLabel.BackgroundTransparency = 1
+                    hotkeyLabel.Text = hotkeyText
+                    hotkeyLabel.TextColor3 = Library.theme.Text
+                    hotkeyLabel.TextSize = 13
+                    hotkeyLabel.Font = Enum.Font.Gotham
+                    hotkeyLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    hotkeyLabel.Parent = hotkeyFrame
                     
                     local hotkeyButton = Instance.new("TextButton")
-                    hotkeyButton.Size = UDim2.new(0, 70, 0, 22)
-                    hotkeyButton.Position = UDim2.new(1, -75, 0, 4)
-                    hotkeyButton.BackgroundColor3 = ui.theme.Secondary
+                    hotkeyButton.Size = UDim2.new(0, 50, 0, 22)
+                    hotkeyButton.Position = UDim2.new(1, -50, 0, 4)
+                    hotkeyButton.BackgroundColor3 = Library.theme.Background
                     hotkeyButton.BorderSizePixel = 0
-                    hotkeyButton.Text = hotkey.key and hotkey.key.Name or "None"
-                    hotkeyButton.TextColor3 = ui.theme.Text
-                    hotkeyButton.TextSize = 10
-                    hotkeyButton.Font = Enum.Font.GothamSemibold
-                    hotkeyButton.Parent = hotkey.frame
+                    hotkeyButton.Text = defaultKey.Name
+                    hotkeyButton.TextColor3 = Library.theme.SubText
+                    hotkeyButton.TextSize = 11
+                    hotkeyButton.Font = Enum.Font.Gotham
+                    hotkeyButton.Parent = hotkeyFrame
                     
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = hotkeyButton
+                    if Library.settings.rounding then
+                        createRound(hotkeyButton, 5)
+                    end
+                    createStroke(hotkeyButton, Library.theme.Border, 1)
+                    
+                    local Hotkey = {
+                        element = hotkeyFrame,
+                        type = "hotkey",
+                        key = defaultKey,
+                        linkedControl = nil
+                    }
+                    
+                    function Hotkey:setHotkey(keyCode)
+                        self.key = keyCode
+                        hotkeyButton.Text = keyCode.Name
                     end
                     
-                    function hotkey:setHotkey(key)
-                        self.key = key
-                        hotkeyButton.Text = key.Name
-                        
-                        if ui.autoSave then
-                            Library:UpdateConfigValue(self.flag, key.Name)
-                        end
-                    end
-                    
-                    function hotkey:linkToControl(control)
+                    function Hotkey:linkToControl(control)
                         self.linkedControl = control
                     end
                     
-                    function hotkey:setTooltip(text)
-                        self.tooltip = text
+                    function Hotkey:setTooltip(text)
                         return self
                     end
                     
+                    local listening = false
+                    
                     hotkeyButton.MouseButton1Click:Connect(function()
-                        hotkey.listening = true
+                        listening = true
                         hotkeyButton.Text = "..."
-                        hotkeyButton.BackgroundColor3 = ui.theme.Accent
+                        
+                        local connection
+                        connection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                            if input.UserInputType == Enum.UserInputType.Keyboard then
+                                listening = false
+                                Hotkey:setHotkey(input.KeyCode)
+                                connection:Disconnect()
+                            end
+                        end)
                     end)
                     
                     UserInputService.InputBegan:Connect(function(input, gameProcessed)
-                        if gameProcessed then return end
-                        
-                        if hotkey.listening and input.UserInputType == Enum.UserInputType.Keyboard then
-                            hotkey:setHotkey(input.KeyCode)
-                            hotkey.listening = false
-                            hotkeyButton.BackgroundColor3 = ui.theme.Secondary
-                        end
-                        
-                        if not hotkey.listening and hotkey.key and input.KeyCode == hotkey.key then
-                            if hotkey.linkedControl and hotkey.linkedControl.type == "toggle" then
-                                hotkey.linkedControl:setState(not hotkey.linkedControl.state)
+                        if not gameProcessed and input.KeyCode == Hotkey.key and Hotkey.linkedControl then
+                            if Hotkey.linkedControl.type == "toggle" then
+                                Hotkey.linkedControl:setState(not Hotkey.linkedControl.state)
                             end
                         end
                     end)
                     
-                    table.insert(section.controls, hotkey)
-                    return hotkey
+                    table.insert(Section.elements, Hotkey)
+                    return Hotkey
                 end
                 
-                -- Add Dropdown
-                function section:AddDropdown(options)
-                    options = options or {}
-                    
-                    local dropdown = {
-                        text = options.text or "Dropdown",
-                        items = options.items or {},
-                        selected = options.selected or (options.items and options.items[1]),
-                        flag = options.flag or "Dropdown_" .. tostring(#section.controls + 1),
-                        callback = options.callback,
-                        type = "dropdown",
-                        open = false
-                    }
-                    
-                    -- Load saved selection
-                    if ui.autoSave and ui.savedConfig[dropdown.flag] ~= nil then
-                        dropdown.selected = ui.savedConfig[dropdown.flag]
-                    end
-                    
-                    dropdown.frame = Instance.new("Frame")
-                    dropdown.frame.Size = UDim2.new(1, 0, 0, 55)
-                    dropdown.frame.BackgroundColor3 = ui.theme.Background
-                    dropdown.frame.BorderSizePixel = 0
-                    dropdown.frame.Parent = section.content
-                    
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = dropdown.frame
-                    end
-                    
-                    local dropdownLabel = Instance.new("TextLabel")
-                    dropdownLabel.Size = UDim2.new(1, -16, 0, 18)
-                    dropdownLabel.Position = UDim2.new(0, 8, 0, 5)
-                    dropdownLabel.BackgroundTransparency = 1
-                    dropdownLabel.Text = dropdown.text
-                    dropdownLabel.TextColor3 = ui.theme.Text
-                    dropdownLabel.TextSize = 12
-                    dropdownLabel.Font = Enum.Font.GothamSemibold
-                    dropdownLabel.TextXAlignment = Enum.TextXAlignment.Left
-                    dropdownLabel.Parent = dropdown.frame
-                    
-                    local dropdownButton = Instance.new("TextButton")
-                    dropdownButton.Size = UDim2.new(1, -16, 0, 25)
-                    dropdownButton.Position = UDim2.new(0, 8, 0, 25)
-                    dropdownButton.BackgroundColor3 = ui.theme.Secondary
-                    dropdownButton.BorderSizePixel = 0
-                    dropdownButton.Text = dropdown.selected or "Select..."
-                    dropdownButton.TextColor3 = ui.theme.Text
-                    dropdownButton.TextSize = 11
-                    dropdownButton.Font = Enum.Font.Gotham
-                    dropdownButton.Parent = dropdown.frame
-                    
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = dropdownButton
-                    end
-                    
-                    local dropdownStroke = Instance.new("UIStroke")
-                    dropdownStroke.Color = ui.theme.Border
-                    dropdownStroke.Thickness = 1
-                    dropdownStroke.Parent = dropdownButton
-                    
-                    local dropdownList = Instance.new("Frame")
-                    dropdownList.Size = UDim2.new(1, -16, 0, 0)
-                    dropdownList.Position = UDim2.new(0, 8, 0, 55)
-                    dropdownList.BackgroundColor3 = ui.theme.Secondary
-                    dropdownList.BorderSizePixel = 0
-                    dropdownList.Visible = false
-                    dropdownList.ZIndex = 10
-                    dropdownList.Parent = dropdown.frame
-                    
-                    if ui.rounding then
-                        local corner = Instance.new("UICorner")
-                        corner.CornerRadius = UDim.new(0, 4)
-                        corner.Parent = dropdownList
-                    end
-                    
-                    local listStroke = Instance.new("UIStroke")
-                    listStroke.Color = ui.theme.Border
-                    listStroke.Thickness = 1
-                    listStroke.Parent = dropdownList
-                    
-                    local listLayout = Instance.new("UIListLayout")
-                    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-                    listLayout.Parent = dropdownList
-                    
-                    function dropdown:setSelected(item)
-                        self.selected = item
-                        dropdownButton.Text = item
-                        
-                        if ui.autoSave then
-                            Library:UpdateConfigValue(self.flag, item)
-                        end
-                        
-                        if self.callback then
-                            self.callback(item)
-                        end
-                    end
-                    
-                    function dropdown:updateItems(items)
-                        self.items = items
-                        
-                        for _, child in pairs(dropdownList:GetChildren()) do
-                            if child:IsA("TextButton") then
-                                child:Destroy()
-                            end
-                        end
-                        
-                        for _, item in pairs(items) do
-                            local itemButton = Instance.new("TextButton")
-                            itemButton.Size = UDim2.new(1, 0, 0, 25)
-                            itemButton.BackgroundColor3 = ui.theme.Secondary
-                            itemButton.BorderSizePixel = 0
-                            itemButton.Text = item
-                            itemButton.TextColor3 = ui.theme.Text
-                            itemButton.TextSize = 11
-                            itemButton.Font = Enum.Font.Gotham
-                            itemButton.Parent = dropdownList
-                            
-                            itemButton.MouseEnter:Connect(function()
-                                itemButton.BackgroundColor3 = ui.theme.Accent
-                            end)
-                            
-                            itemButton.MouseLeave:Connect(function()
-                                itemButton.BackgroundColor3 = ui.theme.Secondary
-                            end)
-                            
-                            itemButton.MouseButton1Click:Connect(function()
-                                dropdown:setSelected(item)
-                                dropdown.open = false
-                                dropdownList.Visible = false
-                                CreateTween(dropdown.frame, {Size = UDim2.new(1, 0, 0, 55)}, 0.2)
-                            end)
-                        end
-                        
-                        dropdownList.Size = UDim2.new(1, -16, 0, #items * 25)
-                    end
-                    
-                    dropdown:updateItems(dropdown.items)
-                    
-                    dropdownButton.MouseButton1Click:Connect(function()
-                        dropdown.open = not dropdown.open
-                        dropdownList.Visible = dropdown.open
-                        
-                        if dropdown.open then
-                            CreateTween(dropdown.frame, {Size = UDim2.new(1, 0, 0, 55 + #dropdown.items * 25 + 5)}, 0.2)
-                        else
-                            CreateTween(dropdown.frame, {Size = UDim2.new(1, 0, 0, 55)}, 0.2)
-                        end
-                    end)
-                    
-                    table.insert(section.controls, dropdown)
-                    
-                    -- Apply saved selection
-                    if dropdown.callback and dropdown.selected then
-                        task.defer(dropdown.callback, dropdown.selected)
-                    end
-                    
-                    return dropdown
-                end
-                
-                table.insert(menu.sections, section)
-                return section
+                table.insert(Menu.sections, Section)
+                return Section
             end
             
-            table.insert(window.menus, menu)
-            return menu
+            -- Show first menu by default
+            if #Window.menus == 0 then
+                menuContent.Visible = true
+                Menu.visible = true
+                menuButton.BackgroundColor3 = Library.theme.Primary
+                menuButton.TextColor3 = Library.theme.Text
+            end
+            
+            table.insert(Window.menus, Menu)
+            return Menu
         end
         
-        table.insert(ui.windows, window)
-        return window
+        -- Load saved configuration
+        if Library.settings.autoSave then
+            local savedConfig = loadConfig(Library.settings.configName)
+            if savedConfig then
+                Library.flags = savedConfig
+                Library:notify({
+                    title = "Config Loaded",
+                    message = "Previous settings restored",
+                    duration = 2
+                })
+            end
+        end
+        
+        table.insert(Library.windows, Window)
+        return Window
     end
     
-    -- Auto-save on exit
-    game:GetService("Players").LocalPlayer.AncestryChanged:Connect(function()
-        if ui.autoSave and ui.ConfigData then
-            Library:SaveConfig(ui.ConfigData)
-        end
-    end)
-    
-    return ui
+    return Library
 end
 
-return Library
+return DollarwareLib
