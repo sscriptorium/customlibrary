@@ -5286,6 +5286,5 @@ local Library do
     end
 end
 
-Library:Init()
 getgenv().Library = Library
 return Library
