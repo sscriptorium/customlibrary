@@ -5288,7 +5288,8 @@ local Library do
         
             ConfigsSection:Button({Name = "Save Config", Callback = function()
                 if ConfigSelected then
-                    Library:SaveConfig(ConfigSelected)
+                    local nameOnly = StringGSub(ConfigSelected, "%.json$", "")
+                    Library:SaveConfig(nameOnly)
                 end
             end})
         
