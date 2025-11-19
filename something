@@ -2,6 +2,14 @@
 -- [[https://hyperion.vip/]]
 -- [Modified to NeoAura Premium Edition with Config System]
 
+-- Prevent duplicate UI instances
+if getgenv().NeoAuraUIInstance then
+	pcall(function()
+		getgenv().NeoAuraUIInstance:Destroy()
+	end)
+	getgenv().NeoAuraUIInstance = nil
+end
+
 if not game:IsLoaded() then
 	game.Loaded:Wait()
 end
@@ -320,7 +328,7 @@ end
 function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 	local HyperWindow = {
 		Tabs = {},
-		Size = UDim2.new(0.230000004, 350, 0.25, 250),
+		Size = UDim2.new(0.200000004, 300, 0.22, 220),  -- Made UI smaller
 		Toggle = Enum.KeyCode.LeftControl
 	}
 
@@ -361,6 +369,9 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 	end)
 
 	HyperWindow.ScreenSource = NoHyperUI
+	
+	-- Store reference for reload cleanup
+	getgenv().NeoAuraUIInstance = NoHyperUI
 
 	NoHyperUI.Name = tostring("neoaura.protect.") .. tostring(math.random(1, 100)) .. tostring(Random.new():NextNumber(0.1, 0.9))
 	NoHyperUI.Parent = Core
@@ -1006,7 +1017,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Button.ZIndex = 7
 
 				UIAspectRatioConstraint.Parent = Button
-				UIAspectRatioConstraint.AspectRatio = 9.000
+				UIAspectRatioConstraint.AspectRatio = 7.000  -- Made buttons bigger (was 9.000)
 				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
 				Button_2.Name = "Button"
@@ -1058,7 +1069,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				TextLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				TextLabel.BorderSizePixel = 0
 				TextLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
-				TextLabel.Size = UDim2.new(0.899999976, 0, 0.5, 0)
+				TextLabel.Size = UDim2.new(0.899999976, 0, 0.6, 0)  -- Made text slightly bigger
 				TextLabel.ZIndex = 10
 				TextLabel.Font = Enum.Font.GothamMedium
 				TextLabel.Text = ButtonName
@@ -1115,7 +1126,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Toggle.ZIndex = 7
 
 				UIAspectRatioConstraint.Parent = Toggle
-				UIAspectRatioConstraint.AspectRatio = 9.000
+				UIAspectRatioConstraint.AspectRatio = 7.000  -- Made toggles bigger (was 9.000)
 				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
 				Text.Name = "Text"
@@ -1126,7 +1137,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Text.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Text.BorderSizePixel = 0
 				Text.Position = UDim2.new(0.0516665913, 0, 0.499999881, 0)
-				Text.Size = UDim2.new(0.998333275, 0, 0.444999993, 0)
+				Text.Size = UDim2.new(0.998333275, 0, 0.55, 0)  -- Made text bigger
 				Text.ZIndex = 7
 				Text.Font = Enum.Font.GothamMedium
 				Text.Text = ToggleName or "TOGGLE"
@@ -1145,7 +1156,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Ui.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Ui.BorderSizePixel = 0
 				Ui.Position = UDim2.new(0.950000107, 0, 0.500000417, 0)
-				Ui.Size = UDim2.new(0.649999976, 0, 0.649999976, 0)
+				Ui.Size = UDim2.new(0.75, 0, 0.75, 0)  -- Made toggle box bigger
 				Ui.SizeConstraint = Enum.SizeConstraint.RelativeYY
 				Ui.ZIndex = 7
 
@@ -1280,7 +1291,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Keybind.ZIndex = 7
 
 				UIAspectRatioConstraint.Parent = Keybind
-				UIAspectRatioConstraint.AspectRatio = 9.000
+				UIAspectRatioConstraint.AspectRatio = 7.000  -- Made keybinds bigger (was 9.000)
 				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
 				Text.Name = "Text"
@@ -1291,7 +1302,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Text.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Text.BorderSizePixel = 0
 				Text.Position = UDim2.new(0.0516665913, 0, 0.499999881, 0)
-				Text.Size = UDim2.new(0.998333275, 0, 0.444999993, 0)
+				Text.Size = UDim2.new(0.998333275, 0, 0.55, 0)  -- Made text bigger
 				Text.ZIndex = 7
 				Text.Font = Enum.Font.GothamMedium
 				Text.Text = KeybindName or "KEYBIND"
@@ -1310,7 +1321,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Bind.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Bind.BorderSizePixel = 0
 				Bind.Position = UDim2.new(0.950000226, 0, 0.500000417, 0)
-				Bind.Size = UDim2.new(0.177682102, 0, 0.649999976, 0)
+				Bind.Size = UDim2.new(0.177682102, 0, 0.75, 0)  -- Made bind box bigger
 				Bind.ZIndex = 7
 
 				UICorner.CornerRadius = UDim.new(0, 8)
@@ -1324,7 +1335,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				BindKey.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				BindKey.BorderSizePixel = 0
 				BindKey.Position = UDim2.new(0, 0, 0.5, 0)
-				BindKey.Size = UDim2.new(1, 0, 0.649999976, 0)
+				BindKey.Size = UDim2.new(1, 0, 0.75, 0)  -- Made text bigger
 				BindKey.ZIndex = 7
 				BindKey.Font = Enum.Font.GothamMedium
 				BindKey.Text = toname(Default)
@@ -1366,7 +1377,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				local function UpdateText()
 					local t = BindKey.Text
 					local siz = TextService:GetTextSize(t, BindKey.TextSize, BindKey.Font, Vector2.new(math.huge, math.huge))
-					Tween:Create(Bind, TweenInfo.new(0.075), {Size = UDim2.new(0, siz.X, 0.65, 0)}):Play()
+					Tween:Create(Bind, TweenInfo.new(0.075), {Size = UDim2.new(0, siz.X, 0.75, 0)}):Play()
 				end
 
 				UpdateText()
@@ -1467,7 +1478,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Slider.ZIndex = 7
 
 				UIAspectRatioConstraint.Parent = Slider
-				UIAspectRatioConstraint.AspectRatio = 9.000
+				UIAspectRatioConstraint.AspectRatio = 7.000  -- Made sliders bigger (was 9.000)
 				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
 				Text.Name = "Text"
@@ -1478,7 +1489,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Text.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Text.BorderSizePixel = 0
 				Text.Position = UDim2.new(0.0516665913, 0, 0.499999881, 0)
-				Text.Size = UDim2.new(0.998333275, 0, 0.444999993, 0)
+				Text.Size = UDim2.new(0.998333275, 0, 0.55, 0)  -- Made text bigger
 				Text.ZIndex = 7
 				Text.Font = Enum.Font.GothamMedium
 				Text.Text = SliderName or "AIM BOT RANGE"
@@ -1497,7 +1508,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Ui.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Ui.BorderSizePixel = 0
 				Ui.Position = UDim2.new(0.949999869, 0, 0.500000417, 0)
-				Ui.Size = UDim2.new(0.44600001, 0, 0.324999988, 0)
+				Ui.Size = UDim2.new(0.44600001, 0, 0.4, 0)  -- Made slider track bigger
 				Ui.ZIndex = 10
 				Ui.Active = true
 
@@ -1652,7 +1663,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Dropdown.ZIndex = 7
 
 				UIAspectRatioConstraint.Parent = Dropdown
-				UIAspectRatioConstraint.AspectRatio = 9.000
+				UIAspectRatioConstraint.AspectRatio = 7.000  -- Made dropdowns bigger (was 9.000)
 				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
 				Text.Name = "Text"
@@ -1663,7 +1674,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Text.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Text.BorderSizePixel = 0
 				Text.Position = UDim2.new(0.0516665727, 0, 0.499999762, 0)
-				Text.Size = UDim2.new(0.948333681, 0, 0.445000023, 0)
+				Text.Size = UDim2.new(0.948333681, 0, 0.55, 0)  -- Made text bigger
 				Text.ZIndex = 7
 				Text.Font = Enum.Font.GothamMedium
 				Text.Text = tostring(DropdownName or ' - ')
@@ -1683,7 +1694,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				Ui.BorderSizePixel = 0
 				Ui.ClipsDescendants = true
 				Ui.Position = UDim2.new(0.950000226, 0, 0.450411677, 0)
-				Ui.Size = UDim2.new(0.446000099, 0, 0.75, 0)
+				Ui.Size = UDim2.new(0.446000099, 0, 0.85, 0)  -- Made dropdown box bigger
 				Ui.ZIndex = 7
 
 				UICorner.CornerRadius = UDim.new(0, 8)
@@ -1697,7 +1708,7 @@ function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 				ValueText.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				ValueText.BorderSizePixel = 0
 				ValueText.Position = UDim2.new(0.840817988, 0, 0.499999613, 0)
-				ValueText.Size = UDim2.new(1.58200002, 0, 0.449999988, 0)
+				ValueText.Size = UDim2.new(1.58200002, 0, 0.5, 0)  -- Made value text bigger
 				ValueText.ZIndex = 8
 				ValueText.Font = Enum.Font.Gotham
 				ValueText.Text = tostring(DropdownDefault or 'None')
