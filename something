@@ -1003,11 +1003,3 @@ function library:Init(key)
     
     return TabLibrary
 end
-
--- Save config on game close
-game:BindToClose(function()
-    ConfigManager:Save(library.SavedConfig)
-    wait(0.5)
-end)
-
-return library
