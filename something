@@ -1,1 +1,1286 @@
-a
+-- MacUI Library - Clean & Modern UI Library
+-- Modified from HyperLib with enhanced visual clarity and MacOS-inspired design
+
+if not game:IsLoaded() then
+	game.Loaded:Wait()
+end
+
+local Players = game:GetService('Players')
+local TweenService = game:GetService('TweenService')
+local RunService = game:GetService('RunService')
+local UserInputService = game:GetService('UserInputService')
+local TextService = game:GetService('TextService')
+local HttpService = game:GetService('HttpService')
+
+local LocalPlayer = Players.LocalPlayer
+local CoreGui = (gethui and gethui()) or game:FindFirstChild('CoreGui') or LocalPlayer.PlayerGui
+local ProtectGui = protectgui or (syn and syn.protect_gui) or function() end
+
+-- Library Configuration
+local MacUI = {
+	Theme = {
+		Background = Color3.fromRGB(245, 245, 247),
+		Secondary = Color3.fromRGB(255, 255, 255),
+		Accent = Color3.fromRGB(0, 122, 255),
+		Stroke = Color3.fromRGB(220, 220, 225),
+		Text = Color3.fromRGB(28, 28, 30),
+		SubText = Color3.fromRGB(142, 142, 147),
+		Hover = Color3.fromRGB(229, 229, 234),
+		Active = Color3.fromRGB(0, 106, 224)
+	},
+	ConfigFolder = "MacUIConfigs",
+	AutoUpdate = {},
+	SectionWidth = 0.95
+}
+
+-- Theme Presets
+function MacUI:SetTheme(themeName)
+	themeName = themeName:lower()
+	
+	if themeName == "light" or themeName == "mac" then
+		self.Theme.Background = Color3.fromRGB(245, 245, 247)
+		self.Theme.Secondary = Color3.fromRGB(255, 255, 255)
+		self.Theme.Accent = Color3.fromRGB(0, 122, 255)
+		self.Theme.Stroke = Color3.fromRGB(220, 220, 225)
+		self.Theme.Text = Color3.fromRGB(28, 28, 30)
+		self.Theme.SubText = Color3.fromRGB(142, 142, 147)
+		self.Theme.Hover = Color3.fromRGB(229, 229, 234)
+		self.Theme.Active = Color3.fromRGB(0, 106, 224)
+	elseif themeName == "dark" then
+		self.Theme.Background = Color3.fromRGB(28, 28, 30)
+		self.Theme.Secondary = Color3.fromRGB(44, 44, 46)
+		self.Theme.Accent = Color3.fromRGB(10, 132, 255)
+		self.Theme.Stroke = Color3.fromRGB(58, 58, 60)
+		self.Theme.Text = Color3.fromRGB(255, 255, 255)
+		self.Theme.SubText = Color3.fromRGB(174, 174, 178)
+		self.Theme.Hover = Color3.fromRGB(58, 58, 60)
+		self.Theme.Active = Color3.fromRGB(10, 132, 255)
+	elseif themeName == "purple" then
+		self.Theme.Background = Color3.fromRGB(32, 28, 42)
+		self.Theme.Secondary = Color3.fromRGB(46, 40, 58)
+		self.Theme.Accent = Color3.fromRGB(138, 99, 210)
+		self.Theme.Stroke = Color3.fromRGB(58, 52, 70)
+		self.Theme.Text = Color3.fromRGB(255, 255, 255)
+		self.Theme.SubText = Color3.fromRGB(178, 174, 188)
+		self.Theme.Hover = Color3.fromRGB(68, 60, 82)
+		self.Theme.Active = Color3.fromRGB(156, 112, 234)
+	elseif themeName == "green" then
+		self.Theme.Background = Color3.fromRGB(27, 35, 30)
+		self.Theme.Secondary = Color3.fromRGB(38, 48, 42)
+		self.Theme.Accent = Color3.fromRGB(52, 199, 89)
+		self.Theme.Stroke = Color3.fromRGB(52, 64, 56)
+		self.Theme.Text = Color3.fromRGB(255, 255, 255)
+		self.Theme.SubText = Color3.fromRGB(174, 186, 178)
+		self.Theme.Hover = Color3.fromRGB(58, 72, 62)
+		self.Theme.Active = Color3.fromRGB(64, 219, 104)
+	end
+end
+
+-- Helper Functions
+local function CreateButton(parent)
+	local button = Instance.new('TextButton')
+	button.Size = UDim2.new(1, 0, 1, 0)
+	button.BackgroundTransparency = 1
+	button.TextTransparency = 1
+	button.Text = ""
+	button.Parent = parent
+	button.ZIndex = 5000
+	return button
+end
+
+local function Default(value, default)
+	return value or default
+end
+
+local function ScrollingConnect(scrollFrame)
+	task.spawn(function()
+		local padding = 12
+		local layout = scrollFrame:WaitForChild('UIListLayout', 9999999)
+		scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + padding)
+		
+		layout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+			scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + padding)
+		end)
+	end)
+end
+
+local function Signal(callbacks)
+	local signals = {}
+	for _, callback in ipairs(callbacks) do
+		signals[callback.name] = callback.callback
+	end
+	return signals
+end
+
+-- Config System
+function MacUI:SaveConfig(configName, data)
+	local success, result = pcall(function()
+		if not isfolder(self.ConfigFolder) then
+			makefolder(self.ConfigFolder)
+		end
+		
+		local filePath = self.ConfigFolder .. "/" .. configName .. ".json"
+		local jsonData = HttpService:JSONEncode(data)
+		writefile(filePath, jsonData)
+		return true
+	end)
+	
+	return success
+end
+
+function MacUI:LoadConfig(configName)
+	local success, result = pcall(function()
+		local filePath = self.ConfigFolder .. "/" .. configName .. ".json"
+		if not isfile(filePath) then
+			return nil
+		end
+		
+		local fileContent = readfile(filePath)
+		return HttpService:JSONDecode(fileContent)
+	end)
+	
+	return success and result or nil
+end
+
+function MacUI:ListConfigs()
+	local success, result = pcall(function()
+		if not isfolder(self.ConfigFolder) then
+			return {}
+		end
+		
+		local files = listfiles(self.ConfigFolder)
+		local configs = {}
+		
+		for _, file in ipairs(files) do
+			local name = file:match("([^/]+)%.json$")
+			if name then
+				table.insert(configs, name)
+			end
+		end
+		
+		return configs
+	end)
+	
+	return success and result or {}
+end
+
+function MacUI:DeleteConfig(configName)
+	local success = pcall(function()
+		local filePath = self.ConfigFolder .. "/" .. configName .. ".json"
+		if isfile(filePath) then
+			delfile(filePath)
+		end
+	end)
+	
+	return success
+end
+
+-- Main Window Creation
+function MacUI:CreateWindow(options)
+	options = options or {}
+	local windowName = Default(options.Name, 'MacUI Library')
+	local windowIcon = Default(options.Icon, 'rbxassetid://7734053495')
+	local windowSubtitle = Default(options.Subtitle, 'Welcome!')
+	
+	local Window = {
+		Tabs = {},
+		Size = UDim2.new(0, 560, 0, 380),
+		ToggleKey = Enum.KeyCode.RightControl,
+		ConfigData = {}
+	}
+	
+	-- Create UI
+	local ScreenGui = Instance.new("ScreenGui")
+	local MainFrame = Instance.new("Frame")
+	local UICorner = Instance.new("UICorner")
+	local UIStroke = Instance.new("UIStroke")
+	local Shadow = Instance.new("ImageLabel")
+	
+	local TopBar = Instance.new("Frame")
+	local TopBarCorner = Instance.new("UICorner")
+	local WindowIcon = Instance.new("ImageLabel")
+	local WindowTitle = Instance.new("TextLabel")
+	local WindowSubtitle = Instance.new("TextLabel")
+	local CloseButton = Instance.new("TextButton")
+	local CloseIcon = Instance.new("ImageLabel")
+	
+	local Divider = Instance.new("Frame")
+	local TabContainer = Instance.new("Frame")
+	local TabScroll = Instance.new("ScrollingFrame")
+	local TabLayout = Instance.new("UIListLayout")
+	
+	local ContentFrame = Instance.new("Frame")
+	
+	-- Configure ScreenGui
+	ScreenGui.Name = "MacUI_" .. tostring(math.random(1000, 9999))
+	ScreenGui.Parent = CoreGui
+	ScreenGui.ResetOnSpawn = false
+	ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+	ProtectGui(ScreenGui)
+	
+	Window.ScreenGui = ScreenGui
+	
+	-- Configure MainFrame
+	MainFrame.Name = "MainFrame"
+	MainFrame.Parent = ScreenGui
+	MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+	MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+	MainFrame.Size = Window.Size
+	MainFrame.BackgroundColor3 = MacUI.Theme.Background
+	MainFrame.BorderSizePixel = 0
+	MainFrame.ClipsDescendants = true
+	MainFrame.Active = true
+	
+	UICorner.CornerRadius = UDim.new(0, 12)
+	UICorner.Parent = MainFrame
+	
+	UIStroke.Color = MacUI.Theme.Stroke
+	UIStroke.Thickness = 1
+	UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	UIStroke.Parent = MainFrame
+	
+	-- Shadow
+	Shadow.Name = "Shadow"
+	Shadow.Parent = MainFrame
+	Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
+	Shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+	Shadow.Size = UDim2.new(1, 40, 1, 40)
+	Shadow.BackgroundTransparency = 1
+	Shadow.Image = "rbxassetid://6015897843"
+	Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+	Shadow.ImageTransparency = 0.7
+	Shadow.ScaleType = Enum.ScaleType.Slice
+	Shadow.SliceCenter = Rect.new(49, 49, 450, 450)
+	Shadow.ZIndex = 0
+	
+	-- TopBar
+	TopBar.Name = "TopBar"
+	TopBar.Parent = MainFrame
+	TopBar.Size = UDim2.new(1, 0, 0, 56)
+	TopBar.BackgroundColor3 = MacUI.Theme.Secondary
+	TopBar.BorderSizePixel = 0
+	
+	TopBarCorner.CornerRadius = UDim.new(0, 12)
+	TopBarCorner.Parent = TopBar
+	
+	local TopBarFix = Instance.new("Frame")
+	TopBarFix.Parent = TopBar
+	TopBarFix.Position = UDim2.new(0, 0, 1, -12)
+	TopBarFix.Size = UDim2.new(1, 0, 0, 12)
+	TopBarFix.BackgroundColor3 = MacUI.Theme.Secondary
+	TopBarFix.BorderSizePixel = 0
+	
+	-- Window Icon
+	WindowIcon.Name = "WindowIcon"
+	WindowIcon.Parent = TopBar
+	WindowIcon.AnchorPoint = Vector2.new(0, 0.5)
+	WindowIcon.Position = UDim2.new(0, 16, 0.5, 0)
+	WindowIcon.Size = UDim2.new(0, 32, 0, 32)
+	WindowIcon.BackgroundTransparency = 1
+	WindowIcon.Image = windowIcon
+	WindowIcon.ScaleType = Enum.ScaleType.Fit
+	
+	-- Window Title
+	WindowTitle.Name = "WindowTitle"
+	WindowTitle.Parent = TopBar
+	WindowTitle.AnchorPoint = Vector2.new(0, 0)
+	WindowTitle.Position = UDim2.new(0, 56, 0, 10)
+	WindowTitle.Size = UDim2.new(0.6, -56, 0, 20)
+	WindowTitle.BackgroundTransparency = 1
+	WindowTitle.Font = Enum.Font.GothamMedium
+	WindowTitle.Text = windowName
+	WindowTitle.TextColor3 = MacUI.Theme.Text
+	WindowTitle.TextSize = 16
+	WindowTitle.TextXAlignment = Enum.TextXAlignment.Left
+	
+	-- Window Subtitle
+	WindowSubtitle.Name = "WindowSubtitle"
+	WindowSubtitle.Parent = TopBar
+	WindowSubtitle.AnchorPoint = Vector2.new(0, 0)
+	WindowSubtitle.Position = UDim2.new(0, 56, 0, 30)
+	WindowSubtitle.Size = UDim2.new(0.6, -56, 0, 16)
+	WindowSubtitle.BackgroundTransparency = 1
+	WindowSubtitle.Font = Enum.Font.Gotham
+	WindowSubtitle.Text = windowSubtitle
+	WindowSubtitle.TextColor3 = MacUI.Theme.SubText
+	WindowSubtitle.TextSize = 13
+	WindowSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+	
+	-- Close Button
+	CloseButton.Name = "CloseButton"
+	CloseButton.Parent = TopBar
+	CloseButton.AnchorPoint = Vector2.new(1, 0.5)
+	CloseButton.Position = UDim2.new(1, -12, 0.5, 0)
+	CloseButton.Size = UDim2.new(0, 32, 0, 32)
+	CloseButton.BackgroundColor3 = MacUI.Theme.Hover
+	CloseButton.BackgroundTransparency = 1
+	CloseButton.Text = ""
+	CloseButton.AutoButtonColor = false
+	
+	local CloseCorner = Instance.new("UICorner")
+	CloseCorner.CornerRadius = UDim.new(0, 8)
+	CloseCorner.Parent = CloseButton
+	
+	CloseIcon.Parent = CloseButton
+	CloseIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+	CloseIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
+	CloseIcon.Size = UDim2.new(0, 20, 0, 20)
+	CloseIcon.BackgroundTransparency = 1
+	CloseIcon.Image = "rbxassetid://10002398990"
+	CloseIcon.ImageColor3 = MacUI.Theme.Text
+	
+	-- Divider
+	Divider.Name = "Divider"
+	Divider.Parent = MainFrame
+	Divider.Position = UDim2.new(0, 0, 0, 56)
+	Divider.Size = UDim2.new(1, 0, 0, 1)
+	Divider.BackgroundColor3 = MacUI.Theme.Stroke
+	Divider.BorderSizePixel = 0
+	
+	-- Tab Container
+	TabContainer.Name = "TabContainer"
+	TabContainer.Parent = MainFrame
+	TabContainer.Position = UDim2.new(0, 12, 0, 68)
+	TabContainer.Size = UDim2.new(0, 140, 1, -80)
+	TabContainer.BackgroundTransparency = 1
+	TabContainer.ClipsDescendants = true
+	
+	TabScroll.Name = "TabScroll"
+	TabScroll.Parent = TabContainer
+	TabScroll.Size = UDim2.new(1, 0, 1, 0)
+	TabScroll.BackgroundTransparency = 1
+	TabScroll.BorderSizePixel = 0
+	TabScroll.ScrollBarThickness = 4
+	TabScroll.ScrollBarImageColor3 = MacUI.Theme.Stroke
+	
+	TabLayout.Parent = TabScroll
+	TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	TabLayout.Padding = UDim.new(0, 6)
+	
+	ScrollingConnect(TabScroll)
+	
+	-- Content Frame
+	ContentFrame.Name = "ContentFrame"
+	ContentFrame.Parent = MainFrame
+	ContentFrame.Position = UDim2.new(0, 164, 0, 68)
+	ContentFrame.Size = UDim2.new(1, -176, 1, -80)
+	ContentFrame.BackgroundTransparency = 1
+	ContentFrame.ClipsDescendants = true
+	
+	-- Tab Creation
+	function Window:CreateTab(options)
+		options = options or {}
+		local tabName = Default(options.Name, 'Tab')
+		local tabIcon = Default(options.Icon, 'rbxassetid://7734053495')
+		
+		local Tab = {
+			Sections = {}
+		}
+		
+		-- Tab Button
+		local TabButton = Instance.new("TextButton")
+		local TabCorner = Instance.new("UICorner")
+		local TabIcon = Instance.new("ImageLabel")
+		local TabLabel = Instance.new("TextLabel")
+		
+		TabButton.Name = tabName
+		TabButton.Parent = TabScroll
+		TabButton.Size = UDim2.new(1, 0, 0, 40)
+		TabButton.BackgroundColor3 = MacUI.Theme.Hover
+		TabButton.BackgroundTransparency = 1
+		TabButton.Text = ""
+		TabButton.AutoButtonColor = false
+		
+		TabCorner.CornerRadius = UDim.new(0, 8)
+		TabCorner.Parent = TabButton
+		
+		TabIcon.Parent = TabButton
+		TabIcon.AnchorPoint = Vector2.new(0, 0.5)
+		TabIcon.Position = UDim2.new(0, 10, 0.5, 0)
+		TabIcon.Size = UDim2.new(0, 20, 0, 20)
+		TabIcon.BackgroundTransparency = 1
+		TabIcon.Image = tabIcon
+		TabIcon.ImageColor3 = MacUI.Theme.SubText
+		TabIcon.ScaleType = Enum.ScaleType.Fit
+		
+		TabLabel.Parent = TabButton
+		TabLabel.AnchorPoint = Vector2.new(0, 0.5)
+		TabLabel.Position = UDim2.new(0, 38, 0.5, 0)
+		TabLabel.Size = UDim2.new(1, -48, 1, 0)
+		TabLabel.BackgroundTransparency = 1
+		TabLabel.Font = Enum.Font.GothamMedium
+		TabLabel.Text = tabName
+		TabLabel.TextColor3 = MacUI.Theme.SubText
+		TabLabel.TextSize = 14
+		TabLabel.TextXAlignment = Enum.TextXAlignment.Left
+		
+		-- Tab Content
+		local TabContent = Instance.new("Frame")
+		local LeftColumn = Instance.new("ScrollingFrame")
+		local LeftLayout = Instance.new("UIListLayout")
+		local RightColumn = Instance.new("ScrollingFrame")
+		local RightLayout = Instance.new("UIListLayout")
+		
+		TabContent.Name = tabName .. "_Content"
+		TabContent.Parent = ContentFrame
+		TabContent.Size = UDim2.new(1, 0, 1, 0)
+		TabContent.BackgroundTransparency = 1
+		TabContent.Visible = false
+		
+		-- Left Column
+		LeftColumn.Name = "LeftColumn"
+		LeftColumn.Parent = TabContent
+		LeftColumn.Position = UDim2.new(0, 0, 0, 0)
+		LeftColumn.Size = UDim2.new(0.5, -4, 1, 0)
+		LeftColumn.BackgroundTransparency = 1
+		LeftColumn.BorderSizePixel = 0
+		LeftColumn.ScrollBarThickness = 4
+		LeftColumn.ScrollBarImageColor3 = MacUI.Theme.Stroke
+		
+		LeftLayout.Parent = LeftColumn
+		LeftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		LeftLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		LeftLayout.Padding = UDim.new(0, 8)
+		
+		ScrollingConnect(LeftColumn)
+		
+		-- Right Column
+		RightColumn.Name = "RightColumn"
+		RightColumn.Parent = TabContent
+		RightColumn.Position = UDim2.new(0.5, 4, 0, 0)
+		RightColumn.Size = UDim2.new(0.5, -4, 1, 0)
+		RightColumn.BackgroundTransparency = 1
+		RightColumn.BorderSizePixel = 0
+		RightColumn.ScrollBarThickness = 4
+		RightColumn.ScrollBarImageColor3 = MacUI.Theme.Stroke
+		
+		RightLayout.Parent = RightColumn
+		RightLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		RightLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		RightLayout.Padding = UDim.new(0, 8)
+		
+		ScrollingConnect(RightColumn)
+		
+		-- Tab Selection Logic
+		local function SelectTab(selected)
+			if selected then
+				TabContent.Visible = true
+				TweenService:Create(TabButton, TweenInfo.new(0.2), {
+					BackgroundTransparency = 0
+				}):Play()
+				TweenService:Create(TabIcon, TweenInfo.new(0.2), {
+					ImageColor3 = MacUI.Theme.Accent
+				}):Play()
+				TweenService:Create(TabLabel, TweenInfo.new(0.2), {
+					TextColor3 = MacUI.Theme.Accent
+				}):Play()
+			else
+				TabContent.Visible = false
+				TweenService:Create(TabButton, TweenInfo.new(0.2), {
+					BackgroundTransparency = 1
+				}):Play()
+				TweenService:Create(TabIcon, TweenInfo.new(0.2), {
+					ImageColor3 = MacUI.Theme.SubText
+				}):Play()
+				TweenService:Create(TabLabel, TweenInfo.new(0.2), {
+					TextColor3 = MacUI.Theme.SubText
+				}):Play()
+			end
+		end
+		
+		-- Auto-select first tab
+		if #Window.Tabs == 0 then
+			task.spawn(SelectTab, true)
+		else
+			task.spawn(SelectTab, false)
+		end
+		
+		table.insert(Window.Tabs, {
+			Content = TabContent,
+			Select = SelectTab
+		})
+		
+		TabButton.MouseButton1Click:Connect(function()
+			for _, tab in ipairs(Window.Tabs) do
+				if tab.Content == TabContent then
+					task.spawn(tab.Select, true)
+				else
+					task.spawn(tab.Select, false)
+				end
+			end
+		end)
+		
+		-- Hover Effects
+		TabButton.MouseEnter:Connect(function()
+			if TabButton.BackgroundTransparency == 1 then
+				TweenService:Create(TabButton, TweenInfo.new(0.15), {
+					BackgroundTransparency = 0.5
+				}):Play()
+			end
+		end)
+		
+		TabButton.MouseLeave:Connect(function()
+			if TabContent.Visible == false then
+				TweenService:Create(TabButton, TweenInfo.new(0.15), {
+					BackgroundTransparency = 1
+				}):Play()
+			end
+		end)
+		
+		-- Section Creation
+		function Tab:CreateSection(options)
+			options = options or {}
+			local sectionName = Default(options.Name, 'Section')
+			local sectionSide = Default(options.Side, 'Left')
+			
+			local Section = {
+				Elements = {}
+			}
+			
+			local parent = sectionSide:lower():find('left') and LeftColumn or RightColumn
+			
+			-- Section Container
+			local SectionFrame = Instance.new("Frame")
+			local SectionCorner = Instance.new("UICorner")
+			local SectionStroke = Instance.new("UIStroke")
+			local SectionHeader = Instance.new("TextLabel")
+			local SectionDivider = Instance.new("Frame")
+			local ElementContainer = Instance.new("Frame")
+			local ElementLayout = Instance.new("UIListLayout")
+			
+			SectionFrame.Name = sectionName
+			SectionFrame.Parent = parent
+			SectionFrame.Size = UDim2.new(MacUI.SectionWidth, 0, 0, 50)
+			SectionFrame.BackgroundColor3 = MacUI.Theme.Secondary
+			SectionFrame.BorderSizePixel = 0
+			
+			SectionCorner.CornerRadius = UDim.new(0, 10)
+			SectionCorner.Parent = SectionFrame
+			
+			SectionStroke.Color = MacUI.Theme.Stroke
+			SectionStroke.Thickness = 1
+			SectionStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			SectionStroke.Parent = SectionFrame
+			
+			SectionHeader.Name = "Header"
+			SectionHeader.Parent = SectionFrame
+			SectionHeader.Position = UDim2.new(0, 14, 0, 12)
+			SectionHeader.Size = UDim2.new(1, -28, 0, 18)
+			SectionHeader.BackgroundTransparency = 1
+			SectionHeader.Font = Enum.Font.GothamBold
+			SectionHeader.Text = sectionName
+			SectionHeader.TextColor3 = MacUI.Theme.Text
+			SectionHeader.TextSize = 15
+			SectionHeader.TextXAlignment = Enum.TextXAlignment.Left
+			
+			SectionDivider.Name = "Divider"
+			SectionDivider.Parent = SectionFrame
+			SectionDivider.Position = UDim2.new(0, 12, 0, 38)
+			SectionDivider.Size = UDim2.new(1, -24, 0, 1)
+			SectionDivider.BackgroundColor3 = MacUI.Theme.Stroke
+			SectionDivider.BorderSizePixel = 0
+			
+			ElementContainer.Name = "Elements"
+			ElementContainer.Parent = SectionFrame
+			ElementContainer.Position = UDim2.new(0, 0, 0, 44)
+			ElementContainer.Size = UDim2.new(1, 0, 1, -44)
+			ElementContainer.BackgroundTransparency = 1
+			
+			ElementLayout.Parent = ElementContainer
+			ElementLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			ElementLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			ElementLayout.Padding = UDim.new(0, 6)
+			
+			local function UpdateSectionSize()
+				local totalHeight = 50
+				for _, element in ipairs(ElementContainer:GetChildren()) do
+					if element:IsA('Frame') or element:IsA('TextButton') then
+						totalHeight = totalHeight + element.AbsoluteSize.Y + ElementLayout.Padding.Offset
+					end
+				end
+				TweenService:Create(SectionFrame, TweenInfo.new(0.15), {
+					Size = UDim2.new(MacUI.SectionWidth, 0, 0, totalHeight)
+				}):Play()
+			end
+			
+			table.insert(MacUI.AutoUpdate, UpdateSectionSize)
+			ElementContainer.ChildAdded:Connect(UpdateSectionSize)
+			
+			-- Button Element
+			function Section:AddButton(options)
+				options = options or {}
+				local buttonName = Default(options.Name, 'Button')
+				local callback = Default(options.Callback, function() end)
+				
+				local ButtonFrame = Instance.new("TextButton")
+				local ButtonCorner = Instance.new("UICorner")
+				local ButtonLabel = Instance.new("TextLabel")
+				
+				ButtonFrame.Name = "Button"
+				ButtonFrame.Parent = ElementContainer
+				ButtonFrame.Size = UDim2.new(0.92, 0, 0, 36)
+				ButtonFrame.BackgroundColor3 = MacUI.Theme.Hover
+				ButtonFrame.BackgroundTransparency = 0.5
+				ButtonFrame.Text = ""
+				ButtonFrame.AutoButtonColor = false
+				
+				ButtonCorner.CornerRadius = UDim.new(0, 8)
+				ButtonCorner.Parent = ButtonFrame
+				
+				ButtonLabel.Parent = ButtonFrame
+				ButtonLabel.Size = UDim2.new(1, -16, 1, 0)
+				ButtonLabel.Position = UDim2.new(0, 8, 0, 0)
+				ButtonLabel.BackgroundTransparency = 1
+				ButtonLabel.Font = Enum.Font.GothamMedium
+				ButtonLabel.Text = buttonName
+				ButtonLabel.TextColor3 = MacUI.Theme.Text
+				ButtonLabel.TextSize = 14
+				ButtonLabel.TextXAlignment = Enum.TextXAlignment.Center
+				
+				ButtonFrame.MouseEnter:Connect(function()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.15), {
+						BackgroundTransparency = 0
+					}):Play()
+				end)
+				
+				ButtonFrame.MouseLeave:Connect(function()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.15), {
+						BackgroundTransparency = 0.5
+					}):Play()
+				end)
+				
+				ButtonFrame.MouseButton1Down:Connect(function()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.1), {
+						BackgroundColor3 = MacUI.Theme.Accent
+					}):Play()
+					TweenService:Create(ButtonLabel, TweenInfo.new(0.1), {
+						TextColor3 = Color3.fromRGB(255, 255, 255)
+					}):Play()
+				end)
+				
+				ButtonFrame.MouseButton1Up:Connect(function()
+					TweenService:Create(ButtonFrame, TweenInfo.new(0.1), {
+						BackgroundColor3 = MacUI.Theme.Hover
+					}):Play()
+					TweenService:Create(ButtonLabel, TweenInfo.new(0.1), {
+						TextColor3 = MacUI.Theme.Text
+					}):Play()
+				end)
+				
+				ButtonFrame.MouseButton1Click:Connect(callback)
+				
+				UpdateSectionSize()
+				
+				return Signal({
+					{name = 'SetText', callback = function(text)
+						ButtonLabel.Text = tostring(text)
+					end},
+					{name = 'Fire', callback = callback}
+				})
+			end
+			
+			-- Toggle Element
+			function Section:AddToggle(options)
+				options = options or {}
+				local toggleName = Default(options.Name, 'Toggle')
+				local defaultValue = Default(options.Default, false)
+				local callback = Default(options.Callback, function() end)
+				
+				local currentValue = defaultValue
+				
+				local ToggleFrame = Instance.new("Frame")
+				local ToggleLabel = Instance.new("TextLabel")
+				local ToggleButton = Instance.new("TextButton")
+				local ToggleCorner = Instance.new("UICorner")
+				local ToggleIndicator = Instance.new("Frame")
+				local IndicatorCorner = Instance.new("UICorner")
+				
+				ToggleFrame.Name = "Toggle"
+				ToggleFrame.Parent = ElementContainer
+				ToggleFrame.Size = UDim2.new(0.92, 0, 0, 36)
+				ToggleFrame.BackgroundTransparency = 1
+				
+				ToggleLabel.Parent = ToggleFrame
+				ToggleLabel.AnchorPoint = Vector2.new(0, 0.5)
+				ToggleLabel.Position = UDim2.new(0, 8, 0.5, 0)
+				ToggleLabel.Size = UDim2.new(1, -60, 1, 0)
+				ToggleLabel.BackgroundTransparency = 1
+				ToggleLabel.Font = Enum.Font.GothamMedium
+				ToggleLabel.Text = toggleName
+				ToggleLabel.TextColor3 = MacUI.Theme.Text
+				ToggleLabel.TextSize = 14
+				ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+				
+				ToggleButton.Name = "ToggleButton"
+				ToggleButton.Parent = ToggleFrame
+				ToggleButton.AnchorPoint = Vector2.new(1, 0.5)
+				ToggleButton.Position = UDim2.new(1, -8, 0.5, 0)
+				ToggleButton.Size = UDim2.new(0, 44, 0, 24)
+				ToggleButton.BackgroundColor3 = MacUI.Theme.Stroke
+				ToggleButton.Text = ""
+				ToggleButton.AutoButtonColor = false
+				
+				ToggleCorner.CornerRadius = UDim.new(1, 0)
+				ToggleCorner.Parent = ToggleButton
+				
+				ToggleIndicator.Name = "Indicator"
+				ToggleIndicator.Parent = ToggleButton
+				ToggleIndicator.AnchorPoint = Vector2.new(0, 0.5)
+				ToggleIndicator.Position = UDim2.new(0, 3, 0.5, 0)
+				ToggleIndicator.Size = UDim2.new(0, 18, 0, 18)
+				ToggleIndicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				
+				IndicatorCorner.CornerRadius = UDim.new(1, 0)
+				IndicatorCorner.Parent = ToggleIndicator
+				
+				local function UpdateToggle(value)
+					currentValue = value
+					
+					if value then
+						TweenService:Create(ToggleButton, TweenInfo.new(0.2), {
+							BackgroundColor3 = MacUI.Theme.Accent
+						}):Play()
+						TweenService:Create(ToggleIndicator, TweenInfo.new(0.2), {
+							Position = UDim2.new(1, -21, 0.5, 0)
+						}):Play()
+					else
+						TweenService:Create(ToggleButton, TweenInfo.new(0.2), {
+							BackgroundColor3 = MacUI.Theme.Stroke
+						}):Play()
+						TweenService:Create(ToggleIndicator, TweenInfo.new(0.2), {
+							Position = UDim2.new(0, 3, 0.5, 0)
+						}):Play()
+					end
+					
+					callback(value)
+				end
+				
+				UpdateToggle(defaultValue)
+				
+				ToggleButton.MouseButton1Click:Connect(function()
+					UpdateToggle(not currentValue)
+				end)
+				
+				UpdateSectionSize()
+				
+				return Signal({
+					{name = 'SetText', callback = function(text)
+						ToggleLabel.Text = tostring(text)
+					end},
+					{name = 'SetValue', callback = UpdateToggle},
+					{name = 'GetValue', callback = function()
+						return currentValue
+					end}
+				})
+			end
+			
+			-- Slider Element
+			function Section:AddSlider(options)
+				options = options or {}
+				local sliderName = Default(options.Name, 'Slider')
+				local min = Default(options.Min, 0)
+				local max = Default(options.Max, 100)
+				local defaultValue = Default(options.Default, min)
+				local suffix = Default(options.Suffix, '')
+				local callback = Default(options.Callback, function() end)
+				
+				local currentValue = defaultValue
+				local dragging = false
+				
+				local SliderFrame = Instance.new("Frame")
+				local SliderLabel = Instance.new("TextLabel")
+				local SliderValue = Instance.new("TextLabel")
+				local SliderBar = Instance.new("Frame")
+				local SliderCorner = Instance.new("UICorner")
+				local SliderFill = Instance.new("Frame")
+				local FillCorner = Instance.new("UICorner")
+				local SliderButton = Instance.new("TextButton")
+				
+				SliderFrame.Name = "Slider"
+				SliderFrame.Parent = ElementContainer
+				SliderFrame.Size = UDim2.new(0.92, 0, 0, 52)
+				SliderFrame.BackgroundTransparency = 1
+				
+				SliderLabel.Parent = SliderFrame
+				SliderLabel.Position = UDim2.new(0, 8, 0, 0)
+				SliderLabel.Size = UDim2.new(0.7, -8, 0, 20)
+				SliderLabel.BackgroundTransparency = 1
+				SliderLabel.Font = Enum.Font.GothamMedium
+				SliderLabel.Text = sliderName
+				SliderLabel.TextColor3 = MacUI.Theme.Text
+				SliderLabel.TextSize = 14
+				SliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+				
+				SliderValue.Parent = SliderFrame
+				SliderValue.AnchorPoint = Vector2.new(1, 0)
+				SliderValue.Position = UDim2.new(1, -8, 0, 0)
+				SliderValue.Size = UDim2.new(0.3, 0, 0, 20)
+				SliderValue.BackgroundTransparency = 1
+				SliderValue.Font = Enum.Font.GothamMedium
+				SliderValue.Text = tostring(defaultValue) .. suffix
+				SliderValue.TextColor3 = MacUI.Theme.SubText
+				SliderValue.TextSize = 13
+				SliderValue.TextXAlignment = Enum.TextXAlignment.Right
+				
+				SliderBar.Name = "Bar"
+				SliderBar.Parent = SliderFrame
+				SliderBar.Position = UDim2.new(0, 8, 0, 28)
+				SliderBar.Size = UDim2.new(1, -16, 0, 18)
+				SliderBar.BackgroundColor3 = MacUI.Theme.Hover
+				SliderBar.BorderSizePixel = 0
+				
+				SliderCorner.CornerRadius = UDim.new(1, 0)
+				SliderCorner.Parent = SliderBar
+				
+				SliderFill.Name = "Fill"
+				SliderFill.Parent = SliderBar
+				SliderFill.Size = UDim2.new((defaultValue - min) / (max - min), 0, 1, 0)
+				SliderFill.BackgroundColor3 = MacUI.Theme.Accent
+				SliderFill.BorderSizePixel = 0
+				
+				FillCorner.CornerRadius = UDim.new(1, 0)
+				FillCorner.Parent = SliderFill
+				
+				SliderButton.Name = "SliderButton"
+				SliderButton.Parent = SliderBar
+				SliderButton.Size = UDim2.new(1, 0, 1, 0)
+				SliderButton.BackgroundTransparency = 1
+				SliderButton.Text = ""
+				SliderButton.ZIndex = 5
+				
+				local function UpdateSlider(input)
+					local sizeScale = math.clamp((input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
+					local value = math.floor(((max - min) * sizeScale) + min)
+					
+					currentValue = value
+					SliderValue.Text = tostring(value) .. suffix
+					
+					TweenService:Create(SliderFill, TweenInfo.new(0.1), {
+						Size = UDim2.new(sizeScale, 0, 1, 0)
+					}):Play()
+					
+					callback(value)
+				end
+				
+				SliderButton.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+						dragging = true
+						UpdateSlider(input)
+					end
+				end)
+				
+				SliderButton.InputEnded:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+						dragging = false
+					end
+				end)
+				
+				UserInputService.InputChanged:Connect(function(input)
+					if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+						UpdateSlider(input)
+					end
+				end)
+				
+				UpdateSectionSize()
+				
+				return Signal({
+					{name = 'SetText', callback = function(text)
+						SliderLabel.Text = tostring(text)
+					end},
+					{name = 'SetValue', callback = function(value)
+						currentValue = math.clamp(value, min, max)
+						SliderValue.Text = tostring(currentValue) .. suffix
+						local sizeScale = (currentValue - min) / (max - min)
+						TweenService:Create(SliderFill, TweenInfo.new(0.1), {
+							Size = UDim2.new(sizeScale, 0, 1, 0)
+						}):Play()
+						callback(currentValue)
+					end},
+					{name = 'GetValue', callback = function()
+						return currentValue
+					end}
+				})
+			end
+			
+			-- Dropdown Element
+			function Section:AddDropdown(options)
+				options = options or {}
+				local dropdownName = Default(options.Name, 'Dropdown')
+				local items = Default(options.Items, {})
+				local defaultValue = Default(options.Default, items[1])
+				local callback = Default(options.Callback, function() end)
+				
+				local currentValue = defaultValue
+				local isOpen = false
+				
+				local DropdownFrame = Instance.new("Frame")
+				local DropdownLabel = Instance.new("TextLabel")
+				local DropdownButton = Instance.new("TextButton")
+				local DropdownCorner = Instance.new("UICorner")
+				local DropdownValue = Instance.new("TextLabel")
+				local DropdownIcon = Instance.new("ImageLabel")
+				local DropdownList = Instance.new("Frame")
+				local ListCorner = Instance.new("UICorner")
+				local ListStroke = Instance.new("UIStroke")
+				local ListScroll = Instance.new("ScrollingFrame")
+				local ListLayout = Instance.new("UIListLayout")
+				
+				DropdownFrame.Name = "Dropdown"
+				DropdownFrame.Parent = ElementContainer
+				DropdownFrame.Size = UDim2.new(0.92, 0, 0, 62)
+				DropdownFrame.BackgroundTransparency = 1
+				DropdownFrame.ClipsDescendants = false
+				
+				DropdownLabel.Parent = DropdownFrame
+				DropdownLabel.Position = UDim2.new(0, 8, 0, 0)
+				DropdownLabel.Size = UDim2.new(1, -16, 0, 20)
+				DropdownLabel.BackgroundTransparency = 1
+				DropdownLabel.Font = Enum.Font.GothamMedium
+				DropdownLabel.Text = dropdownName
+				DropdownLabel.TextColor3 = MacUI.Theme.Text
+				DropdownLabel.TextSize = 14
+				DropdownLabel.TextXAlignment = Enum.TextXAlignment.Left
+				
+				DropdownButton.Name = "Button"
+				DropdownButton.Parent = DropdownFrame
+				DropdownButton.Position = UDim2.new(0, 8, 0, 26)
+				DropdownButton.Size = UDim2.new(1, -16, 0, 32)
+				DropdownButton.BackgroundColor3 = MacUI.Theme.Hover
+				DropdownButton.Text = ""
+				DropdownButton.AutoButtonColor = false
+				DropdownButton.ZIndex = 2
+				
+				DropdownCorner.CornerRadius = UDim.new(0, 8)
+				DropdownCorner.Parent = DropdownButton
+				
+				DropdownValue.Parent = DropdownButton
+				DropdownValue.AnchorPoint = Vector2.new(0, 0.5)
+				DropdownValue.Position = UDim2.new(0, 12, 0.5, 0)
+				DropdownValue.Size = UDim2.new(1, -40, 1, 0)
+				DropdownValue.BackgroundTransparency = 1
+				DropdownValue.Font = Enum.Font.Gotham
+				DropdownValue.Text = tostring(defaultValue)
+				DropdownValue.TextColor3 = MacUI.Theme.Text
+				DropdownValue.TextSize = 13
+				DropdownValue.TextXAlignment = Enum.TextXAlignment.Left
+				DropdownValue.ZIndex = 3
+				
+				DropdownIcon.Parent = DropdownButton
+				DropdownIcon.AnchorPoint = Vector2.new(1, 0.5)
+				DropdownIcon.Position = UDim2.new(1, -10, 0.5, 0)
+				DropdownIcon.Size = UDim2.new(0, 16, 0, 16)
+				DropdownIcon.BackgroundTransparency = 1
+				DropdownIcon.Image = "rbxassetid://7733717447"
+				DropdownIcon.ImageColor3 = MacUI.Theme.SubText
+				DropdownIcon.ZIndex = 3
+				
+				DropdownList.Name = "List"
+				DropdownList.Parent = DropdownFrame
+				DropdownList.Position = UDim2.new(0, 8, 0, 62)
+				DropdownList.Size = UDim2.new(1, -16, 0, 0)
+				DropdownList.BackgroundColor3 = MacUI.Theme.Secondary
+				DropdownList.BorderSizePixel = 0
+				DropdownList.Visible = false
+				DropdownList.ClipsDescendants = true
+				DropdownList.ZIndex = 10
+				
+				ListCorner.CornerRadius = UDim.new(0, 8)
+				ListCorner.Parent = DropdownList
+				
+				ListStroke.Color = MacUI.Theme.Stroke
+				ListStroke.Thickness = 1
+				ListStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+				ListStroke.Parent = DropdownList
+				
+				ListScroll.Parent = DropdownList
+				ListScroll.Size = UDim2.new(1, 0, 1, 0)
+				ListScroll.BackgroundTransparency = 1
+				ListScroll.BorderSizePixel = 0
+				ListScroll.ScrollBarThickness = 4
+				ListScroll.ScrollBarImageColor3 = MacUI.Theme.Stroke
+				ListScroll.ZIndex = 11
+				
+				ListLayout.Parent = ListScroll
+				ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+				ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+				ListLayout.Padding = UDim.new(0, 4)
+				
+				local function CreateItem(itemName)
+					local ItemButton = Instance.new("TextButton")
+					local ItemCorner = Instance.new("UICorner")
+					
+					ItemButton.Name = itemName
+					ItemButton.Parent = ListScroll
+					ItemButton.Size = UDim2.new(0.92, 0, 0, 28)
+					ItemButton.BackgroundColor3 = MacUI.Theme.Hover
+					ItemButton.BackgroundTransparency = itemName == currentValue and 0 or 1
+					ItemButton.Text = itemName
+					ItemButton.Font = Enum.Font.Gotham
+					ItemButton.TextColor3 = itemName == currentValue and MacUI.Theme.Accent or MacUI.Theme.Text
+					ItemButton.TextSize = 13
+					ItemButton.AutoButtonColor = false
+					ItemButton.ZIndex = 12
+					
+					ItemCorner.CornerRadius = UDim.new(0, 6)
+					ItemCorner.Parent = ItemButton
+					
+					ItemButton.MouseEnter:Connect(function()
+						if itemName ~= currentValue then
+							TweenService:Create(ItemButton, TweenInfo.new(0.15), {
+								BackgroundTransparency = 0.5
+							}):Play()
+						end
+					end)
+					
+					ItemButton.MouseLeave:Connect(function()
+						if itemName ~= currentValue then
+							TweenService:Create(ItemButton, TweenInfo.new(0.15), {
+								BackgroundTransparency = 1
+							}):Play()
+						end
+					end)
+					
+					ItemButton.MouseButton1Click:Connect(function()
+						for _, child in ipairs(ListScroll:GetChildren()) do
+							if child:IsA("TextButton") then
+								TweenService:Create(child, TweenInfo.new(0.2), {
+									BackgroundTransparency = 1,
+									TextColor3 = MacUI.Theme.Text
+								}):Play()
+							end
+						end
+						
+						TweenService:Create(ItemButton, TweenInfo.new(0.2), {
+							BackgroundTransparency = 0,
+							TextColor3 = MacUI.Theme.Accent
+						}):Play()
+						
+						currentValue = itemName
+						DropdownValue.Text = itemName
+						callback(itemName)
+						
+						-- Close dropdown
+						isOpen = false
+						TweenService:Create(DropdownList, TweenInfo.new(0.2), {
+							Size = UDim2.new(1, -16, 0, 0)
+						}):Play()
+						TweenService:Create(DropdownIcon, TweenInfo.new(0.2), {
+							Rotation = 0
+						}):Play()
+						task.wait(0.2)
+						DropdownList.Visible = false
+					end)
+				end
+				
+				for _, item in ipairs(items) do
+					CreateItem(tostring(item))
+				end
+				
+				ScrollingConnect(ListScroll)
+				
+				DropdownButton.MouseButton1Click:Connect(function()
+					isOpen = not isOpen
+					
+					if isOpen then
+						DropdownList.Visible = true
+						local listHeight = math.min(#items * 32 + 8, 120)
+						TweenService:Create(DropdownList, TweenInfo.new(0.2), {
+							Size = UDim2.new(1, -16, 0, listHeight)
+						}):Play()
+						TweenService:Create(DropdownIcon, TweenInfo.new(0.2), {
+							Rotation = 180
+						}):Play()
+					else
+						TweenService:Create(DropdownList, TweenInfo.new(0.2), {
+							Size = UDim2.new(1, -16, 0, 0)
+						}):Play()
+						TweenService:Create(DropdownIcon, TweenInfo.new(0.2), {
+							Rotation = 0
+						}):Play()
+						task.wait(0.2)
+						DropdownList.Visible = false
+					end
+				end)
+				
+				UpdateSectionSize()
+				
+				return Signal({
+					{name = 'SetText', callback = function(text)
+						DropdownLabel.Text = tostring(text)
+					end},
+					{name = 'SetValue', callback = function(value)
+						currentValue = tostring(value)
+						DropdownValue.Text = currentValue
+						callback(currentValue)
+					end},
+					{name = 'GetValue', callback = function()
+						return currentValue
+					end},
+					{name = 'Refresh', callback = function(newItems)
+						for _, child in ipairs(ListScroll:GetChildren()) do
+							if child:IsA("TextButton") then
+								child:Destroy()
+							end
+						end
+						items = newItems
+						for _, item in ipairs(items) do
+							CreateItem(tostring(item))
+						end
+					end}
+				})
+			end
+			
+			-- Label Element
+			function Section:AddLabel(options)
+				options = options or {}
+				local labelText = Default(options.Text, 'Label')
+				
+				local LabelFrame = Instance.new("Frame")
+				local Label = Instance.new("TextLabel")
+				
+				LabelFrame.Name = "Label"
+				LabelFrame.Parent = ElementContainer
+				LabelFrame.Size = UDim2.new(0.92, 0, 0, 24)
+				LabelFrame.BackgroundTransparency = 1
+				
+				Label.Parent = LabelFrame
+				Label.Position = UDim2.new(0, 8, 0, 0)
+				Label.Size = UDim2.new(1, -16, 1, 0)
+				Label.BackgroundTransparency = 1
+				Label.Font = Enum.Font.Gotham
+				Label.Text = labelText
+				Label.TextColor3 = MacUI.Theme.SubText
+				Label.TextSize = 13
+				Label.TextXAlignment = Enum.TextXAlignment.Left
+				Label.TextWrapped = true
+				
+				UpdateSectionSize()
+				
+				return Signal({
+					{name = 'SetText', callback = function(text)
+						Label.Text = tostring(text)
+					end}
+				})
+			end
+			
+			UpdateSectionSize()
+			return Section
+		end
+		
+		return Tab
+	end
+	
+	-- Window Controls
+	local isVisible = true
+	local dragToggle = false
+	local dragStart = nil
+	local startPos = nil
+	
+	local function UpdateInput(input)
+		local delta = input.Position - dragStart
+		local position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+		TweenService:Create(MainFrame, TweenInfo.new(0.1), {Position = position}):Play()
+	end
+	
+	TopBar.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragToggle = true
+			dragStart = input.Position
+			startPos = MainFrame.Position
+			
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragToggle = false
+				end
+			end)
+		end
+	end)
+	
+	UserInputService.InputChanged:Connect(function(input)
+		if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			UpdateInput(input)
+		end
+	end)
+	
+	function Window:Toggle(visible)
+		if visible == nil then
+			isVisible = not isVisible
+		else
+			isVisible = visible
+		end
+		
+		if isVisible then
+			ScreenGui.Enabled = true
+		else
+			ScreenGui.Enabled = false
+		end
+	end
+	
+	CloseButton.MouseEnter:Connect(function()
+		TweenService:Create(CloseButton, TweenInfo.new(0.15), {
+			BackgroundTransparency = 0
+		}):Play()
+	end)
+	
+	CloseButton.MouseLeave:Connect(function()
+		TweenService:Create(CloseButton, TweenInfo.new(0.15), {
+			BackgroundTransparency = 1
+		}):Play()
+	end)
+	
+	CloseButton.MouseButton1Click:Connect(function()
+		Window:Toggle(false)
+	end)
+	
+	UserInputService.InputBegan:Connect(function(input)
+		if input.KeyCode == Window.ToggleKey then
+			Window:Toggle()
+		end
+	end)
+	
+	-- Config Functions
+	function Window:SaveConfig(configName)
+		return MacUI:SaveConfig(configName, self.ConfigData)
+	end
+	
+	function Window:LoadConfig(configName)
+		local data = MacUI:LoadConfig(configName)
+		if data then
+			self.ConfigData = data
+			return true
+		end
+		return false
+	end
+	
+	function Window:GetConfigData()
+		return self.ConfigData
+	end
+	
+	function Window:SetConfigData(data)
+		self.ConfigData = data
+	end
+	
+	return Window
+end
+
+-- Auto-update loop
+function MacUI:StartAutoUpdate()
+	task.spawn(function()
+		while true do
+			task.wait()
+			pcall(function()
+				for _, updateFunc in ipairs(self.AutoUpdate) do
+					task.wait()
+					pcall(updateFunc)
+				end
+			end)
+		end
+	end)
+end
+
+return MacUI
