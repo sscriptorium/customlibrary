@@ -1,25 +1,6 @@
--- [Original by Hyperion : CSGO Cheat - Modified to NeoAura Premium]
+-- [Original by Hyperion : CSGO Cheat]
 -- [[https://hyperion.vip/]]
--- [Rewritten by: hyperlib_neoAura.lua v1.0]
--- [Theme: NeoAura Premium - Full grey/black monochrome premium style]
--- [Config System: Autosave, AutoLoad, Save/Load/Export/Import/Delete with file API]
-
-local __CHANGELOG = {
-	Version = "1.0.0",
-	Theme = "NeoAura Premium - Grey/Black Monochrome",
-	Changes = {
-		"Applied NeoAura Premium theme with grey/black palette",
-		"Added full config system with RegisterValue/GetValue/SetValue",
-		"Implemented autosave with configurable interval (default 8s)",
-		"Auto-load last used config on startup",
-		"Save/Load/Export/Import/Delete config files",
-		"Box-style layout with rounded corners (12-14px)",
-		"Config registration hooks for all UI controls",
-		"Preserved all original API compatibility",
-		"Improved structure and error handling",
-		"Non-blocking autosave implementation"
-	}
-}
+-- [Modified to NeoAura Premium Edition with Config System]
 
 if not game:IsLoaded() then
 	game.Loaded:Wait()
@@ -31,418 +12,322 @@ local Run = game:GetService('RunService')
 local Core = (gethui and gethui()) or game:FindFirstChild'CoreGui' or LocalPlayer.PlayerGui
 local UIS = game:GetService('UserInputService')
 local TextService = game:GetService('TextService')
-local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end)
 local HttpService = game:GetService('HttpService')
+local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end)
 
--- NeoAura Premium Theme Palette
-local NeoAura = {
-	Theme = {
-		BACKGROUND = Color3.fromRGB(13, 13, 15),      -- #0D0D0F
-		SECTION = Color3.fromRGB(35, 35, 37),         -- #232325
-		PANEL = Color3.fromRGB(28, 28, 31),           -- #1C1C1F
-		STROKE = Color3.fromRGB(42, 42, 45),          -- #2A2A2D
-		ACCENT = Color3.fromRGB(255, 255, 255),       -- #FFFFFF
-		TEXT = Color3.fromRGB(175, 175, 175),         -- #AFAFAF
-		MAIN = Color3.fromRGB(255, 255, 255),
-		TOUCH = Color3.fromRGB(60, 60, 63),
-		SYSTEM = Color3.fromRGB(200, 200, 200)
-	},
-	AutoUpdate = {},
-	SectionWidth = 0.95,
-	ConfigSystem = {
-		Folder = "NeoAura/configs/",
-		LastConfigFile = "NeoAura/lastconfig.json",
-		CurrentConfig = "default",
-		Values = {},
-		Callbacks = {},
-		AutosaveEnabled = true,
-		AutosaveInterval = 8,
-		LastSaveTime = 0
-	}
+-- NeoAura Premium Theme Colors
+local NeoAuraTheme = {
+	Background = Color3.fromRGB(13, 13, 15),      -- #0D0D0F
+	Panel = Color3.fromRGB(28, 28, 31),           -- #1C1C1F
+	Section = Color3.fromRGB(35, 35, 37),         -- #232325
+	Stroke = Color3.fromRGB(42, 42, 45),          -- #2A2A2D
+	Accent = Color3.fromRGB(255, 255, 255),       -- #FFFFFF
+	AccentDim = Color3.fromRGB(175, 175, 175),    -- #AFAFAF
+	Glow = Color3.fromRGB(80, 80, 85),
+	Touch = Color3.fromRGB(45, 45, 48),
+	System = Color3.fromRGB(60, 60, 65)
 }
 
--- File API wrappers
-local FileAPI = {
-	makefolder = makefolder or function() end,
-	writefile = writefile or function() end,
-	readfile = readfile or function() return "" end,
-	isfile = isfile or function() return false end,
-	listfiles = listfiles or function() return {} end,
-	delfile = delfile or function() end
+-- Config System
+local ConfigSystem = {
+	Values = {},
+	ApplyFuncs = {},
+	AutoSaveInterval = 8,
+	LastConfig = "lastconfig",
+	ConfigFolder = "NeoAuraConfigs"
 }
-
--- Config System Functions
-local ConfigManager = {}
-
-function ConfigManager:Initialize()
-	pcall(function()
-		FileAPI.makefolder("NeoAura")
-		FileAPI.makefolder("NeoAura/configs")
-	end)
-	
-	-- Load last config on startup
-	self:AutoLoadLastConfig()
-	
-	-- Start autosave loop
-	self:StartAutosave()
-end
-
-function ConfigManager:RegisterValue(key, default, applyFunc)
-	NeoAura.ConfigSystem.Values[key] = default
-	NeoAura.ConfigSystem.Callbacks[key] = applyFunc or function() end
-end
-
-function ConfigManager:GetConfigValue(key)
-	return NeoAura.ConfigSystem.Values[key]
-end
-
-function ConfigManager:SetConfigValue(key, value, silent)
-	NeoAura.ConfigSystem.Values[key] = value
-	if not silent and NeoAura.ConfigSystem.Callbacks[key] then
-		pcall(function()
-			NeoAura.ConfigSystem.Callbacks[key](value)
-		end)
-	end
-end
-
-function ConfigManager:SaveConfig(configName)
-	configName = configName or NeoAura.ConfigSystem.CurrentConfig
-	local filePath = NeoAura.ConfigSystem.Folder .. configName .. ".json"
-	
-	local success, err = pcall(function()
-		local encoded = HttpService:JSONEncode(NeoAura.ConfigSystem.Values)
-		FileAPI.writefile(filePath, encoded)
-		
-		-- Update last config pointer
-		FileAPI.writefile(NeoAura.ConfigSystem.LastConfigFile, HttpService:JSONEncode({
-			lastConfig = configName,
-			timestamp = os.time()
-		}))
-		
-		NeoAura.ConfigSystem.CurrentConfig = configName
-		NeoAura.ConfigSystem.LastSaveTime = tick()
-	end)
-	
-	if not success then
-		warn("[NeoAura Config] Failed to save config:", err)
-	end
-	
-	return success
-end
-
-function ConfigManager:LoadConfig(configName)
-	configName = configName or NeoAura.ConfigSystem.CurrentConfig
-	local filePath = NeoAura.ConfigSystem.Folder .. configName .. ".json"
-	
-	if not FileAPI.isfile(filePath) then
-		warn("[NeoAura Config] Config file not found:", configName)
-		return false
-	end
-	
-	local success, err = pcall(function()
-		local content = FileAPI.readfile(filePath)
-		local decoded = HttpService:JSONDecode(content)
-		
-		for key, value in pairs(decoded) do
-			self:SetConfigValue(key, value, false)
-		end
-		
-		NeoAura.ConfigSystem.CurrentConfig = configName
-		
-		-- Update last config pointer
-		FileAPI.writefile(NeoAura.ConfigSystem.LastConfigFile, HttpService:JSONEncode({
-			lastConfig = configName,
-			timestamp = os.time()
-		}))
-	end)
-	
-	if not success then
-		warn("[NeoAura Config] Failed to load config:", err)
-	end
-	
-	return success
-end
-
-function ConfigManager:DeleteConfig(configName)
-	if not configName or configName == "" then
-		return false
-	end
-	
-	local filePath = NeoAura.ConfigSystem.Folder .. configName .. ".json"
-	
-	local success, err = pcall(function()
-		FileAPI.delfile(filePath)
-	end)
-	
-	return success
-end
-
-function ConfigManager:ListConfigs()
-	local configs = {}
-	
-	pcall(function()
-		local files = FileAPI.listfiles(NeoAura.ConfigSystem.Folder)
-		for _, file in ipairs(files) do
-			local name = file:match("([^/\\]+)%.json$")
-			if name then
-				table.insert(configs, name)
-			end
-		end
-	end)
-	
-	return configs
-end
-
-function ConfigManager:ExportConfig(configName)
-	configName = configName or NeoAura.ConfigSystem.CurrentConfig
-	local filePath = NeoAura.ConfigSystem.Folder .. configName .. ".json"
-	
-	if FileAPI.isfile(filePath) then
-		local content = FileAPI.readfile(filePath)
-		(setclipboard or toclipboard or function(text)
-			print("[NeoAura Config] Export:", text)
-		end)(content)
-		return true
-	end
-	
-	return false
-end
-
-function ConfigManager:ImportConfig(configName, jsonData)
-	if not configName or not jsonData then
-		return false
-	end
-	
-	local success, err = pcall(function()
-		-- Validate JSON
-		local decoded = HttpService:JSONDecode(jsonData)
-		
-		-- Save to file
-		local filePath = NeoAura.ConfigSystem.Folder .. configName .. ".json"
-		FileAPI.writefile(filePath, jsonData)
-	end)
-	
-	return success
-end
-
-function ConfigManager:AutoLoadLastConfig()
-	pcall(function()
-		if FileAPI.isfile(NeoAura.ConfigSystem.LastConfigFile) then
-			local content = FileAPI.readfile(NeoAura.ConfigSystem.LastConfigFile)
-			local data = HttpService:JSONDecode(content)
-			
-			if data.lastConfig then
-				self:LoadConfig(data.lastConfig)
-			end
-		end
-	end)
-end
-
-function ConfigManager:StartAutosave()
-	task.spawn(function()
-		while NeoAura.ConfigSystem.AutosaveEnabled do
-			task.wait(NeoAura.ConfigSystem.AutosaveInterval)
-			
-			-- Non-blocking autosave
-			task.spawn(function()
-				pcall(function()
-					self:SaveConfig()
-				end)
-			end)
-		end
-	end)
-end
-
-function ConfigManager:SetAutosaveInterval(seconds)
-	NeoAura.ConfigSystem.AutosaveInterval = math.max(1, seconds)
-end
-
--- Initialize config system
-ConfigManager:Initialize()
 
 -- Utility Functions
-local function cretate_button(asd)
+local function ToDefault(val, def)
+	return val or def
+end
+
+local function CreateButton(parent)
 	local button = Instance.new('TextButton')
 	button.Size = UDim2.new(1, 0, 1, 0)
 	button.BackgroundTransparency = 1
 	button.TextTransparency = 1
 	button.Text = ""
-	button.Parent = asd
+	button.Parent = parent
 	button.ZIndex = 5000
 	return button
 end
 
-local function ToDefault(val, def)
-	return val or def
-end
-
-function NeoAura.set_theme(name:string)
-	-- Kept for compatibility but uses NeoAura theme
-	print("[NeoAura] Theme locked to NeoAura Premium")
-end
-
-local function Signal(list:{{name:string, callback:FunctionalTest}})
-	local k = {}
-	
-	for i, v in ipairs(list) do
-		k[v.name] = v.callback
-	end
-	
-	return k
-end
-
-local function scrolling_connect(scrollframe:ScrollingFrame)
+local function ScrollingConnect(scrollframe)
 	task.spawn(function()
 		local addres = 45
-		local UIListLayout:UIListLayout = scrollframe:WaitForChild('UIListLayout', 9999999)
+		local UIListLayout = scrollframe:WaitForChild('UIListLayout', 9999999)
 		scrollframe.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + addres)
-		
+
 		UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
 			scrollframe.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + addres)
 		end)
 	end)
 end
 
-local function SetImage(name:string, image:ImageLabel)
+local function SetImage(name, image)
 	name = name or "ADS"
 	name = name:lower()
-	
+
 	local NigImage = "rbxassetid://3926305904"
-	
+
 	if name == "ads" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(205, 565)
 		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
-	
+
 	if name == "list" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(485, 205)
 		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
-	
+
 	if name == "folder" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(805, 45)
 		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
-	
+
 	if name == "earth" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(604, 324)
 		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
-	
+
 	if name == "locked" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(524, 644)
 		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
-	
+
 	if name == "home" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(964, 205)
 		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
-	
+
 	if name == "positon" or name == 'gps' then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(325, 565)
 		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
-	
+
 	if name == "notify" or name == 'notification' then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(325, 565)
 		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
-	
+
 	if name == "close" or name == 'no' then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(284, 4)
 		image.ImageRectSize = Vector2.new(24, 24)
 		return
 	end
-	
+
 	if name == "color" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(44, 964)
 		image.ImageRectSize = Vector2.new(36, 36)
 		return
 	end
-	
+
 	image.ImageRectOffset = Vector2.new(0, 0)
 	image.ImageRectSize = Vector2.new(0, 0)
-	
+
 	if name == "settings" then
 		image.Image = "rbxassetid://7734053495"
 	end
-	
+
 	if name == "smartphone" then
 		image.Image = "rbxassetid://7734058979"
 	end
-	
+
 	if name == "crown" then
 		image.Image = "rbxassetid://7733765398"
 	end
-	
+
 	if name == "save" then
 		image.Image = "rbxassetid://7734052335"
 	end
-	
+
 	if name == "hash" then
 		image.Image = "rbxassetid://7733955740"
 	end
-	
+
 	if name == "server" then
 		image.Image = "rbxassetid://7734053426"
 	end
-	
+
 	if name == "option" then
 		image.Image = "rbxassetid://7734021300"
 	end
-	
+
 	if name == "link" then
 		image.Image = "rbxassetid://7733978098"
 	end
-	
+
 	if name == "copy" then
 		image.Image = "rbxassetid://7733764083"
 	end
-	
+
 	if name == "cpu" then
 		image.Image = "rbxassetid://7733765045"
 	end
-	
+
 	if name == "moon" then
 		image.Image = "rbxassetid://7743870134"
 	end
-	
+
 	if name == "wallet" then
 		image.Image = "rbxassetid://7743877573"
 	end
 end
 
-function NeoAura.new(WindowName, WindowLogo, WindowDescription)
+-- Config System Functions
+function ConfigSystem:RegisterValue(key, default, applyFunc)
+	self.Values[key] = default
+	self.ApplyFuncs[key] = applyFunc
+end
+
+function ConfigSystem:GetValue(key)
+	return self.Values[key]
+end
+
+function ConfigSystem:SetValue(key, value, silent)
+	self.Values[key] = value
+	if not silent and self.ApplyFuncs[key] then
+		pcall(self.ApplyFuncs[key], value)
+	end
+end
+
+function ConfigSystem:SaveConfig(name)
+	name = name or self.LastConfig
+	local success, err = pcall(function()
+		local configData = HttpService:JSONEncode(self.Values)
+		if writefile then
+			local folderPath = self.ConfigFolder .. "/" .. name .. ".json"
+			if not isfolder(self.ConfigFolder) then
+				makefolder(self.ConfigFolder)
+			end
+			writefile(folderPath, configData)
+			writefile(self.ConfigFolder .. "/lastconfig.json", configData)
+			return true
+		end
+	end)
+	return success
+end
+
+function ConfigSystem:LoadConfig(name)
+	name = name or self.LastConfig
+	local success, result = pcall(function()
+		if readfile and isfile then
+			local filePath = self.ConfigFolder .. "/" .. name .. ".json"
+			if isfile(filePath) then
+				local configData = readfile(filePath)
+				local decoded = HttpService:JSONDecode(configData)
+				for key, value in pairs(decoded) do
+					self:SetValue(key, value, false)
+				end
+				return true
+			end
+		end
+		return false
+	end)
+	return success and result
+end
+
+function ConfigSystem:AutoLoad()
+	task.spawn(function()
+		wait(1)
+		local success = self:LoadConfig("lastconfig")
+	end)
+end
+
+function ConfigSystem:DeleteConfig(name)
+	if delfile and isfile then
+		local filePath = self.ConfigFolder .. "/" .. name .. ".json"
+		if isfile(filePath) then
+			delfile(filePath)
+			return true
+		end
+	end
+	return false
+end
+
+function ConfigSystem:ListConfigs()
+	local configs = {}
+	if listfiles and isfolder then
+		if isfolder(self.ConfigFolder) then
+			local files = listfiles(self.ConfigFolder)
+			for _, file in ipairs(files) do
+				if file:match("%.json$") and not file:match("lastconfig%.json$") then
+					local name = file:match("([^/]+)%.json$")
+					table.insert(configs, name)
+				end
+			end
+		end
+	end
+	return configs
+end
+
+function ConfigSystem:StartAutoSave()
+	task.spawn(function()
+		while true do
+			wait(self.AutoSaveInterval)
+			self:SaveConfig()
+		end
+	end)
+end
+
+-- Main Library
+local NoHyper = {
+	Theme = NeoAuraTheme,
+	AutoUpdate = {},
+	SectionWidth = 0.95,
+	Config = ConfigSystem
+}
+
+function NoHyper.SetTheme(name)
+	-- NeoAura theme is locked, but can be customized here
+	if name:lower() == "neoaura" then
+		NoHyper.Theme.Background = Color3.fromRGB(13, 13, 15)
+		NoHyper.Theme.Panel = Color3.fromRGB(28, 28, 31)
+		NoHyper.Theme.Section = Color3.fromRGB(35, 35, 37)
+		NoHyper.Theme.Stroke = Color3.fromRGB(42, 42, 45)
+		NoHyper.Theme.Accent = Color3.fromRGB(255, 255, 255)
+		NoHyper.Theme.AccentDim = Color3.fromRGB(175, 175, 175)
+	end
+end
+
+local function Signal(list)
+	local k = {}
+	for i, v in ipairs(list) do
+		k[v.name] = v.callback
+	end
+	return k
+end
+
+function NoHyper.new(WindowName, WindowLogo, WindowDescription)
 	local HyperWindow = {
 		Tabs = {},
 		Size = UDim2.new(0.230000004, 350, 0.25, 250),
-		Toggle = Enum.KeyCode.LeftControl,
-		ConfigManager = ConfigManager
+		Toggle = Enum.KeyCode.LeftControl
 	}
-	
+
 	WindowName = ToDefault(WindowName, 'NeoAura Premium')
 	WindowLogo = ToDefault(WindowLogo, 'http://www.roblox.com/asset/?id=16530565354')
-	WindowDescription = ToDefault(WindowDescription, 'Premium UI Library')
-	
+	WindowDescription = ToDefault(WindowDescription, 'Premium Experience')
+
 	local NoHyperUI = Instance.new("ScreenGui")
 	local MainFrame = Instance.new("Frame")
 	local Frame = Instance.new("Frame")
@@ -466,26 +351,28 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	local View = Instance.new("Frame")
 	local UICorner_2 = Instance.new("UICorner")
 	local UICorner_3 = Instance.new("UICorner")
-	
+	local UIStroke = Instance.new("UIStroke")
+	local GlowEffect = Instance.new("Frame")
+
 	NoHyperUI:GetPropertyChangedSignal('Enabled'):Connect(function()
 		if not NoHyperUI.Enabled then
 			NoHyperUI.Enabled = true
 		end
 	end)
-	
+
 	HyperWindow.ScreenSource = NoHyperUI
-	
-	NoHyperUI.Name = tostring("ui.protect.") .. tostring(math.random(1, 100)) .. tostring(Random.new():NextNumber(0.1, 0.9)) .. tostring(Random.new():NextNumber(0.1, 0.9)) .. tostring(Random.new():NextNumber(0.1, 0.9))
+
+	NoHyperUI.Name = tostring("neoaura.protect.") .. tostring(math.random(1, 100)) .. tostring(Random.new():NextNumber(0.1, 0.9))
 	NoHyperUI.Parent = Core
 	NoHyperUI.ResetOnSpawn = false
 	NoHyperUI.IgnoreGuiInset = true
 	NoHyperUI.ZIndexBehavior = Enum.ZIndexBehavior.Global
 	ProtectGui(NoHyperUI)
-	
+
 	MainFrame.Name = "MainFrame"
 	MainFrame.Parent = NoHyperUI
 	MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-	MainFrame.BackgroundColor3 = NeoAura.Theme.BACKGROUND
+	MainFrame.BackgroundColor3 = NoHyper.Theme.Background
 	MainFrame.BackgroundTransparency = 1.000
 	MainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	MainFrame.BorderSizePixel = 0
@@ -493,18 +380,23 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 	MainFrame.Size = HyperWindow.Size
 	MainFrame.Active = true
-	
+
 	Frame.Parent = MainFrame
-	Frame.BackgroundColor3 = NeoAura.Theme.BACKGROUND
+	Frame.BackgroundColor3 = NoHyper.Theme.Background
 	Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	Frame.BorderSizePixel = 0
 	Frame.Size = UDim2.new(1, 0, 1, 0)
 	Frame.Position = UDim2.fromScale(-1, 0)
 	Frame.ClipsDescendants = true
-	
+
 	UICorner.Parent = Frame
 	UICorner.CornerRadius = UDim.new(0, 14)
-	
+
+	UIStroke.Parent = Frame
+	UIStroke.Color = NoHyper.Theme.Stroke
+	UIStroke.Thickness = 2
+	UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
 	Contact.Name = "Contact"
 	Contact.Parent = Frame
 	Contact.AnchorPoint = Vector2.new(0.5, 0)
@@ -514,14 +406,14 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	Contact.BorderSizePixel = 0
 	Contact.Position = UDim2.new(0.125, 0, 1.25, 0)
 	Contact.Size = UDim2.new(0.230000004, 0, 0.0484971367, 0)
-	
+
 	UIListLayout.Parent = Contact
 	UIListLayout.FillDirection = Enum.FillDirection.Horizontal
 	UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 	UIListLayout.Padding = UDim.new(0, 10)
-	
+
 	YoutubeButton.Name = "YoutubeButton"
 	YoutubeButton.Parent = Contact
 	YoutubeButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -534,7 +426,7 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	YoutubeButton.Image = "rbxassetid://5027762797"
 	YoutubeButton.ScaleType = Enum.ScaleType.Crop
 	YoutubeButton.Visible = false
-	
+
 	WebsiteButton.Name = "WebsiteButton"
 	WebsiteButton.Parent = Contact
 	WebsiteButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -545,12 +437,12 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	WebsiteButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	WebsiteButton.ZIndex = 5
 	WebsiteButton.Image = "rbxassetid://3926305904"
-	WebsiteButton.ImageColor3 = NeoAura.Theme.ACCENT
+	WebsiteButton.ImageColor3 = NoHyper.Theme.AccentDim
 	WebsiteButton.ImageRectOffset = Vector2.new(604, 324)
 	WebsiteButton.ImageRectSize = Vector2.new(35, 35)
 	WebsiteButton.ScaleType = Enum.ScaleType.Fit
 	WebsiteButton.Visible = false
-	
+
 	DiscordButton.Name = "DiscordButton"
 	DiscordButton.Parent = Contact
 	DiscordButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -563,7 +455,7 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	DiscordButton.Image = "http://www.roblox.com/asset/?id=16759385019"
 	DiscordButton.ScaleType = Enum.ScaleType.Fit
 	DiscordButton.Visible = false
-	
+
 	TabButtonList.Name = "TabButtonList"
 	TabButtonList.Parent = Frame
 	TabButtonList.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -574,7 +466,7 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	TabButtonList.Position = UDim2.new(-0.3, 0, 0.132051408, 0)
 	TabButtonList.Size = UDim2.new(0.230000004, 0, 0.781199217, 0)
 	TabButtonList.ZIndex = 3
-	
+
 	ScrollingFrame.Parent = TabButtonList
 	ScrollingFrame.Active = true
 	ScrollingFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -589,13 +481,14 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	ScrollingFrame.BottomImage = ""
 	ScrollingFrame.ScrollBarThickness = 0
 	ScrollingFrame.TopImage = ""
-	
+
 	UIListLayout_2.Parent = ScrollingFrame
 	UIListLayout_2.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
 	UIListLayout_2.Padding = UDim.new(0, 6)
-	
-	scrolling_connect(ScrollingFrame)
+
+	ScrollingConnect(ScrollingFrame)
+
 	TabSystem.Name = "TabSystem"
 	TabSystem.Parent = Frame
 	TabSystem.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -607,16 +500,16 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	TabSystem.Position = UDim2.new(1.5, 0, 0.571928024, 0)
 	TabSystem.Size = UDim2.new(0.706745386, 0, 0.816288531, 0)
 	TabSystem.ZIndex = 5
-	
+
 	Top.Name = "Top"
 	Top.Parent = Frame
 	Top.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	Top.BackgroundTransparency = 1.000
 	Top.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	Top.BorderSizePixel = 0
-	Top.Position = UDim2.new(-3.28824861e-08, 0, 0, 0)
+	Top.Position = UDim2.new(0, 0, 0, 0)
 	Top.Size = UDim2.new(1.00000012, 0, 0.139001563, 0)
-	
+
 	LogoHub.Name = "LogoHub"
 	LogoHub.Parent = Top
 	LogoHub.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -630,7 +523,7 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	LogoHub.Image = tostring(WindowLogo)
 	LogoHub.ScaleType = Enum.ScaleType.Fit
 	LogoHub.ImageTransparency = 1
-	
+
 	MainText.Name = "MainText"
 	MainText.Parent = Top
 	MainText.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -639,16 +532,16 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	MainText.BorderSizePixel = 0
 	MainText.Position = UDim2.new(0.270000011, 0, 0.125, 0)
 	MainText.Size = UDim2.new(0.706745207, 0, 0.509708107, 0)
-	MainText.Font = Enum.Font.GothamMedium
+	MainText.Font = Enum.Font.GothamBold
 	MainText.Text = tostring(WindowName)
-	MainText.TextColor3 = NeoAura.Theme.ACCENT
+	MainText.TextColor3 = NoHyper.Theme.Accent
 	MainText.TextScaled = true
 	MainText.TextSize = 14.000
 	MainText.TextStrokeTransparency = 0.800
 	MainText.TextWrapped = true
 	MainText.TextXAlignment = Enum.TextXAlignment.Left
 	MainText.TextTransparency = 1
-	
+
 	DescriptionText.Name = "DescriptionText"
 	DescriptionText.Parent = Top
 	DescriptionText.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -657,16 +550,16 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	DescriptionText.BorderSizePixel = 0
 	DescriptionText.Position = UDim2.new(0.27000013, 0, 0.749999702, 0)
 	DescriptionText.Size = UDim2.new(0.706745267, 0, 0.187055781, 0)
-	DescriptionText.Font = Enum.Font.GothamMedium
+	DescriptionText.Font = Enum.Font.Gotham
 	DescriptionText.Text = tostring(WindowDescription)
-	DescriptionText.TextColor3 = NeoAura.Theme.TEXT
+	DescriptionText.TextColor3 = NoHyper.Theme.AccentDim
 	DescriptionText.TextScaled = true
 	DescriptionText.TextSize = 14.000
 	DescriptionText.TextStrokeTransparency = 0.800
 	DescriptionText.TextTransparency = 1
 	DescriptionText.TextWrapped = true
 	DescriptionText.TextXAlignment = Enum.TextXAlignment.Left
-	
+
 	DropShadow.Name = "DropShadow"
 	DropShadow.Parent = Frame
 	DropShadow.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -681,28 +574,23 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	DropShadow.ImageTransparency = 1
 	DropShadow.ScaleType = Enum.ScaleType.Slice
 	DropShadow.SliceCenter = Rect.new(49, 49, 450, 450)
-	
-	local cs = Tween:Create(Frame, TweenInfo.new(1), {
+
+	local cs = Tween:Create(Frame, TweenInfo.new(1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
 		Position = UDim2.fromScale(0, 0)
 	})
-	
+
 	cs:Play()
 	cs.Completed:Connect(function()
 		Tween:Create(DropShadow, TweenInfo.new(2), {
-			ImageTransparency = 0.3,
-		}):Play()
-		
-		Tween:Create(DropShadow, TweenInfo.new(1), {
-			ImageTransparency = 0.5,
+			ImageTransparency = 0.2,
 		}):Play()
 	end)
-	
-	-- Items
+
 	delay(0.5, function()
 		Tween:Create(CloseButton, TweenInfo.new(0.5), {
 			ImageTransparency = 0
 		}):Play()
-		
+
 		Tween:Create(TickUI, TweenInfo.new(0.5), {
 			BackgroundTransparency = 0.5
 		}):Play()
@@ -718,19 +606,19 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 		Tween:Create(LogoHub, TweenInfo.new(.55), {
 			ImageTransparency = 0
 		}):Play()
-		Tween:Create(TabButtonList, TweenInfo.new(.55), {
+		Tween:Create(TabButtonList, TweenInfo.new(.55, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
 			Position = UDim2.new(0.00999999139, 0, 0.132051408, 0)
 		}):Play()
-		
-		Tween:Create(TabSystem, TweenInfo.new(.55), {
+
+		Tween:Create(TabSystem, TweenInfo.new(.55, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
 			Position = UDim2.new(0.623372614, 0, 0.571928024, 0)
 		}):Play()
-		
+
 		Tween:Create(Contact, TweenInfo.new(.55), {
 			Position = UDim2.new(0.125, 0, 0.934000015, 0)
 		}):Play()
 	end)
-	
+
 	CloseButton.ImageTransparency = 1
 	CloseButton.Name = "CloseButton"
 	CloseButton.Parent = Frame
@@ -744,70 +632,81 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 	CloseButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	CloseButton.ZIndex = 8
 	CloseButton.Image = "rbxassetid://10002398990"
-	
+	CloseButton.ImageColor3 = NoHyper.Theme.AccentDim
+
 	TickUI.BackgroundTransparency = 1
 	TickUI.Name = "TickUI"
 	TickUI.Parent = Frame
 	TickUI.AnchorPoint = Vector2.new(0, 0.5)
-	TickUI.BackgroundColor3 = NeoAura.Theme.STROKE
+	TickUI.BackgroundColor3 = NoHyper.Theme.Stroke
 	TickUI.BackgroundTransparency = 1
 	TickUI.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	TickUI.BorderSizePixel = 0
 	TickUI.Position = UDim2.new(0.25, 0, 0.5, 0)
 	TickUI.Size = UDim2.new(0, 1, 1, 0)
 	TickUI.ZIndex = 3
-	
+
 	View.BackgroundTransparency = 1
 	View.Name = "View"
 	View.Parent = TickUI
 	View.AnchorPoint = Vector2.new(0.5, 0.5)
-	View.BackgroundColor3 = NeoAura.Theme.STROKE
+	View.BackgroundColor3 = NoHyper.Theme.Stroke
 	View.BackgroundTransparency = 1
 	View.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	View.BorderSizePixel = 0
 	View.Position = UDim2.new(0.5, 0, 0.5, 0)
 	View.Size = UDim2.new(1, 1, 1, 0)
 	View.ZIndex = 2
-	
+
 	UICorner_2.CornerRadius = UDim.new(0.5, 0)
 	UICorner_2.Parent = View
-	
+
 	UICorner_3.CornerRadius = UDim.new(0.5, 0)
 	UICorner_3.Parent = TickUI
-	
-	function HyperWindow:NewTab(TabName:string, TabIcon:string)
+
+	-- Initialize Config System
+	ConfigSystem:AutoLoad()
+	ConfigSystem:StartAutoSave()
+
+	function HyperWindow:NewTab(TabName, TabIcon)
 		local TabHyper = {
 			Section = {}
 		}
-		
+
 		local TabButton = Instance.new("Frame")
 		local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 		local UICorner = Instance.new("UICorner")
-		local UIGradient = Instance.new("UIGradient")
 		local TextLabel = Instance.new("TextLabel")
 		local Icon = Instance.new("ImageLabel")
 		local Button = Instance.new("TextButton")
-		
+		local Glow = Instance.new("Frame")
+		local GlowCorner = Instance.new("UICorner")
+
 		TabButton.Name = TabName or "TabButton"
 		TabButton.Parent = ScrollingFrame
-		TabButton.BackgroundColor3 = NeoAura.Theme.PANEL
-		TabButton.BackgroundTransparency = 1.000
+		TabButton.BackgroundColor3 = NoHyper.Theme.Panel
+		TabButton.BackgroundTransparency = 0.95
 		TabButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		TabButton.BorderSizePixel = 0
 		TabButton.Size = UDim2.new(0.980000019, 0, 0.5, 0)
-		
+
 		UIAspectRatioConstraint.Parent = TabButton
 		UIAspectRatioConstraint.AspectRatio = 5.000
 		UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
-		
-		UICorner.CornerRadius = UDim.new(0, 12)
+
+		UICorner.CornerRadius = UDim.new(0, 8)
 		UICorner.Parent = TabButton
-		
-		UIGradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(214, 214, 214)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 255, 255))}
-		UIGradient.Rotation = 190
-		UIGradient.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0.00, 0.04), NumberSequenceKeypoint.new(1.00, 0.00)}
-		UIGradient.Parent = TabButton
-		
+
+		Glow.Name = "Glow"
+		Glow.Parent = TabButton
+		Glow.BackgroundColor3 = NoHyper.Theme.Glow
+		Glow.BackgroundTransparency = 1
+		Glow.Size = UDim2.new(1, 0, 1, 0)
+		Glow.ZIndex = 0
+
+		GlowCorner.CornerRadius = UDim.new(0, 8)
+		GlowCorner.Parent = Glow
+
 		TextLabel.Parent = TabButton
 		TextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 		TextLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -818,13 +717,13 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 		TextLabel.Size = UDim2.new(1.5, 0, 0.5, 0)
 		TextLabel.Font = Enum.Font.GothamBold
 		TextLabel.Text = TabName or "Null"
-		TextLabel.TextColor3 = NeoAura.Theme.ACCENT
+		TextLabel.TextColor3 = NoHyper.Theme.AccentDim
 		TextLabel.TextScaled = true
 		TextLabel.TextSize = 14.000
 		TextLabel.TextStrokeTransparency = 0.950
 		TextLabel.TextWrapped = true
 		TextLabel.TextXAlignment = Enum.TextXAlignment.Left
-		
+
 		Icon.Name = "Icon"
 		Icon.Parent = TabButton
 		Icon.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -835,8 +734,9 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 		Icon.Position = UDim2.new(0.125, 0, 0.5, 0)
 		Icon.Size = UDim2.new(0.800000012, 0, 0.800000012, 0)
 		Icon.SizeConstraint = Enum.SizeConstraint.RelativeYY
+		Icon.ImageColor3 = NoHyper.Theme.AccentDim
 		SetImage(TabIcon, Icon)
-		
+
 		Button.Name = "Button"
 		Button.Parent = TabButton
 		Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -849,16 +749,16 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 		Button.TextColor3 = Color3.fromRGB(0, 0, 0)
 		Button.TextSize = 14.000
 		Button.TextTransparency = 1.000
-		
-		--[=========================================]
-		
+
 		local TabFrame = Instance.new("Frame")
 		local LeftFrame = Instance.new("ScrollingFrame")
 		local UIListLayout = Instance.new("UIListLayout")
 		local RightFrame = Instance.new("ScrollingFrame")
 		local UIListLayout_2 = Instance.new("UIListLayout")
-		
-		scrolling_connect(RightFrame) scrolling_connect(LeftFrame)
+
+		ScrollingConnect(RightFrame)
+		ScrollingConnect(LeftFrame)
+
 		TabFrame.Name = "TabFrame"
 		TabFrame.Parent = TabSystem
 		TabFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -870,7 +770,7 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 		TabFrame.Position = UDim2.new(0.5, 0, 0.497500002, 0)
 		TabFrame.Size = UDim2.new(0.949999988, 0, 0.980000019, 0)
 		TabFrame.ZIndex = 6
-		
+
 		LeftFrame.Name = "LeftFrame"
 		LeftFrame.Parent = TabFrame
 		LeftFrame.Active = true
@@ -886,12 +786,12 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 		LeftFrame.BottomImage = ""
 		LeftFrame.ScrollBarThickness = 0
 		LeftFrame.TopImage = ""
-		
+
 		UIListLayout.Parent = LeftFrame
 		UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 		UIListLayout.Padding = UDim.new(0, 5)
-		
+
 		RightFrame.Name = "RightFrame"
 		RightFrame.Parent = TabFrame
 		RightFrame.Active = true
@@ -908,46 +808,49 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 		RightFrame.ScrollBarThickness = 0
 		RightFrame.TopImage = ""
 		RightFrame.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Left
-		
+
 		UIListLayout_2.Parent = RightFrame
 		UIListLayout_2.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
 		UIListLayout_2.Padding = UDim.new(0, 5)
-		
+
 		local call = function(val)
 			if val then
 				TabFrame.Visible = true
-				Tween:Create(TabButton, TweenInfo.new(0.1), {BackgroundTransparency = 0}):Play()
-				Tween:Create(TextLabel, TweenInfo.new(0.3), {TextTransparency = 0, Size = UDim2.fromScale(1.5, 0.5)}):Play()
+				Tween:Create(TabButton, TweenInfo.new(0.2, Enum.EasingStyle.Quart), {BackgroundTransparency = 0}):Play()
+				Tween:Create(TextLabel, TweenInfo.new(0.3), {TextTransparency = 0, TextColor3 = NoHyper.Theme.Accent, Size = UDim2.fromScale(1.5, 0.5)}):Play()
 				Tween:Create(Icon, TweenInfo.new(0.3), {
 					ImageTransparency = 0,
+					ImageColor3 = NoHyper.Theme.Accent,
 					Size = UDim2.new(0.800000012, 0, 0.800000012, 0)
 				}):Play()
 			else
 				TabFrame.Visible = false
-				Tween:Create(TabButton, TweenInfo.new(0.1), {BackgroundTransparency = 0.95}):Play()
+				Tween:Create(TabButton, TweenInfo.new(0.2, Enum.EasingStyle.Quart), {BackgroundTransparency = 0.95}):Play()
 				Tween:Create(TextLabel, TweenInfo.new(0.3), {
 					TextTransparency = 0.4,
+					TextColor3 = NoHyper.Theme.AccentDim,
 					Size = UDim2.fromScale(1.5, 0.45)
 				}):Play()
 				Tween:Create(Icon, TweenInfo.new(0.3), {
 					ImageTransparency = 0.4,
+					ImageColor3 = NoHyper.Theme.AccentDim,
 					Size = UDim2.new(0.65, 0, 0.65, 0)
 				}):Play()
 			end
 		end
-		
+
 		if not HyperWindow.Tabs[1] then
 			task.spawn(call, true)
 		else
 			task.spawn(call, false)
 		end
-		
+
 		table.insert(HyperWindow.Tabs, {
 			TabFrame,
 			call
 		})
-		
+
 		Button.MouseButton1Click:Connect(function()
 			for i, v in ipairs(HyperWindow.Tabs) do
 				if v[1] == TabFrame then
@@ -957,20 +860,19 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				end
 			end
 		end)
-		
-		function TabHyper:NewSection(SectionName:string, SectionIcon:string, Position:string)
+
+		function TabHyper:NewSection(SectionName, SectionIcon, Position)
 			local Section_Hyper = {}
-			
+
 			SectionName = ToDefault(SectionName, 'Section')
 			SectionIcon = ToDefault(SectionIcon, 'home')
 			Position = (Position and (Position:lower():find('left') and LeftFrame) or RightFrame) or LeftFrame
-			
+
 			local Section = Instance.new("Frame")
 			local UICorner = Instance.new("UICorner")
 			local SectionTitle = Instance.new("Frame")
 			local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 			local Icon = Instance.new("ImageLabel")
-			local UIGradient = Instance.new("UIGradient")
 			local TextLabel = Instance.new("TextLabel")
 			local Frame = Instance.new("Frame")
 			local Frame_2 = Instance.new("Frame")
@@ -978,18 +880,18 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 			local UICorner_3 = Instance.new("UICorner")
 			local UIListLayout = Instance.new("UIListLayout")
 			local UIStroke = Instance.new("UIStroke")
-			
+
 			Section.Name = "Section"
 			Section.Parent = Position
-			Section.BackgroundColor3 = NeoAura.Theme.SECTION
+			Section.BackgroundColor3 = NoHyper.Theme.Section
 			Section.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			Section.BorderSizePixel = 0
-			Section.Size = UDim2.new(NeoAura.SectionWidth, 0, 0, 33)
+			Section.Size = UDim2.new(NoHyper.SectionWidth, 0, 0, 33)
 			Section.ZIndex = 5
-			
+
 			UICorner.CornerRadius = UDim.new(0, 12)
 			UICorner.Parent = Section
-			
+
 			SectionTitle.Name = "SectionTitle"
 			SectionTitle.Parent = Section
 			SectionTitle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -999,15 +901,15 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 			SectionTitle.ClipsDescendants = true
 			SectionTitle.Size = UDim2.new(1, 0, 1, 0)
 			SectionTitle.ZIndex = 7
-			
+
 			UIAspectRatioConstraint.Parent = SectionTitle
 			UIAspectRatioConstraint.AspectRatio = 8.500
 			UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
-			
+
 			Icon.Name = "Icon"
 			Icon.Parent = SectionTitle
 			Icon.AnchorPoint = Vector2.new(0.5, 0.5)
-			Icon.BackgroundColor3 = NeoAura.Theme.ACCENT
+			Icon.BackgroundColor3 = NoHyper.Theme.Accent
 			Icon.BackgroundTransparency = 1.000
 			Icon.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			Icon.BorderSizePixel = 0
@@ -1015,14 +917,9 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 			Icon.Size = UDim2.new(0.649999976, 0, 0.649999976, 0)
 			Icon.SizeConstraint = Enum.SizeConstraint.RelativeYY
 			Icon.ZIndex = 8
-			Icon.ImageColor3 = NeoAura.Theme.ACCENT
+			Icon.ImageColor3 = NoHyper.Theme.Accent
 			SetImage(SectionIcon, Icon)
-			
-			UIGradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(214, 214, 214)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 255, 255))}
-			UIGradient.Rotation = 190
-			UIGradient.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0.00, 0.04), NumberSequenceKeypoint.new(1.00, 0.00)}
-			UIGradient.Parent = Icon
-			
+
 			TextLabel.Parent = SectionTitle
 			TextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 			TextLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1032,77 +929,73 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 			TextLabel.Position = UDim2.new(0.935000002, 0, 0.5, 0)
 			TextLabel.Size = UDim2.new(1.5664264, 0, 0.600000024, 0)
 			TextLabel.ZIndex = 8
-			TextLabel.Font = Enum.Font.GothamMedium
+			TextLabel.Font = Enum.Font.GothamBold
 			TextLabel.Text = SectionName or "General"
-			TextLabel.TextColor3 = NeoAura.Theme.ACCENT
+			TextLabel.TextColor3 = NoHyper.Theme.Accent
 			TextLabel.TextScaled = true
 			TextLabel.TextSize = 14.000
 			TextLabel.TextStrokeTransparency = 0.950
 			TextLabel.TextWrapped = true
 			TextLabel.TextXAlignment = Enum.TextXAlignment.Left
-			
+
 			Frame.Parent = SectionTitle
 			Frame.AnchorPoint = Vector2.new(0.5, 1)
-			Frame.BackgroundColor3 = NeoAura.Theme.TEXT
-			Frame.BackgroundTransparency = 0.750
+			Frame.BackgroundColor3 = NoHyper.Theme.Stroke
+			Frame.BackgroundTransparency = 0.5
 			Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			Frame.BorderSizePixel = 0
 			Frame.Position = UDim2.new(0.5, 0, 1, 0)
 			Frame.Size = UDim2.new(0.800000012, 0, 0.0250000004, 0)
 			Frame.ZIndex = 9
-			
+
 			Frame_2.Parent = Frame
 			Frame_2.AnchorPoint = Vector2.new(0.5, 0.5)
-			Frame_2.BackgroundColor3 = NeoAura.Theme.TEXT
-			Frame_2.BackgroundTransparency = 0.750
+			Frame_2.BackgroundColor3 = NoHyper.Theme.Stroke
+			Frame_2.BackgroundTransparency = 0.5
 			Frame_2.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			Frame_2.BorderSizePixel = 0
 			Frame_2.Position = UDim2.new(0.5, 0, 0.5, 0)
 			Frame_2.Size = UDim2.new(1, 0, 1.10000002, 0)
 			Frame_2.ZIndex = 9
-			
+
 			UICorner_2.Parent = Frame_2
-			
+
 			UICorner_3.Parent = Frame
-			
+
 			UIListLayout.Parent = Section
 			UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 			UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 			UIListLayout.Padding = UDim.new(0, 3)
-			
-			UIStroke.Color = NeoAura.Theme.STROKE
+
+			UIStroke.Color = NoHyper.Theme.Stroke
 			UIStroke.Parent = Section
-			
+
 			function Section_Hyper.update()
 				local old = 1
-				
+
 				for i, v in ipairs(Section:GetChildren()) do
 					if v:IsA('Frame') then
 						old += (v.AbsoluteSize.Y or 27) + UIListLayout.Padding.Offset
 					end
 				end
-				
-				Tween:Create(Section, TweenInfo.new(0.1), {Size = UDim2.new(NeoAura.SectionWidth, 0, 0, old + 1)}):Play()
+
+				Tween:Create(Section, TweenInfo.new(0.1), {Size = UDim2.new(NoHyper.SectionWidth, 0, 0, old + 1)}):Play()
 			end
-			
-			table.insert(NeoAura.AutoUpdate, Section_Hyper.update)
-			
+
+			table.insert(NoHyper.AutoUpdate, Section_Hyper.update)
+
 			function Section_Hyper.text(...)
 				TextLabel.Text = tostring(...)
 			end
-			
+
 			function Section_Hyper:AddButton(ButtonName, callback)
-				local configKey = "Button_" .. ButtonName
-				
 				local Button = Instance.new("Frame")
 				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 				local Button_2 = Instance.new("TextButton")
 				local Frame = Instance.new("Frame")
 				local UICorner = Instance.new("UICorner")
 				local TextLabel = Instance.new("TextLabel")
-				
-				--Properties:
-				
+
 				Button.Name = "Button"
 				Button.Parent = Section
 				Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1111,11 +1004,11 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Button.BorderSizePixel = 0
 				Button.Size = UDim2.new(1, 0, 1, 0)
 				Button.ZIndex = 7
-				
+
 				UIAspectRatioConstraint.Parent = Button
 				UIAspectRatioConstraint.AspectRatio = 9.000
 				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
-				
+
 				Button_2.Name = "Button"
 				Button_2.Parent = Button
 				Button_2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1129,35 +1022,35 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Button_2.TextColor3 = Color3.fromRGB(0, 0, 0)
 				Button_2.TextSize = 14.000
 				Button_2.TextTransparency = 1.000
-				
+
 				Frame.Parent = Button
 				Frame.AnchorPoint = Vector2.new(0.5, 0.5)
-				Frame.BackgroundColor3 = NeoAura.Theme.PANEL
+				Frame.BackgroundColor3 = NoHyper.Theme.Panel
 				Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Frame.BorderSizePixel = 0
 				Frame.Position = UDim2.new(0.5, 0, 0.5, 0)
 				Frame.Size = UDim2.new(0.899999976, 0, 1, 0)
 				Frame.ZIndex = 10
-				
+
 				Button_2.MouseEnter:Connect(function()
-					Tween:Create(Frame, TweenInfo.new(0.075), {BackgroundColor3 = NeoAura.Theme.TOUCH}):Play()
+					Tween:Create(Frame, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.Touch}):Play()
 				end)
-				
+
 				Button_2.MouseButton1Down:Connect(function()
-					Tween:Create(Frame, TweenInfo.new(0.075), {BackgroundColor3 = NeoAura.Theme.SYSTEM}):Play()
+					Tween:Create(Frame, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.System}):Play()
 				end)
-				
+
 				Button_2.MouseButton1Up:Connect(function()
-					Tween:Create(Frame, TweenInfo.new(0.075), {BackgroundColor3 = NeoAura.Theme.PANEL}):Play()
+					Tween:Create(Frame, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.Panel}):Play()
 				end)
-				
+
 				Button_2.MouseLeave:Connect(function()
-					Tween:Create(Frame, TweenInfo.new(0.075), {BackgroundColor3 = NeoAura.Theme.PANEL}):Play()
+					Tween:Create(Frame, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.Panel}):Play()
 				end)
-				
-				UICorner.CornerRadius = UDim.new(0, 12)
+
+				UICorner.CornerRadius = UDim.new(0, 8)
 				UICorner.Parent = Frame
-				
+
 				TextLabel.Parent = Frame
 				TextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 				TextLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1169,17 +1062,17 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				TextLabel.ZIndex = 10
 				TextLabel.Font = Enum.Font.GothamMedium
 				TextLabel.Text = ButtonName
-				TextLabel.TextColor3 = NeoAura.Theme.ACCENT
+				TextLabel.TextColor3 = NoHyper.Theme.Accent
 				TextLabel.TextScaled = true
 				TextLabel.TextSize = 14.000
 				TextLabel.TextWrapped = true
-				
+
 				Button_2.MouseButton1Click:Connect(callback or function()
-				
+
 				end)
-				
+
 				Section_Hyper.update()
-				
+
 				return Signal({
 					{
 						name = 'Text',
@@ -1193,19 +1086,16 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 					}
 				})
 			end
-			
-			function Section_Hyper:AddToggle(ToggleName:string, Default:boolean, callback:FunctionalTest)
+
+			function Section_Hyper:AddToggle(ToggleName, Default, callback)
 				Default = Default or false
 				callback = ToDefault(callback, function()
-				
+
 				end)
-				
+
 				local configKey = "Toggle_" .. ToggleName
-				ConfigManager:RegisterValue(configKey, Default, function(value)
-					Default = value
-					callback(value)
-				end)
-				
+				ConfigSystem:RegisterValue(configKey, Default, callback)
+
 				local Toggle = Instance.new("Frame")
 				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 				local Text = Instance.new("TextLabel")
@@ -1213,9 +1103,7 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				local UICorner = Instance.new("UICorner")
 				local True = Instance.new("ImageLabel")
 				local Button = Instance.new("TextButton")
-				
-				--Properties:
-				
+
 				Toggle.Name = "Toggle"
 				Toggle.Parent = Section
 				Toggle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1225,11 +1113,11 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Toggle.ClipsDescendants = true
 				Toggle.Size = UDim2.new(1, 0, 1, 0)
 				Toggle.ZIndex = 7
-				
+
 				UIAspectRatioConstraint.Parent = Toggle
 				UIAspectRatioConstraint.AspectRatio = 9.000
 				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
-				
+
 				Text.Name = "Text"
 				Text.Parent = Toggle
 				Text.AnchorPoint = Vector2.new(0, 0.5)
@@ -1242,28 +1130,28 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Text.ZIndex = 7
 				Text.Font = Enum.Font.GothamMedium
 				Text.Text = ToggleName or "TOGGLE"
-				Text.TextColor3 = NeoAura.Theme.ACCENT
+				Text.TextColor3 = NoHyper.Theme.Accent
 				Text.TextScaled = true
 				Text.TextSize = 14.000
 				Text.TextStrokeTransparency = 0.800
 				Text.TextTransparency = 0.100
 				Text.TextWrapped = true
 				Text.TextXAlignment = Enum.TextXAlignment.Left
-				
+
 				Ui.Name = "Ui"
 				Ui.Parent = Toggle
 				Ui.AnchorPoint = Vector2.new(1, 0.5)
-				Ui.BackgroundColor3 = NeoAura.Theme.PANEL
+				Ui.BackgroundColor3 = NoHyper.Theme.Panel
 				Ui.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Ui.BorderSizePixel = 0
 				Ui.Position = UDim2.new(0.950000107, 0, 0.500000417, 0)
 				Ui.Size = UDim2.new(0.649999976, 0, 0.649999976, 0)
 				Ui.SizeConstraint = Enum.SizeConstraint.RelativeYY
 				Ui.ZIndex = 7
-				
-				UICorner.CornerRadius = UDim.new(0, 12)
+
+				UICorner.CornerRadius = UDim.new(0, 8)
 				UICorner.Parent = Ui
-				
+
 				True.Name = "True"
 				True.Parent = Ui
 				True.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1276,7 +1164,8 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				True.Visible = false
 				True.ZIndex = 8
 				True.Image = "rbxassetid://3944680095"
-				
+				True.ImageColor3 = NoHyper.Theme.Accent
+
 				Button.Name = "Button"
 				Button.Parent = Toggle
 				Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1290,49 +1179,49 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Button.TextColor3 = Color3.fromRGB(0, 0, 0)
 				Button.TextSize = 14.000
 				Button.TextTransparency = 1.000
-				
+
 				Button.MouseEnter:Connect(function()
 					if Default then
 						return
 					end
-					
-					Tween:Create(Ui, TweenInfo.new(0.075), {BackgroundColor3 = NeoAura.Theme.TOUCH}):Play()
+
+					Tween:Create(Ui, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.Touch}):Play()
 				end)
-				
+
 				Button.MouseLeave:Connect(function()
 					if Default then
 						return
 					end
-					
-					Tween:Create(Ui, TweenInfo.new(0.075), {BackgroundColor3 = NeoAura.Theme.PANEL}):Play()
+
+					Tween:Create(Ui, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.Panel}):Play()
 				end)
-				
+
 				local function Effect(vcal)
 					if vcal then
-						Tween:Create(Ui, TweenInfo.new(0.075), {BackgroundColor3 = NeoAura.Theme.ACCENT}):Play()
+						Tween:Create(Ui, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.System}):Play()
 						True.Visible = true
 					else
 						True.Visible = false
-						Tween:Create(Ui, TweenInfo.new(0.075), {BackgroundColor3 = NeoAura.Theme.PANEL}):Play()
+						Tween:Create(Ui, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.Panel}):Play()
 					end
 				end
-				
+
 				Effect(Default)
-				
+
 				Button.MouseButton1Click:Connect(function()
 					Default = not Default
 					Effect(Default)
-					ConfigManager:SetConfigValue(configKey, Default, true)
+					ConfigSystem:SetValue(configKey, Default, true)
 					callback(Default)
 				end)
-				
+
 				Section_Hyper.update()
-				
+
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							TextLabel.Text = tostring(...)
+							Text.Text = tostring(...)
 						end,
 					},
 					{
@@ -1344,16 +1233,16 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 						callback = function(v)
 							Default = v
 							Effect(v)
-							ConfigManager:SetConfigValue(configKey, v, true)
+							ConfigSystem:SetValue(configKey, v, true)
 							callback(v)
 						end,
 					}
 				})
 			end
-			
-			function Section_Hyper:AddKeybind(KeybindName:string, Default:Enum.KeyCode, callback)
+
+			function Section_Hyper:AddKeybind(KeybindName, Default, callback)
 				callback = ToDefault(callback, function() end)
-				
+
 				if typeof(Default) == 'string' then
 					pcall(function()
 						if Enum.KeyCode[tostring(Default)] then
@@ -1361,19 +1250,15 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 						end
 					end)
 				end
-				
+
 				local configKey = "Keybind_" .. KeybindName
-				ConfigManager:RegisterValue(configKey, Default and Default.Name or "None", function(value)
-					if value and Enum.KeyCode[value] then
-						Default = Enum.KeyCode[value]
-					end
-				end)
-				
-				local function toname(v:Enum.KeyCode)
+				ConfigSystem:RegisterValue(configKey, Default and Default.Name or "None", callback)
+
+				local function toname(v)
 					if v then
 						return v.Name
 					end
-					
+
 					return 'None'
 				end
 				local Keybind = Instance.new("Frame")
@@ -1383,9 +1268,7 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				local UICorner = Instance.new("UICorner")
 				local BindKey = Instance.new("TextLabel")
 				local Button = Instance.new("TextButton")
-				
-				--Properties:
-				
+
 				Keybind.Name = "Keybind"
 				Keybind.Parent = Section
 				Keybind.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1395,11 +1278,11 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Keybind.ClipsDescendants = true
 				Keybind.Size = UDim2.new(1, 0, 1, 0)
 				Keybind.ZIndex = 7
-				
+
 				UIAspectRatioConstraint.Parent = Keybind
 				UIAspectRatioConstraint.AspectRatio = 9.000
 				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
-				
+
 				Text.Name = "Text"
 				Text.Parent = Keybind
 				Text.AnchorPoint = Vector2.new(0, 0.5)
@@ -1412,27 +1295,27 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Text.ZIndex = 7
 				Text.Font = Enum.Font.GothamMedium
 				Text.Text = KeybindName or "KEYBIND"
-				Text.TextColor3 = NeoAura.Theme.ACCENT
+				Text.TextColor3 = NoHyper.Theme.Accent
 				Text.TextScaled = true
 				Text.TextSize = 14.000
 				Text.TextStrokeTransparency = 0.800
 				Text.TextTransparency = 0.100
 				Text.TextWrapped = true
 				Text.TextXAlignment = Enum.TextXAlignment.Left
-				
+
 				Bind.Name = "Bind"
 				Bind.Parent = Keybind
 				Bind.AnchorPoint = Vector2.new(1, 0.5)
-				Bind.BackgroundColor3 = NeoAura.Theme.PANEL
+				Bind.BackgroundColor3 = NoHyper.Theme.Panel
 				Bind.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Bind.BorderSizePixel = 0
 				Bind.Position = UDim2.new(0.950000226, 0, 0.500000417, 0)
 				Bind.Size = UDim2.new(0.177682102, 0, 0.649999976, 0)
 				Bind.ZIndex = 7
-				
-				UICorner.CornerRadius = UDim.new(0, 12)
+
+				UICorner.CornerRadius = UDim.new(0, 8)
 				UICorner.Parent = Bind
-				
+
 				BindKey.Name = "BindKey"
 				BindKey.Parent = Bind
 				BindKey.AnchorPoint = Vector2.new(0, 0.5)
@@ -1445,11 +1328,11 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				BindKey.ZIndex = 7
 				BindKey.Font = Enum.Font.GothamMedium
 				BindKey.Text = toname(Default)
-				BindKey.TextColor3 = NeoAura.Theme.ACCENT
+				BindKey.TextColor3 = NoHyper.Theme.Accent
 				BindKey.TextScaled = true
 				BindKey.TextSize = 14.000
 				BindKey.TextWrapped = true
-				
+
 				Button.Name = "Button"
 				Button.Parent = Keybind
 				Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1463,46 +1346,46 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Button.TextColor3 = Color3.fromRGB(0, 0, 0)
 				Button.TextSize = 14.000
 				Button.TextTransparency = 1.000
-				
+
 				local BindConnect
-				
+
 				Button.MouseEnter:Connect(function()
 					if BindConnect then
 						return
 					end
-					Tween:Create(Bind, TweenInfo.new(0.075), {BackgroundColor3 = NeoAura.Theme.TOUCH}):Play()
+					Tween:Create(Bind, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.Touch}):Play()
 				end)
-				
+
 				Button.MouseLeave:Connect(function()
 					if BindConnect then
 						return
 					end
-					Tween:Create(Bind, TweenInfo.new(0.075), {BackgroundColor3 = NeoAura.Theme.PANEL}):Play()
+					Tween:Create(Bind, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.Panel}):Play()
 				end)
-				
+
 				local function UpdateText()
 					local t = BindKey.Text
 					local siz = TextService:GetTextSize(t, BindKey.TextSize, BindKey.Font, Vector2.new(math.huge, math.huge))
 					Tween:Create(Bind, TweenInfo.new(0.075), {Size = UDim2.new(0, siz.X, 0.65, 0)}):Play()
 				end
-				
+
 				UpdateText()
-				
+
 				Button.MouseButton1Click:Connect(function()
 					if BindConnect then
 						return
 					end
-					
+
 					BindKey.Text = '...'
 					UpdateText()
-					Tween:Create(Bind, TweenInfo.new(0.075), {BackgroundColor3 = NeoAura.Theme.ACCENT}):Play()
+					Tween:Create(Bind, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.System}):Play()
 					BindConnect = 'wait'
 					BindConnect = UIS.InputBegan:Wait()
-					
+
 					if BindConnect.KeyCode ~= Enum.KeyCode.Unknown then
 						BindKey.Text = toname(BindConnect.KeyCode)
 						Default = BindConnect.KeyCode
-						ConfigManager:SetConfigValue(configKey, Default.Name, true)
+						ConfigSystem:SetValue(configKey, BindConnect.KeyCode.Name, true)
 						pcall(function()
 							task.spawn(callback, BindConnect.KeyCode)
 						end)
@@ -1510,19 +1393,18 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 						BindKey.Text = toname(Default)
 						UpdateText()
 					end
-					
-					Tween:Create(Bind, TweenInfo.new(0.075), {BackgroundColor3 = NeoAura.Theme.PANEL}):Play()
-					
-					
+
+					Tween:Create(Bind, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.Panel}):Play()
+
 					UpdateText()
 					BindConnect = nil
 				end)
-				
+
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							TextLabel.Text = tostring(...)
+							Text.Text = tostring(...)
 						end,
 					},
 					{
@@ -1534,8 +1416,8 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 						callback = function(v)
 							Default = v
 							BindKey.Text = toname(v)
-							ConfigManager:SetConfigValue(configKey, v and v.Name or "None", true)
 							UpdateText()
+							ConfigSystem:SetValue(configKey, v.Name or v, true)
 							callback(v)
 						end,
 					},
@@ -1547,24 +1429,21 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 					},
 				})
 			end
-			
-			function Section_Hyper:AddSlider(SliderName, Value:{Min:number, Max:number, Default:number, ValueT:string}, callback)
+
+			function Section_Hyper:AddSlider(SliderName, Value, callback)
 				Value = Value or {}
 				Value.Min = Value.Min or 1
 				Value.Max = Value.Max or 100
 				Value.Default = Value.Default or Value.Min
 				Value.ValueT = Value.ValueT or ''
-				
+
 				callback = ToDefault(callback, function()
-				
+
 				end)
-				
+
 				local configKey = "Slider_" .. SliderName
-				ConfigManager:RegisterValue(configKey, Value.Default, function(value)
-					Value.Default = value
-					callback(value)
-				end)
-				
+				ConfigSystem:RegisterValue(configKey, Value.Default, callback)
+
 				local Slider = Instance.new("Frame")
 				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 				local Text = Instance.new("TextLabel")
@@ -1575,13 +1454,8 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				local Frame = Instance.new("Frame")
 				local UICorner_3 = Instance.new("UICorner")
 				local UIStroke = Instance.new("UIStroke")
-				local UIGradient = Instance.new("UIGradient")
-				local UIGradient_2 = Instance.new("UIGradient")
 				local ValueText = Instance.new("TextLabel")
-				local UIGradient_3 = Instance.new("UIGradient")
-				
-				--Properties:
-				
+
 				Slider.Name = "Slider"
 				Slider.Parent = Section
 				Slider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1591,11 +1465,11 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Slider.ClipsDescendants = true
 				Slider.Size = UDim2.new(1, 0, 1, 0)
 				Slider.ZIndex = 7
-				
+
 				UIAspectRatioConstraint.Parent = Slider
 				UIAspectRatioConstraint.AspectRatio = 9.000
 				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
-				
+
 				Text.Name = "Text"
 				Text.Parent = Slider
 				Text.AnchorPoint = Vector2.new(0, 0.5)
@@ -1608,67 +1482,57 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Text.ZIndex = 7
 				Text.Font = Enum.Font.GothamMedium
 				Text.Text = SliderName or "AIM BOT RANGE"
-				Text.TextColor3 = NeoAura.Theme.ACCENT
+				Text.TextColor3 = NoHyper.Theme.Accent
 				Text.TextScaled = true
 				Text.TextSize = 14.000
 				Text.TextStrokeTransparency = 0.800
 				Text.TextTransparency = 0.100
 				Text.TextWrapped = true
 				Text.TextXAlignment = Enum.TextXAlignment.Left
-				
+
 				Ui.Name = "Ui"
 				Ui.Parent = Slider
 				Ui.AnchorPoint = Vector2.new(1, 0.5)
-				Ui.BackgroundColor3 = NeoAura.Theme.PANEL
+				Ui.BackgroundColor3 = NoHyper.Theme.Panel
 				Ui.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Ui.BorderSizePixel = 0
 				Ui.Position = UDim2.new(0.949999869, 0, 0.500000417, 0)
 				Ui.Size = UDim2.new(0.44600001, 0, 0.324999988, 0)
 				Ui.ZIndex = 10
 				Ui.Active = true
-				
-				UICorner.CornerRadius = UDim.new(0, 12)
+
+				UICorner.CornerRadius = UDim.new(0, 8)
 				UICorner.Parent = Ui
-				
+
 				SLIDE.Name = "SLIDE"
 				SLIDE.Parent = Ui
-				SLIDE.BackgroundColor3 = NeoAura.Theme.ACCENT
+				SLIDE.BackgroundColor3 = NoHyper.Theme.Accent
 				SLIDE.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				SLIDE.BorderSizePixel = 0
 				SLIDE.Size = UDim2.new(0.462937713, 0, 1, 0)
 				SLIDE.ZIndex = 11
-				
-				UICorner_2.CornerRadius = UDim.new(0, 12)
+
+				UICorner_2.CornerRadius = UDim.new(0, 8)
 				UICorner_2.Parent = SLIDE
-				
+
 				Frame.Parent = SLIDE
 				Frame.AnchorPoint = Vector2.new(1, 0)
-				Frame.BackgroundColor3 = NeoAura.Theme.ACCENT
+				Frame.BackgroundColor3 = NoHyper.Theme.Accent
 				Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Frame.BorderSizePixel = 0
 				Frame.Position = UDim2.new(1.075, 0, 0, 0)
 				Frame.Size = UDim2.new(1, 0, 1, 0)
 				Frame.SizeConstraint = Enum.SizeConstraint.RelativeYY
 				Frame.ZIndex = 12
-				
-				UICorner_3.CornerRadius = UDim.new(0, 12)
+
+				UICorner_3.CornerRadius = UDim.new(0, 8)
 				UICorner_3.Parent = Frame
-				
+
 				UIStroke.Thickness = 2.000
-				UIStroke.Color = NeoAura.Theme.STROKE
+				UIStroke.Color = NoHyper.Theme.Stroke
 				UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 				UIStroke.Parent = Frame
-				
-				UIGradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(214, 214, 214)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 255, 255))}
-				UIGradient.Rotation = 190
-				UIGradient.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0.00, 0.04), NumberSequenceKeypoint.new(1.00, 0.00)}
-				UIGradient.Parent = UIStroke
-				
-				UIGradient_2.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(214, 214, 214)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 255, 255))}
-				UIGradient_2.Rotation = 190
-				UIGradient_2.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0.00, 0.04), NumberSequenceKeypoint.new(1.00, 0.00)}
-				UIGradient_2.Parent = SLIDE
-				
+
 				ValueText.Name = "ValueText"
 				ValueText.Parent = Ui
 				ValueText.AnchorPoint = Vector2.new(0, 1)
@@ -1681,20 +1545,15 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				ValueText.ZIndex = 7
 				ValueText.Font = Enum.Font.GothamMedium
 				ValueText.Text = tostring(Value.Default) .. ' / ' .. tostring(Value.Max) .. tostring(Value.ValueT)
-				ValueText.TextColor3 = NeoAura.Theme.TEXT
+				ValueText.TextColor3 = NoHyper.Theme.AccentDim
 				ValueText.TextScaled = true
 				ValueText.TextSize = 14.000
 				ValueText.TextStrokeTransparency = 0.800
 				ValueText.TextTransparency = 0.500
 				ValueText.TextWrapped = true
-				
-				UIGradient_3.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(214, 214, 214)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(255, 255, 255))}
-				UIGradient_3.Rotation = 190
-				UIGradient_3.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0.00, 0.04), NumberSequenceKeypoint.new(1.00, 0.00)}
-				UIGradient_3.Parent = Ui
-				
+
 				local Touch = false
-				
+
 				local function update(Input)
 					local SizeScale = math.clamp((((Input.Position.X) - Ui.AbsolutePosition.X) / Ui.AbsoluteSize.X), 0, 1)
 					local Valuea = math.floor(((Value.Max - Value.Min) * SizeScale) + Value.Min)
@@ -1702,24 +1561,24 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 					ValueText.Text = tostring(Valuea) .. ' / ' .. tostring(Value.Max) .. tostring(Value.ValueT)
 					Tween:Create(SLIDE, TweenInfo.new(0.1), {Size = Size}):Play()
 					Value.Default = Valuea
-					ConfigManager:SetConfigValue(configKey, Valuea, true)
+					ConfigSystem:SetValue(configKey, Valuea, true)
 					callback(Valuea)
 				end
-				
+
 				Ui.InputBegan:Connect(function(Input)
 					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 						Touch = true
 						update(Input)
-					
+
 					end
 				end)
-				
+
 				Ui.InputEnded:Connect(function(Input)
 					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 						Touch = false
 					end
 				end)
-				
+
 				UIS.InputChanged:Connect(function(Input)
 					if Touch then
 						if (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
@@ -1727,12 +1586,12 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 						end
 					end
 				end)
-				
+
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							TextLabel.Text = tostring(...)
+							Text.Text = tostring(...)
 						end,
 					},
 					{
@@ -1746,7 +1605,7 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 							local Size = UDim2.fromScale((v / Value.Max), 1)
 							ValueText.Text = tostring(v) .. ' / ' .. tostring(Value.Max) .. tostring(Value.ValueT)
 							Tween:Create(SLIDE, TweenInfo.new(0.1), {Size = Size}):Play()
-							ConfigManager:SetConfigValue(configKey, v, true)
+							ConfigSystem:SetValue(configKey, v, true)
 							callback(v)
 						end,
 					},
@@ -1758,17 +1617,14 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 					},
 				})
 			end
-			
-			function Section_Hyper:AddDropdown(DropdownName:string, DropdownInfo:{any}, DropdownDefault:any, callback)
+
+			function Section_Hyper:AddDropdown(DropdownName, DropdownInfo, DropdownDefault, callback)
 				DropdownInfo = DropdownInfo or {}
 				DropdownDefault = DropdownDefault or DropdownInfo[1]
-				
+
 				local configKey = "Dropdown_" .. DropdownName
-				ConfigManager:RegisterValue(configKey, DropdownDefault, function(value)
-					DropdownDefault = value
-					callback(value)
-				end)
-				
+				ConfigSystem:RegisterValue(configKey, DropdownDefault, callback)
+
 				local Dropdown = Instance.new("Frame")
 				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 				local Text = Instance.new("TextLabel")
@@ -1785,9 +1641,7 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				local UIListLayout = Instance.new("UIListLayout")
 				local DOPWN = 'rbxassetid://7733717447'
 				local UP = 'rbxassetid://7072706796'
-				
-				--Properties:
-				
+
 				Dropdown.Name = "Dropdown"
 				Dropdown.Parent = Section
 				Dropdown.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1796,11 +1650,11 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Dropdown.BorderSizePixel = 0
 				Dropdown.Size = UDim2.new(1, 0, 1, 0)
 				Dropdown.ZIndex = 7
-				
+
 				UIAspectRatioConstraint.Parent = Dropdown
 				UIAspectRatioConstraint.AspectRatio = 9.000
 				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
-				
+
 				Text.Name = "Text"
 				Text.Parent = Dropdown
 				Text.AnchorPoint = Vector2.new(0, 0.5)
@@ -1813,28 +1667,28 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Text.ZIndex = 7
 				Text.Font = Enum.Font.GothamMedium
 				Text.Text = tostring(DropdownName or ' - ')
-				Text.TextColor3 = NeoAura.Theme.ACCENT
+				Text.TextColor3 = NoHyper.Theme.Accent
 				Text.TextScaled = true
 				Text.TextSize = 14.000
 				Text.TextStrokeTransparency = 0.800
 				Text.TextTransparency = 0.100
 				Text.TextWrapped = true
 				Text.TextXAlignment = Enum.TextXAlignment.Left
-				
+
 				Ui.Name = "Ui"
 				Ui.Parent = Dropdown
 				Ui.AnchorPoint = Vector2.new(1, 0.5)
-				Ui.BackgroundColor3 = NeoAura.Theme.PANEL
+				Ui.BackgroundColor3 = NoHyper.Theme.Panel
 				Ui.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Ui.BorderSizePixel = 0
 				Ui.ClipsDescendants = true
 				Ui.Position = UDim2.new(0.950000226, 0, 0.450411677, 0)
 				Ui.Size = UDim2.new(0.446000099, 0, 0.75, 0)
 				Ui.ZIndex = 7
-				
-				UICorner.CornerRadius = UDim.new(0, 12)
+
+				UICorner.CornerRadius = UDim.new(0, 8)
 				UICorner.Parent = Ui
-				
+
 				ValueText.Name = "ValueText"
 				ValueText.Parent = Ui
 				ValueText.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1847,13 +1701,13 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				ValueText.ZIndex = 8
 				ValueText.Font = Enum.Font.Gotham
 				ValueText.Text = tostring(DropdownDefault or 'None')
-				ValueText.TextColor3 = NeoAura.Theme.TEXT
+				ValueText.TextColor3 = NoHyper.Theme.Accent
 				ValueText.TextScaled = true
 				ValueText.TextSize = 14.000
 				ValueText.TextTransparency = 0.500
 				ValueText.TextWrapped = true
 				ValueText.TextXAlignment = Enum.TextXAlignment.Left
-				
+
 				ValueIcon.Name = "ValueIcon"
 				ValueIcon.Parent = Ui
 				ValueIcon.AnchorPoint = Vector2.new(1, 0.5)
@@ -1865,10 +1719,10 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				ValueIcon.Size = UDim2.new(0.850000024, 0, 0.850000024, 0)
 				ValueIcon.SizeConstraint = Enum.SizeConstraint.RelativeYY
 				ValueIcon.ZIndex = 8
-				
-				UICorner_2.CornerRadius = UDim.new(0, 4)
+
+				UICorner_2.CornerRadius = UDim.new(0, 8)
 				UICorner_2.Parent = ValueIcon
-				
+
 				Iconcc.Name = "Icon.cc"
 				Iconcc.Parent = ValueIcon
 				Iconcc.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1878,7 +1732,8 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Iconcc.Size = UDim2.new(1, 0, 1, 0)
 				Iconcc.ZIndex = 7
 				Iconcc.Image = DOPWN
-				
+				Iconcc.ImageColor3 = NoHyper.Theme.AccentDim
+
 				Button.Name = "Button"
 				Button.Parent = Dropdown
 				Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1892,11 +1747,11 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Button.TextColor3 = Color3.fromRGB(0, 0, 0)
 				Button.TextSize = 14.000
 				Button.TextTransparency = 1.000
-				
+
 				Drop.Name = "Drop"
 				Drop.Parent = Dropdown
 				Drop.AnchorPoint = Vector2.new(1, 0)
-				Drop.BackgroundColor3 = NeoAura.Theme.PANEL
+				Drop.BackgroundColor3 = NoHyper.Theme.Panel
 				Drop.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Drop.BorderSizePixel = 0
 				Drop.ClipsDescendants = true
@@ -1905,30 +1760,30 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				Drop.Visible = false
 				Drop.ZIndex = 16
 				Drop.Active = true
-				
-				UICorner_3.CornerRadius = UDim.new(0, 12)
+
+				UICorner_3.CornerRadius = UDim.new(0, 8)
 				UICorner_3.Parent = Drop
-				
-				UIStroke.Color = NeoAura.Theme.STROKE
+
+				UIStroke.Color = NoHyper.Theme.Stroke
 				UIStroke.Parent = Drop
-				
+
 				UIListLayout.Parent = Drop
 				UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 				UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 				UIListLayout.Padding = UDim.new(0, 5)
-				
+
 				local function valshopw()
 					local old = 1
-					
+
 					for i, v in ipairs(Drop:GetChildren()) do
 						if v:IsA('TextButton') then
 							old += (v.AbsoluteSize.Y or 27) + UIListLayout.Padding.Offset
 						end
 					end
-					
+
 					return old + 1
 				end
-				
+
 				Drop:GetPropertyChangedSignal('Size'):Connect(function()
 					if Drop.Size.Y.Offset <= 15 then
 						Drop.Visible = false
@@ -1936,32 +1791,31 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 						Drop.Visible = true
 					end
 				end)
-				
+
 				local function Toggle(vla)
 					if vla then
 						Iconcc.Image = UP
 						Tween:Create(Drop, TweenInfo.new(0.15), {
 							Size = UDim2.new(0.446000069, 0, 0, valshopw() + 6),
 						}):Play()
-						Tween:Create(Ui, TweenInfo.new(0.4), {BackgroundColor3 = NeoAura.Theme.TOUCH}):Play()
+						Tween:Create(Ui, TweenInfo.new(0.4), {BackgroundColor3 = NoHyper.Theme.Touch}):Play()
 					else
 						Iconcc.Image = DOPWN
 						Tween:Create(Drop, TweenInfo.new(0.15), {
 							Size = UDim2.new(0.446000069, 0, 0, 15),
 						}):Play()
-						
-						Tween:Create(Ui, TweenInfo.new(0.4), {BackgroundColor3 = NeoAura.Theme.PANEL}):Play()
+
+						Tween:Create(Ui, TweenInfo.new(0.4), {BackgroundColor3 = NoHyper.Theme.Panel}):Play()
 					end
 				end
-				
+
 				local function getbutton()
-				
+
 					local Button = Instance.new("TextButton")
 					local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 					local Frame = Instance.new("Frame")
 					local UICorner = Instance.new("UICorner")
-					local Frame_2 = Instance.new("Frame")
-					
+
 					Button.Name = "Button"
 					Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 					Button.BackgroundTransparency = 1.000
@@ -1971,39 +1825,39 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 					Button.Size = UDim2.new(0.850000024, 0, 0.5, 0)
 					Button.ZIndex = 25
 					Button.Font = Enum.Font.GothamMedium
-					Button.TextColor3 = NeoAura.Theme.ACCENT
+					Button.TextColor3 = NoHyper.Theme.Accent
 					Button.TextScaled = true
 					Button.TextSize = 14.000
 					Button.TextTransparency = 0.100
 					Button.TextWrapped = true
 					Button.TextXAlignment = Enum.TextXAlignment.Left
-					
+
 					UIAspectRatioConstraint.Parent = Button
 					UIAspectRatioConstraint.AspectRatio = 6.500
 					UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
-					
+
 					Frame.Parent = Button
 					Frame.AnchorPoint = Vector2.new(0.5, 0.5)
-					Frame.BackgroundColor3 = NeoAura.Theme.ACCENT
+					Frame.BackgroundColor3 = NoHyper.Theme.System
 					Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					Frame.BorderSizePixel = 0
 					Frame.Position = UDim2.new(1, 0, 0.5, 0)
 					Frame.Size = UDim2.new(0.100000001, 0, 0.800000012, 0)
 					Frame.ZIndex = 20
-					
-					UICorner.CornerRadius = UDim.new(0, 2)
+
+					UICorner.CornerRadius = UDim.new(0, 4)
 					UICorner.Parent = Frame
-					
+
 					return Button, Frame
 				end
-				
+
 				local function Render()
 					for i, v in ipairs(Drop:GetChildren()) do
 						if v:IsA('TextButton') then
 							v:Destroy()
 						end
 					end
-					
+
 					local lastui
 					for i, v in pairs(DropdownInfo) do
 						local ubtton, Toggle = getbutton()
@@ -2012,49 +1866,49 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 							lastui = Toggle
 						else
 							Tween:Create(Toggle, TweenInfo.new(0.1), {BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0.800000012, 0)}):Play()
-						
+
 						end
 						ubtton.Parent = Drop
 						ubtton.Text = tostring(v)
 						ubtton.MouseButton1Click:Connect(function()
 							if lastui then
 								Tween:Create(lastui, TweenInfo.new(0.1), {BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0.800000012, 0)}):Play()
-							
+
 							end
-							
+
 							Tween:Create(Toggle, TweenInfo.new(0.1), {BackgroundTransparency = 0, Size = UDim2.new(0.100000001, 0, 0.800000012, 0)}):Play()
-							
+
 							lastui = Toggle
 							DropdownDefault = v
 							ValueText.Text = tostring(DropdownDefault or 'None')
-							ConfigManager:SetConfigValue(configKey, v, true)
+							ConfigSystem:SetValue(configKey, v, true)
 							callback(v)
 						end)
-						
+
 						ubtton.MouseEnter:Connect(function()
-							Tween:Create(ubtton, TweenInfo.new(0.1), {TextColor3 = NeoAura.Theme.TOUCH}):Play()
+							Tween:Create(ubtton, TweenInfo.new(0.1), {TextColor3 = NoHyper.Theme.Touch}):Play()
 						end)
-						
+
 						ubtton.MouseLeave:Connect(function()
-							Tween:Create(ubtton, TweenInfo.new(0.1), {TextColor3 = NeoAura.Theme.ACCENT}):Play()
+							Tween:Create(ubtton, TweenInfo.new(0.1), {TextColor3 = NoHyper.Theme.Accent}):Play()
 						end)
 					end
 				end
-				
+
 				local valnow = false
-				
+
 				Render()
-				
+
 				Button.MouseButton1Click:Connect(function()
 					valnow = not valnow
 					Toggle(valnow)
 				end)
-				
+
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							TextLabel.Text = tostring(...)
+							Text.Text = tostring(...)
 						end,
 					},
 					{
@@ -2066,7 +1920,7 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 						callback = function(v)
 							DropdownDefault = v
 							ValueText.Text = tostring(DropdownDefault or 'None')
-							ConfigManager:SetConfigValue(configKey, v, true)
+							ConfigSystem:SetValue(configKey, v, true)
 							callback(v)
 						end,
 					},
@@ -2085,23 +1939,23 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 					},
 				})
 			end
-			
+
 			Section.ChildAdded:Connect(Section_Hyper.update)
-			
+
 			Section_Hyper.update()
-			
+
 			return Section_Hyper
 		end
-		
+
 		return TabHyper
 	end
-	
+
 	function HyperWindow:NewSize(v)
 		HyperWindow.Size = v
 		MainFrame.Size = v
 	end
-	
-	function HyperWindow:AddYoutube(Link:string)
+
+	function HyperWindow:AddYoutube(Link)
 		if Link:find('https://') then
 			YoutubeButton.Visible = true
 			YoutubeButton.MouseButton1Click:Connect(function()
@@ -2111,8 +1965,8 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 			end)
 		end
 	end
-	
-	function HyperWindow:AddWebsite(Link:string)
+
+	function HyperWindow:AddWebsite(Link)
 		if Link:find('https://') then
 			WebsiteButton.Visible = true
 			WebsiteButton.MouseButton1Click:Connect(function()
@@ -2122,8 +1976,8 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 			end)
 		end
 	end
-	
-	function HyperWindow:AddDiscord(Link:string)
+
+	function HyperWindow:AddDiscord(Link)
 		if Link:find('https://') or Link:find('discord.gg/') then
 			DiscordButton.Visible = true
 			DiscordButton.MouseButton1Click:Connect(function()
@@ -2133,62 +1987,62 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 			end)
 		end
 	end
-	
+
 	for i, v in ipairs({DiscordButton, WebsiteButton, YoutubeButton}) do
 		v.MouseEnter:Connect(function()
 			Tween:Create(v, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
 				Size = UDim2.fromScale(1.1, 1.1)
 			}):Play()
 		end)
-		
+
 		v.MouseLeave:Connect(function()
 			Tween:Create(v, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
 				Size = UDim2.fromScale(0.9, 0.9)
 			}):Play()
 		end)
 	end
-	
+
 	local lastposition = MainFrame.Position
 	local function UIToggle(val)
 		local tim = 0.75
 		local item = 0.6
-		
+
 		if val then
-			Tween:Create(MainFrame, TweenInfo.new(tim), {
+			Tween:Create(MainFrame, TweenInfo.new(tim, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
 				Size = HyperWindow.Size,
 				Position = UDim2.fromScale(0.5, 0.5)
 			}):Play()
-			
+
 			Tween:Create(CloseButton, TweenInfo.new(tim), {
 				ImageTransparency = 0.1
 			}):Play()
-			
+
 			Tween:Create(Top, TweenInfo.new(tim), {
 				Size = UDim2.new(1.00000012, 0, 0.139001563, 0)
 			}):Play()
-			
+
 			Tween:Create(Contact, TweenInfo.new(item), {
 				Position = UDim2.new(0.125, 0, 0.934000015, 0)
 			}):Play()
-			
+
 			Tween:Create(TabSystem, TweenInfo.new(item), {
 				Position = UDim2.new(0.623372614, 0, 0.571928024, 0)
 			}):Play()
-			
+
 			Tween:Create(TabButtonList, TweenInfo.new(item), {
 				Position = UDim2.new(0.00999999139, 0, 0.132051408, 0)
 			}):Play()
-			
+
 			Tween:Create(TickUI, TweenInfo.new(item), {
 				Position = UDim2.new(0.25, 0, 0.5, 0)
 			}):Play()
-			
+
 			Tween:Create(DescriptionText, TweenInfo.new(item * 1.6), {
 				TextTransparency = 0.5,
 				Size = UDim2.fromScale(0.707, 0.187),
 				Position = UDim2.new(0.27000013, 0, 0.749999702, 0)
 			}):Play()
-			
+
 			Tween:Create(MainText, TweenInfo.new(item * 1.5), {
 				TextTransparency = 0,
 				Size = UDim2.fromScale(0.707, 0.51),
@@ -2198,117 +2052,117 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 			Tween:Create(CloseButton, TweenInfo.new(tim), {
 				ImageTransparency = 1
 			}):Play()
-			
-			Tween:Create(MainFrame, TweenInfo.new(tim), {
+
+			Tween:Create(MainFrame, TweenInfo.new(tim, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
 				Size = UDim2.new(0.1, 100, 0.1, 50),
 				Position = lastposition,
 			}):Play()
-			
+
 			Tween:Create(Top, TweenInfo.new(tim * 1.5), {
 				Size = UDim2.fromScale(3.9, 1)
 			}):Play()
-			
+
 			Tween:Create(Contact, TweenInfo.new(item), {
 				Position = UDim2.new(0.125, 0, 1, 0)
 			}):Play()
-			
+
 			Tween:Create(TabSystem, TweenInfo.new(item), {
 				Position = UDim2.new(1.5, 0, 0.571928024, 0)
 			}):Play()
-			
+
 			Tween:Create(TabButtonList, TweenInfo.new(item), {
 				Position = UDim2.new(0.00999999139, 0, 1, 0)
 			}):Play()
-			
+
 			Tween:Create(TickUI, TweenInfo.new(item), {
 				Position = UDim2.new(.25, 0, 1.5, 0)
 			}):Play()
-			
+
 			Tween:Create(DescriptionText, TweenInfo.new(item / 1.5), {
 				TextTransparency = 1,
 				Size = UDim2.fromScale(0.1, 0.1),
 				Position = UDim2.new(0.170000011, 0, -0.5, 0)
 			}):Play()
-			
+
 			Tween:Create(MainText, TweenInfo.new(item / 1.5), {
 				TextTransparency = 1,
 				Size = UDim2.fromScale(0.1, 0.1),
 				Position = UDim2.new(0.170000011, 0, -0.5, 0)
 			}):Play()
-		
+
 		end
 	end
-	
+
 	local Status = true
 	local oldposcheck = MainFrame.Position
-	local buton = cretate_button(Frame)
-	
+	local buton = CreateButton(Frame)
+
 	buton.Visible = false
-	
+
 	UIS.InputBegan:Connect(function(cc)
 		if cc.KeyCode == HyperWindow.Toggle then
 			Status = not Status
-			
+
 			if Status then
 				buton.Visible = false
 			else
 				buton.Visible = true
 			end
-			
+
 			UIToggle(Status)
 		end
 	end)
-	
+
 	CloseButton.MouseButton1Click:Connect(function()
 		Status = not Status
-		
+
 		if Status then
 			buton.Visible = false
 		else
 			buton.Visible = true
 		end
-		
+
 		UIToggle(Status)
 	end)
-	
+
 	buton.MouseButton1Down:Connect(function(inp)
 		oldposcheck = MainFrame.Position
 	end)
-	
+
 	buton.MouseButton1Up:Connect(function(inp)
 		if oldposcheck == MainFrame.Position and not Status then
 			Status = not Status
-			
+
 			if Status then
 				buton.Visible = false
 			else
 				buton.Visible = true
 			end
-			
+
 			UIToggle(Status)
 		end
 	end)
-	
+
 	spawn(function()
 		local dragToggle = nil
 		local dragSpeed = 0.2
 		local dragStart = nil
 		local startPos = nil
-		
+
 		local function updateInput(input)
 			local delta = input.Position - dragStart
 			local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
 				startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 			game:GetService('TweenService'):Create(MainFrame, TweenInfo.new(dragSpeed), {Position = position}):Play()
 		end
-		
+
 		buton.InputBegan:Connect(function(input)
 			if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and buton.Visible then
 				dragToggle = true
 				dragStart = input.Position
 				startPos = MainFrame.Position
 				lastposition = MainFrame.Position
-				
+
 				input.Changed:Connect(function()
 					if input.UserInputState == Enum.UserInputState.End then
 						dragToggle = false
@@ -2316,7 +2170,7 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 				end)
 			end
 		end)
-		
+
 		UIS.InputChanged:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch and buton.Visible then
 				if dragToggle then
@@ -2325,19 +2179,19 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 			end
 		end)
 	end)
-	
+
 	local dragToggle = nil
 	local dragSpeed = 0.13
 	local dragStart = nil
 	local startPos = nil
-	
+
 	local function updateInput(input)
 		local delta = input.Position - dragStart
 		local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
 			startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 		game:GetService('TweenService'):Create(MainFrame, TweenInfo.new(dragSpeed), {Position = position}):Play()
 	end
-	
+
 	Top.InputBegan:Connect(function(input)
 		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 			dragToggle = true
@@ -2350,7 +2204,7 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 			end)
 		end
 	end)
-	
+
 	UIS.InputChanged:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 			if dragToggle then
@@ -2358,15 +2212,17 @@ function NeoAura.new(WindowName, WindowLogo, WindowDescription)
 			end
 		end
 	end)
-	
+
 	return HyperWindow
 end
 
-function NeoAura:LoopUpdate()
+function NoHyper:LoopUpdate()
 	task.spawn(function()
-		while true do task.wait()
+		while true do
+			task.wait()
 			pcall(function()
-				for i, v in ipairs(NeoAura.AutoUpdate) do task.wait()
+				for i, v in ipairs(NoHyper.AutoUpdate) do
+					task.wait()
 					pcall(v)
 				end
 			end)
@@ -2374,174 +2230,25 @@ function NeoAura:LoopUpdate()
 	end)
 end
 
--- Backward compatibility API wrappers
-local NoHyper = NeoAura
-
-function NoHyper.new(...)
-	return NeoAura.new(...)
+-- Config API exposed to users
+function NoHyper:SaveConfig(name)
+	return ConfigSystem:SaveConfig(name)
 end
 
-function NoHyper.set_theme(...)
-	return NeoAura.set_theme(...)
+function NoHyper:LoadConfig(name)
+	return ConfigSystem:LoadConfig(name)
 end
 
-function NoHyper:LoopUpdate(...)
-	return NeoAura:LoopUpdate(...)
+function NoHyper:DeleteConfig(name)
+	return ConfigSystem:DeleteConfig(name)
 end
 
--- Debug Self Test Function
-function NeoAura.DebugSelfTest()
-	print("[NeoAura] Starting Self-Test...")
-	
-	local tests = {
-		{
-			name = "API Existence",
-			test = function()
-				assert(NeoAura.new, "NeoAura.new missing")
-				assert(NeoAura.set_theme, "NeoAura.set_theme missing")
-				assert(NeoAura.LoopUpdate, "NeoAura.LoopUpdate missing")
-				assert(ConfigManager.SaveConfig, "ConfigManager.SaveConfig missing")
-				assert(ConfigManager.LoadConfig, "ConfigManager.LoadConfig missing")
-				assert(ConfigManager.RegisterValue, "ConfigManager.RegisterValue missing")
-				assert(ConfigManager.GetConfigValue, "ConfigManager.GetConfigValue missing")
-				assert(ConfigManager.SetConfigValue, "ConfigManager.SetConfigValue missing")
-				return true
-			end
-		},
-		{
-			name = "Window Creation",
-			test = function()
-				local window = NeoAura.new("Test Window", nil, "Test Description")
-				assert(window, "Failed to create window")
-				assert(window.NewTab, "NewTab method missing")
-				assert(window.NewSize, "NewSize method missing")
-				assert(window.ConfigManager, "ConfigManager missing from window")
-				return true
-			end
-		},
-		{
-			name = "Tab Creation",
-			test = function()
-				local window = NeoAura.new("Test", nil, "Test")
-				local tab = window:NewTab("Test Tab", "home")
-				assert(tab, "Failed to create tab")
-				assert(tab.NewSection, "NewSection method missing")
-				return true
-			end
-		},
-		{
-			name = "Section Creation",
-			test = function()
-				local window = NeoAura.new("Test", nil, "Test")
-				local tab = window:NewTab("Test Tab", "home")
-				local section = tab:NewSection("Test Section", "home", "left")
-				assert(section, "Failed to create section")
-				assert(section.AddButton, "AddButton method missing")
-				assert(section.AddToggle, "AddToggle method missing")
-				assert(section.AddSlider, "AddSlider method missing")
-				assert(section.AddDropdown, "AddDropdown method missing")
-				assert(section.AddKeybind, "AddKeybind method missing")
-				return true
-			end
-		},
-		{
-			name = "Controls Creation",
-			test = function()
-				local window = NeoAura.new("Test", nil, "Test")
-				local tab = window:NewTab("Test Tab", "home")
-				local section = tab:NewSection("Test Section", "home", "left")
-				
-				local button = section:AddButton("Test Button", function() end)
-				assert(button, "Failed to create button")
-				
-				local toggle = section:AddToggle("Test Toggle", false, function() end)
-				assert(toggle, "Failed to create toggle")
-				
-				local slider = section:AddSlider("Test Slider", {Min = 0, Max = 100, Default = 50}, function() end)
-				assert(slider, "Failed to create slider")
-				
-				local dropdown = section:AddDropdown("Test Dropdown", {"Option1", "Option2"}, "Option1", function() end)
-				assert(dropdown, "Failed to create dropdown")
-				
-				local keybind = section:AddKeybind("Test Keybind", Enum.KeyCode.E, function() end)
-				assert(keybind, "Failed to create keybind")
-				
-				return true
-			end
-		},
-		{
-			name = "Config System",
-			test = function()
-				ConfigManager:RegisterValue("test_key", "test_value", function() end)
-				
-				local value = ConfigManager:GetConfigValue("test_key")
-				assert(value == "test_value", "Failed to get config value")
-				
-				ConfigManager:SetConfigValue("test_key", "new_value", true)
-				local newValue = ConfigManager:GetConfigValue("test_key")
-				assert(newValue == "new_value", "Failed to set config value")
-				
-				local saved = ConfigManager:SaveConfig("test_config")
-				assert(saved, "Failed to save config")
-				
-				local configs = ConfigManager:ListConfigs()
-				assert(type(configs) == "table", "Failed to list configs")
-				
-				return true
-			end
-		},
-		{
-			name = "State Persistence",
-			test = function()
-				local testValue = false
-				
-				ConfigManager:RegisterValue("persist_test", false, function(value)
-					testValue = value
-				end)
-				
-				ConfigManager:SetConfigValue("persist_test", true, false)
-				
-				assert(testValue == true, "State callback not fired")
-				
-				ConfigManager:SaveConfig("persist_test_config")
-				
-				ConfigManager:SetConfigValue("persist_test", false, true)
-				
-				ConfigManager:LoadConfig("persist_test_config")
-				
-				assert(testValue == true, "State not persisted after load")
-				
-				return true
-			end
-		}
-	}
-	
-	local passed = 0
-	local failed = 0
-	
-	for i, test in ipairs(tests) do
-		local success, err = pcall(test.test)
-		if success then
-			print("[NeoAura Test] ✓", test.name, "PASSED")
-			passed = passed + 1
-		else
-			print("[NeoAura Test] ✗", test.name, "FAILED:", err)
-			failed = failed + 1
-		end
-	end
-	
-	print("[NeoAura] Self-Test Complete:")
-	print("  Passed:", passed)
-	print("  Failed:", failed)
-	print("  Total:", #tests)
-	
-	if failed == 0 then
-		print("[NeoAura] All tests passed! Library is fully functional.")
-	else
-		warn("[NeoAura] Some tests failed. Check logs above.")
-	end
-	
-	return failed == 0
+function NoHyper:ListConfigs()
+	return ConfigSystem:ListConfigs()
 end
 
-return NeoAura
+function NoHyper:SetAutoSaveInterval(seconds)
+	ConfigSystem.AutoSaveInterval = seconds
+end
+
+return NoHyper
