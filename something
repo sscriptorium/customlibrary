@@ -1,930 +1,1802 @@
 --[[
-  Modified xsx UI lib with:
-  - Save/Load settings (LocalScript - uses writefile/readfile)
-  - Mobile toggle button
-  - Transparent/see-through UI
-  - Key system with expiration tracking (Luarmor compatible)
-  - NO BindToClose (removed)
+                        dP          
+                        88          
+.d8888b. dP    dP .d888b88 .d8888b. 
+Y8ooooo. 88    88 88'  `88 88ooood8 
+      88 88.  .88 88.  .88 88.  ... 
+`88888P' `8888P88 `88888P8 `88888P' beta.
+              .88                   
+          d8888P                    
+
+made with 💓 by sellessence
+Enhanced & Refactored
 ]]
 
--- / Services
-local Workspace = game:GetService("Workspace")
-local Player = game:GetService("Players").LocalPlayer
-local Mouse = Player:GetMouse()
-local UserInputService = game:GetService("UserInputService")
-local TextService = game:GetService("TextService")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
-local CoreGuiService = game:GetService("CoreGui")
-
--- / Configuration Manager
-local ConfigManager = {}
-ConfigManager.__index = ConfigManager
-
-function ConfigManager.new(fileName)
-    local self = setmetatable({}, ConfigManager)
-    self.fileName = fileName or "xsx_config.json"
-    self.config = {}
-    return self
-end
-
-function ConfigManager:Save(data)
-    self.config = data or self.config
-    pcall(function()
-        if writefile then
-            local HttpService = game:GetService("HttpService")
-            local success, json = pcall(function() return HttpService:JSONEncode(self.config) end)
-            if success and json then
-                writefile(self.fileName, json)
-            end
-        end
-    end)
-end
-
-function ConfigManager:Load()
-    local loadedConfig = {}
-    pcall(function()
-        if readfile and isfile and isfile(self.fileName) then
-            local HttpService = game:GetService("HttpService")
-            local json = readfile(self.fileName)
-            local success, decoded = pcall(function() return HttpService:JSONDecode(json) end)
-            if success and decoded and type(decoded) == "table" then
-                loadedConfig = decoded
-            end
-        end
-    end)
-    self.config = loadedConfig
-    return loadedConfig
-end
-
--- / Key System Manager
-local KeySystemManager = {}
-KeySystemManager.__index = KeySystemManager
-
-function KeySystemManager.new()
-    local self = setmetatable({}, KeySystemManager)
-    self.keyFile = "xsx_keydata.json"
-    self.keyData = {
-        key = "",
-        expiration = 0,
-        hwid = ""
-    }
-    return self
-end
-
-function KeySystemManager:GetHWID()
-    local hwid = ""
-    pcall(function()
-        if gethwid then
-            hwid = gethwid()
-        elseif syn and syn.request then
-            hwid = game:GetService("RbxAnalyticsService"):GetClientId()
-        else
-            hwid = game:GetService("RbxAnalyticsService"):GetClientId()
-        end
-    end)
-    return hwid
-end
-
-function KeySystemManager:SaveKey(key, expirationTimestamp)
-    self.keyData = {
-        key = key or "",
-        expiration = expirationTimestamp or 0,
-        hwid = self:GetHWID()
-    }
-    pcall(function()
-        if writefile then
-            local HttpService = game:GetService("HttpService")
-            local json = HttpService:JSONEncode(self.keyData)
-            writefile(self.keyFile, json)
-        end
-    end)
-end
-
-function KeySystemManager:LoadKey()
-    pcall(function()
-        if readfile and isfile and isfile(self.keyFile) then
-            local HttpService = game:GetService("HttpService")
-            local json = readfile(self.keyFile)
-            local decoded = HttpService:JSONDecode(json)
-            if decoded and type(decoded) == "table" then
-                self.keyData = decoded
-            end
-        end
-    end)
-    return self.keyData
-end
-
-function KeySystemManager:IsKeyValid()
-    local data = self:LoadKey()
-    if not data or not data.key or data.key == "" then
-        return false, "No key found"
-    end
-    
-    local currentTime = os.time()
-    if data.expiration and data.expiration > 0 then
-        if currentTime >= data.expiration then
-            return false, "Key expired on " .. os.date("%Y-%m-%d %H:%M:%S", data.expiration)
-        end
-    end
-    
-    local currentHWID = self:GetHWID()
-    if data.hwid and data.hwid ~= "" and data.hwid ~= currentHWID then
-        return false, "HWID mismatch"
-    end
-    
-    return true, "Key valid until " .. (data.expiration > 0 and os.date("%Y-%m-%d %H:%M:%S", data.expiration) or "Never")
-end
-
-function KeySystemManager:GetExpirationInfo()
-    local data = self:LoadKey()
-    if not data.expiration or data.expiration == 0 then
-        return "Never expires"
-    end
-    
-    local currentTime = os.time()
-    local timeLeft = data.expiration - currentTime
-    
-    if timeLeft <= 0 then
-        return "Expired"
-    end
-    
-    local days = math.floor(timeLeft / 86400)
-    local hours = math.floor((timeLeft % 86400) / 3600)
-    local minutes = math.floor((timeLeft % 3600) / 60)
-    
-    return string.format("Expires in: %dd %dh %dm", days, hours, minutes)
-end
-
--- / Tween table & function
-local TweenTable = {
-    Default = {
-        TweenInfo.new(0.17, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, false, 0)
-    }
+-- ============================================================================
+-- SERVICES & CORE DEPENDENCIES
+-- ============================================================================
+local Services = {
+	TweenService = game:GetService("TweenService"),
+	HttpService = game:GetService("HttpService"),
+	RunService = game:GetService("RunService"),
+	UserInputService = game:GetService("UserInputService"),
+	Players = game:GetService("Players"),
+	TextService = game:GetService("TextService"),
+	CoreGui = game:GetService("CoreGui")
 }
 
-local CreateTween = function(name, speed, style, direction, loop, reverse, delay)
-    name = name
-    speed = speed or 0.17
-    style = style or Enum.EasingStyle.Sine
-    direction = direction or Enum.EasingDirection.InOut
-    loop = loop or 0
-    reverse = reverse or false
-    delay = delay or 0
-
-    TweenTable[name] = TweenInfo.new(speed, style, direction, loop, reverse, delay)
-end
-
--- / Dragging
-local drag = function(obj, latency)
-    obj = obj
-    latency = latency or 0.06
-
-    toggled = nil
-    input = nil
-    start = nil
-
-    function updateInput(input)
-        local Delta = input.Position - start
-        local Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + Delta.X, startPos.Y.Scale, startPos.Y.Offset + Delta.Y)
-        TweenService:Create(obj, TweenInfo.new(latency), {Position = Position}):Play()
-    end
-
-    obj.InputBegan:Connect(function(inp)
-        if (inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch) then
-            toggled = true
-            start = inp.Position
-            startPos = obj.Position
-            inp.Changed:Connect(function()
-                if (inp.UserInputState == Enum.UserInputState.End) then
-                    toggled = false
-                end
-            end)
-        end
-    end)
-
-    obj.InputChanged:Connect(function(inp)
-        if (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
-            input = inp
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(inp)
-        if (inp == input and toggled) then
-            updateInput(inp)
-        end
-    end)
-end
-
--- / Library
-local library = {
-    version = "2.0.3",
-    title = title or "xsx " .. tostring(math.random(1,366)),
-    fps = 0,
-    rank = "private",
-    configManager = nil,
-    keyManager = KeySystemManager.new()
+-- ============================================================================
+-- GLOBAL STATE & CONFIGURATION
+-- ============================================================================
+local GlobalState = {
+	ScreenSize = workspace.CurrentCamera.ViewportSize,
+	IsMobile = false,
+	DragOffset = 255,
+	DragOffsetMobile = 150,
+	Camera = workspace.CurrentCamera,
+	Resizing = false,
+	Loaded = false,
+	UIClosed = false,
+	SettingsOpen = false,
+	PluginsOpen = false,
+	Connected = false,
+	UserInfoDisabled = false,
+	UIToggle = Enum.KeyCode.RightShift,
+	Bounce = false
 }
 
-coroutine.wrap(function()
-    RunService.RenderStepped:Connect(function(v)
-        library.fps = math.round(1/v)
-    end)
-end)()
+-- Calculate mobile status
+GlobalState.IsMobile = Services.UserInputService.TouchEnabled or 
+	(GlobalState.ScreenSize.X < 1024 and GlobalState.ScreenSize.Y < 768)
 
-function library:RoundNumber(int, float)
-    return tonumber(string.format("%."..(int or 0).."f", float))
+-- ============================================================================
+-- UI ASSETS & INITIALIZATION
+-- ============================================================================
+local Loader = game:GetObjects("rbxassetid://110221114597158")[1]
+local Library = game:GetObjects("rbxassetid://123800669522471")[1]
+Library.Enabled = false
+
+-- ============================================================================
+-- SYDE LIBRARY CORE
+-- ============================================================================
+local syde = {
+	theme = {
+		Accent = Color3.fromRGB(255, 255, 255),
+		HitBox = Color3.fromRGB(255, 255, 255),
+		DropShadow = Color3.fromRGB(0, 0, 0)
+	},
+	Connections = {},
+	Comms = Instance.new('BindableEvent'),
+	ParentOverride = nil,
+	Build = 'SY3',
+	ConfigEnabled = false,
+	ConfigFolder = 'Syde',
+	ConfigFile = 'Config',
+	Flags = {},
+	SettingsFlags = {},
+	LoadTweens = {}
+}
+
+-- ============================================================================
+-- THEME MANAGEMENT
+-- ============================================================================
+function syde:UpdateTheme(Config)
+	if type(Config) ~= "table" then
+		warn("[UpdateTheme] Invalid configuration table")
+		return
+	end
+
+	local updatedKeys = {}
+
+	for key, value in pairs(Config) do
+		if self.theme[key] ~= nil then
+			if typeof(self.theme[key]) == typeof(value) then
+				if type(value) == "table" then
+					self:DeepMerge(self.theme[key], value)
+				else
+					self.theme[key] = value
+				end
+				table.insert(updatedKeys, key)
+			else
+				warn(("[UpdateTheme] Type mismatch for key '%s' (expected %s, got %s)"):format(
+					key, typeof(self.theme[key]), typeof(value)
+				))
+			end
+		else
+			warn("[UpdateTheme] Key '" .. key .. "' does not exist in theme")
+		end
+	end
+
+	if #updatedKeys > 0 then
+		for _, key in ipairs(updatedKeys) do
+			self.Comms:Fire(key, self.theme[key])
+		end
+	end
 end
 
-function library:GetUsername()
-    return Player.Name
+function syde:DeepMerge(target, source)
+	for k, v in pairs(source) do
+		if type(v) == "table" and type(target[k]) == "table" then
+			self:DeepMerge(target[k], v)
+		else
+			target[k] = v
+		end
+	end
 end
 
-function library:CheckIfLoaded()
-    if game:IsLoaded() then
-        return true
-    else
-        return false
-    end
+-- ============================================================================
+-- UTILITY FUNCTIONS
+-- ============================================================================
+function syde:GetDarkColor(Color, val, mode)
+	if typeof(Color) ~= "Color3" or type(val) ~= "number" then
+		warn("[GetDarkColor] Invalid input: Expected (Color3, number)")
+		return Color
+	end
+
+	local H, S, V = Color:ToHSV()
+	val = math.clamp(val, 0.1, 10)
+
+	if mode == "subtract" then
+		V = math.clamp(V - (val / 10), 0, 1)
+	else
+		V = math.clamp(V / val, 0, 1)
+	end
+
+	return Color3.fromHSV(H, S, V)
 end
 
-function library:GetUserId()
-    return Player.UserId
+function syde:HidePlaceHolder(instance, placeholder, recursive)
+	if typeof(instance) ~= "Instance" or type(placeholder) ~= "string" then
+		warn("[HidePlaceHolder] Invalid input: Expected (Instance, string)")
+		return
+	end
+
+	local target = instance:FindFirstChild(placeholder)
+	if not target then
+		warn(("[HidePlaceHolder] Placeholder '%s' not found in instance '%s'"):format(placeholder, instance.Name))
+		return
+	end
+
+	if target:IsA("GuiObject") then
+		target.Visible = false
+	else
+		warn(("[HidePlaceHolder] '%s' is not a GuiObject and cannot be hidden"):format(placeholder))
+		return
+	end
+
+	if recursive then
+		for _, child in ipairs(target:GetDescendants()) do
+			if child:IsA("GuiObject") then
+				child.Visible = false
+			end
+		end
+	end
 end
 
-function library:GetPlaceId()
-    return game.PlaceId
+function syde:AddConnection(Type, Callback)
+	if typeof(Type) ~= "RBXScriptSignal" then
+		error("[AddConnection] Invalid Type: Expected RBXScriptSignal, got " .. typeof(Type))
+	end
+	if typeof(Callback) ~= "function" then
+		error("[AddConnection] Invalid Callback: Expected function, got " .. typeof(Callback))
+	end
+
+	local Connection = Type:Connect(Callback)
+	local ConnectionData = { Connection = Connection }
+
+	syde.Connections = syde.Connections or {}
+	table.insert(syde.Connections, ConnectionData)
+
+	local function Disconnect()
+		if Connection.Connected then
+			Connection:Disconnect()
+		end
+
+		for i = #syde.Connections, 1, -1 do
+			if syde.Connections[i] == ConnectionData then
+				table.remove(syde.Connections, i)
+				break
+			end
+		end
+	end
+
+	-- Clean up disconnected connections periodically
+	task.spawn(function()
+		task.wait(10)
+		for i = #syde.Connections, 1, -1 do
+			if not syde.Connections[i].Connection.Connected then
+				table.remove(syde.Connections, i)
+			end
+		end
+	end)
+
+	return Connection, Disconnect
 end
 
-function library:Init(options)
-    options = options or {}
-    local title = options.title or library.title
-    local key = options.key or Enum.KeyCode.RightAlt
-    local configName = options.configName or "xsx_config.json"
-    local requireKey = options.requireKey or false
-    local keyValidationFunc = options.keyValidation
-    
-    -- Initialize config manager
-    library.configManager = ConfigManager.new(configName)
-    
-    -- Key system check
-    if requireKey then
-        local isValid, message = library.keyManager:IsKeyValid()
-        if not isValid then
-            -- Show key input UI
-            return library:ShowKeySystem(keyValidationFunc)
-        end
-    end
-    
-    -- Clear old instances
-    for _,v in next, CoreGuiService:GetChildren() do
-        if v.Name == "screen" then
-            v:Destroy()
-        end
-    end
+-- ============================================================================
+-- RESIZABLE UI HANDLER
+-- ============================================================================
+function syde:MakeResizable(Dragger, Object, MinSize, Callback, LockAspectRatio)
+	assert(typeof(Dragger) == "Instance" and Dragger:IsA("GuiObject"), "[MakeResizable] Dragger must be a GuiObject")
+	assert(typeof(Object) == "Instance" and Object:IsA("GuiObject"), "[MakeResizable] Object must be a GuiObject")
+	assert(typeof(MinSize) == "Vector2", "[MakeResizable] MinSize must be a Vector2")
+	assert(Callback == nil or typeof(Callback) == "function", "[MakeResizable] Callback must be a function or nil")
 
-    local screen = Instance.new("ScreenGui")
-    local edge = Instance.new("Frame")
-    local edgeCorner = Instance.new("UICorner")
-    local background = Instance.new("Frame")
-    local backgroundCorner = Instance.new("UICorner")
-    local backgroundGradient = Instance.new("UIGradient")
-    local headerLabel = Instance.new("TextLabel")
-    local headerPadding = Instance.new("UIPadding")
-    local barFolder = Instance.new("Folder")
-    local bar = Instance.new("Frame")
-    local barCorner = Instance.new("UICorner")
-    local barLayout = Instance.new("UIListLayout")
-    local tabButtonsEdge = Instance.new("Frame")
-    local tabButtonCorner = Instance.new("UICorner")
-    local tabButtons = Instance.new("Frame")
-    local tabButtonCorner_2 = Instance.new("UICorner")
-    local tabButtonsGradient = Instance.new("UIGradient")
-    local tabButtonLayout = Instance.new("UIListLayout")
-    local tabButtonPadding = Instance.new("UIPadding")
-    local containerEdge = Instance.new("Frame")
-    local tabButtonCorner_3 = Instance.new("UICorner")
-    local container = Instance.new("Frame")
-    local containerCorner = Instance.new("UICorner")
-    local containerGradient = Instance.new("UIGradient")
-    
-    -- Mobile toggle button
-    local mobileToggleButton = Instance.new("ImageButton")
-    local mobileButtonCorner = Instance.new("UICorner")
+	local startPosition, startSize = nil, nil
+	local isResizing = false
 
-    screen.Name = "screen"
-    screen.Parent = CoreGuiService
-    screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	local function getInputPos(input)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			return Vector2.new(input.Position.X, input.Position.Y)
+		else
+			return Services.UserInputService:GetMouseLocation()
+		end
+	end
 
-    -- Mobile Toggle Button
-    mobileToggleButton.Name = "mobileToggle"
-    mobileToggleButton.Parent = screen
-    mobileToggleButton.BackgroundColor3 = Color3.fromRGB(159, 115, 255)
-    mobileToggleButton.BackgroundTransparency = 0.3
-    mobileToggleButton.Position = UDim2.new(0, 10, 0.5, -25)
-    mobileToggleButton.Size = UDim2.new(0, 50, 0, 50)
-    mobileToggleButton.Image = "rbxassetid://3926305904"
-    mobileToggleButton.ImageColor3 = Color3.fromRGB(255, 255, 255)
-    mobileToggleButton.ImageTransparency = 0
-    mobileToggleButton.ZIndex = 999
-    
-    mobileButtonCorner.CornerRadius = UDim.new(1, 0)
-    mobileButtonCorner.Parent = mobileToggleButton
-    
-    -- Only show mobile button on touch devices
-    if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-        mobileToggleButton.Visible = true
-    else
-        mobileToggleButton.Visible = false
-    end
-    
-    mobileToggleButton.MouseButton1Click:Connect(function()
-        edge.Visible = not edge.Visible
-        local newColor = edge.Visible and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(159, 115, 255)
-        TweenService:Create(mobileToggleButton, TweenInfo.new(0.2), {BackgroundColor3 = newColor}):Play()
-    end)
-    
-    drag(mobileToggleButton, 0.04)
+	local function onInputBegan(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			isResizing = true
+			GlobalState.Resizing = true
+			startPosition = getInputPos(input)
+			startSize = Object.AbsoluteSize
+			Services.TweenService:Create(Library.lib.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {
+				Size = UDim2.new(0, 15, 0, 15)
+			}):Play()
+		end
+	end
 
-    edge.Name = "edge"
-    edge.Parent = screen
-    edge.AnchorPoint = Vector2.new(0.5, 0.5)
-    edge.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    edge.BackgroundTransparency = 0.2  -- Make edges semi-transparent
-    edge.Position = UDim2.new(0.5, 0, 0.5, 0)
-    edge.Size = UDim2.new(0, 594, 0, 406)
+	local function onInputChanged(input)
+		if isResizing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local mouse = getInputPos(input)
+			if startPosition and mouse then
+				local delta = mouse - startPosition
 
-    drag(edge, 0.04)
-    
-    local CanChangeVisibility = true
-    UserInputService.InputBegan:Connect(function(input)
-        if CanChangeVisibility and input.KeyCode == key then
-            edge.Visible = not edge.Visible
-            if edge.Visible and library.configManager then
-                -- Load settings when UI opens
-                local savedConfig = library.configManager:Load()
-                -- Apply loaded config (handled by component callbacks)
-            end
-        end
-    end)
+				local newWidth = math.max(MinSize.X, startSize.X + delta.X)
+				local newHeight = math.max(MinSize.Y, startSize.Y + delta.Y)
 
-    edgeCorner.CornerRadius = UDim.new(0, 2)
-    edgeCorner.Name = "edgeCorner"
-    edgeCorner.Parent = edge
+				if LockAspectRatio then
+					local aspectRatio = startSize.X / startSize.Y
+					newHeight = newWidth / aspectRatio
+				end
 
-    background.Name = "background"
-    background.Parent = edge
-    background.AnchorPoint = Vector2.new(0.5, 0.5)
-    background.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    background.BackgroundTransparency = 0.15  -- Make background see-through
-    background.Position = UDim2.new(0.5, 0, 0.5, 0)
-    background.Size = UDim2.new(0, 592, 0, 404)
-    background.ClipsDescendants = true
+				Object:TweenSize(
+					UDim2.fromOffset(newWidth, newHeight),
+					Enum.EasingDirection.Out,
+					Enum.EasingStyle.Quint,
+					0.7,
+					true
+				)
 
-    backgroundCorner.CornerRadius = UDim.new(0, 2)
-    backgroundCorner.Name = "backgroundCorner"
-    backgroundCorner.Parent = background
+				if Callback then
+					Callback(Vector2.new(newWidth, newHeight))
+				end
+			end
+		end
+	end
 
-    backgroundGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(34, 34, 34)), 
-        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(28, 28, 28))
-    }
-    backgroundGradient.Rotation = 90
-    backgroundGradient.Transparency = NumberSequence.new{
-        NumberSequenceKeypoint.new(0, 0.3),
-        NumberSequenceKeypoint.new(1, 0.4)
-    }  -- Add transparency to gradient
-    backgroundGradient.Name = "backgroundGradient"
-    backgroundGradient.Parent = background
+	local function onInputEnded(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			isResizing = false
+			GlobalState.Resizing = false
+			startPosition, startSize = nil, nil
+			Services.TweenService:Create(Library.lib.resize, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {
+				Size = UDim2.new(0, 20, 0, 20)
+			}):Play()
+		end
+	end
 
-    headerLabel.Name = "headerLabel"
-    headerLabel.Parent = background
-    headerLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    headerLabel.BackgroundTransparency = 1.000
-    headerLabel.Size = UDim2.new(0, 592, 0, 38)
-    headerLabel.Font = Enum.Font.Code
-    headerLabel.Text = title
-    headerLabel.TextColor3 = Color3.fromRGB(198, 198, 198)
-    headerLabel.TextSize = 16.000
-    headerLabel.TextXAlignment = Enum.TextXAlignment.Left
-    headerLabel.RichText = true
-
-    headerPadding.Name = "headerPadding"
-    headerPadding.Parent = headerLabel
-    headerPadding.PaddingBottom = UDim.new(0, 6)
-    headerPadding.PaddingLeft = UDim.new(0, 12)
-    headerPadding.PaddingRight = UDim.new(0, 6)
-    headerPadding.PaddingTop = UDim.new(0, 6)
-
-    barFolder.Name = "barFolder"
-    barFolder.Parent = background
-
-    bar.Name = "bar"
-    bar.Parent = barFolder
-    bar.BackgroundColor3 = Color3.fromRGB(159, 115, 255)
-    bar.BackgroundTransparency = 0.200
-    bar.Size = UDim2.new(0, 592, 0, 1)
-    bar.BorderSizePixel = 0
-
-    barCorner.CornerRadius = UDim.new(0, 2)
-    barCorner.Name = "barCorner"
-    barCorner.Parent = bar
-
-    barLayout.Name = "barLayout"
-    barLayout.Parent = barFolder
-    barLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    barLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    tabButtonsEdge.Name = "tabButtonsEdge"
-    tabButtonsEdge.Parent = background
-    tabButtonsEdge.AnchorPoint = Vector2.new(0.5, 0.5)
-    tabButtonsEdge.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    tabButtonsEdge.BackgroundTransparency = 0.2
-    tabButtonsEdge.Position = UDim2.new(0.1435, 0, 0.536000013, 0)
-    tabButtonsEdge.Size = UDim2.new(0, 152, 0, 360)
-
-    tabButtonCorner.CornerRadius = UDim.new(0, 2)
-    tabButtonCorner.Name = "tabButtonCorner"
-    tabButtonCorner.Parent = tabButtonsEdge
-
-    tabButtons.Name = "tabButtons"
-    tabButtons.Parent = tabButtonsEdge
-    tabButtons.AnchorPoint = Vector2.new(0.5, 0.5)
-    tabButtons.BackgroundColor3 = Color3.fromRGB(235, 235, 235)
-    tabButtons.BackgroundTransparency = 0.15
-    tabButtons.ClipsDescendants = true
-    tabButtons.Position = UDim2.new(0.5, 0, 0.5, 0)
-    tabButtons.Size = UDim2.new(0, 150, 0, 358)
-
-    tabButtonCorner_2.CornerRadius = UDim.new(0, 2)
-    tabButtonCorner_2.Name = "tabButtonCorner"
-    tabButtonCorner_2.Parent = tabButtons
-
-    tabButtonsGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(34, 34, 34)), 
-        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(28, 28, 28))
-    }
-    tabButtonsGradient.Rotation = 90
-    tabButtonsGradient.Transparency = NumberSequence.new{
-        NumberSequenceKeypoint.new(0, 0.3),
-        NumberSequenceKeypoint.new(1, 0.4)
-    }
-    tabButtonsGradient.Name = "tabButtonsGradient"
-    tabButtonsGradient.Parent = tabButtons
-
-    tabButtonLayout.Name = "tabButtonLayout"
-    tabButtonLayout.Parent = tabButtons
-    tabButtonLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    tabButtonLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-    tabButtonPadding.Name = "tabButtonPadding"
-    tabButtonPadding.Parent = tabButtons
-    tabButtonPadding.PaddingBottom = UDim.new(0, 4)
-    tabButtonPadding.PaddingLeft = UDim.new(0, 4)
-    tabButtonPadding.PaddingRight = UDim.new(0, 4)
-    tabButtonPadding.PaddingTop = UDim.new(0, 4)
-
-    containerEdge.Name = "containerEdge"
-    containerEdge.Parent = background
-    containerEdge.AnchorPoint = Vector2.new(0.5, 0.5)
-    containerEdge.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    containerEdge.BackgroundTransparency = 0.2
-    containerEdge.Position = UDim2.new(0.637000024, 0, 0.536000013, 0)
-    containerEdge.Size = UDim2.new(0, 414, 0, 360)
-
-    tabButtonCorner_3.CornerRadius = UDim.new(0, 2)
-    tabButtonCorner_3.Name = "tabButtonCorner"
-    tabButtonCorner_3.Parent = containerEdge
-
-    container.Name = "container"
-    container.Parent = containerEdge
-    container.AnchorPoint = Vector2.new(0.5, 0.5)
-    container.BackgroundColor3 = Color3.fromRGB(235, 235, 235)
-    container.BackgroundTransparency = 0.15
-    container.Position = UDim2.new(0.5, 0, 0.5, 0)
-    container.Size = UDim2.new(0, 412, 0, 358)
-
-    containerCorner.CornerRadius = UDim.new(0, 2)
-    containerCorner.Name = "containerCorner"
-    containerCorner.Parent = container
-
-    containerGradient.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0.00, Color3.fromRGB(34, 34, 34)), 
-        ColorSequenceKeypoint.new(1.00, Color3.fromRGB(28, 28, 28))
-    }
-    containerGradient.Rotation = 90
-    containerGradient.Transparency = NumberSequence.new{
-        NumberSequenceKeypoint.new(0, 0.3),
-        NumberSequenceKeypoint.new(1, 0.4)
-    }
-    containerGradient.Name = "containerGradient"
-    containerGradient.Parent = container
-    
-    -- Add key info display if key system is used
-    if requireKey then
-        local keyInfoLabel = Instance.new("TextLabel")
-        keyInfoLabel.Name = "keyInfo"
-        keyInfoLabel.Parent = background
-        keyInfoLabel.BackgroundTransparency = 1
-        keyInfoLabel.Position = UDim2.new(0, 12, 1, -20)
-        keyInfoLabel.Size = UDim2.new(1, -24, 0, 18)
-        keyInfoLabel.Font = Enum.Font.Code
-        keyInfoLabel.TextSize = 10
-        keyInfoLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-        keyInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
-        keyInfoLabel.Text = library.keyManager:GetExpirationInfo()
-        keyInfoLabel.RichText = true
-        
-        -- Update expiration info every minute
-        task.spawn(function()
-            while true do
-                task.wait(60)
-                if keyInfoLabel and keyInfoLabel.Parent then
-                    keyInfoLabel.Text = library.keyManager:GetExpirationInfo()
-                end
-            end
-        end)
-    end
-
-    local TabLibrary = {
-        IsFirst = true,
-        CurrentTab = "",
-        SavedSettings = library.configManager:Load()
-    }
-    
-    CreateTween("tab_text_colour", 0.16)
-    
-    function TabLibrary:NewTab(title)
-        title = title or "tab"
-
-        local tabButton = Instance.new("TextButton")
-        local page = Instance.new("ScrollingFrame")
-        local pageLayout = Instance.new("UIListLayout")
-        local pagePadding = Instance.new("UIPadding")
-
-        tabButton.Name = "tabButton"
-        tabButton.Parent = tabButtons
-        tabButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        tabButton.BackgroundTransparency = 1.000
-        tabButton.ClipsDescendants = true
-        tabButton.Position = UDim2.new(-0.0281690136, 0, 0, 0)
-        tabButton.Size = UDim2.new(0, 150, 0, 22)
-        tabButton.AutoButtonColor = false
-        tabButton.Font = Enum.Font.Code
-        tabButton.Text = title
-        tabButton.TextColor3 = Color3.fromRGB(170, 170, 170)
-        tabButton.TextSize = 15.000
-        tabButton.RichText = true
-
-        page.Name = "page"
-        page.Parent = container
-        page.Active = true
-        page.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        page.BackgroundTransparency = 1.000
-        page.BorderSizePixel = 0
-        page.Size = UDim2.new(0, 412, 0, 358)
-        page.BottomImage = "http://www.roblox.com/asset/?id=3062506202"
-        page.MidImage = "http://www.roblox.com/asset/?id=3062506202"
-        page.ScrollBarThickness = 1
-        page.TopImage = "http://www.roblox.com/asset/?id=3062506202"
-        page.ScrollBarImageColor3 = Color3.fromRGB(159, 115, 255)
-        page.Visible = false
-        
-        pageLayout.Name = "pageLayout"
-        pageLayout.Parent = page
-        pageLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        pageLayout.Padding = UDim.new(0, 4)
-
-        pagePadding.Name = "pagePadding"
-        pagePadding.Parent = page
-        pagePadding.PaddingBottom = UDim.new(0, 6)
-        pagePadding.PaddingLeft = UDim.new(0, 6)
-        pagePadding.PaddingRight = UDim.new(0, 6)
-        pagePadding.PaddingTop = UDim.new(0, 6)
-
-        if TabLibrary.IsFirst then
-            page.Visible = true
-            tabButton.TextColor3 = Color3.fromRGB(159, 115, 255)
-            TabLibrary.CurrentTab = title
-        end
-        
-        tabButton.MouseButton1Click:Connect(function()
-            TabLibrary.CurrentTab = title
-            for i,v in pairs(container:GetChildren()) do 
-                if v:IsA("ScrollingFrame") then
-                    v.Visible = false
-                end
-            end
-            page.Visible = true
-
-            for i,v in pairs(tabButtons:GetChildren()) do
-                if v:IsA("TextButton") then
-                    TweenService:Create(v, TweenTable["tab_text_colour"], {TextColor3 = Color3.fromRGB(170, 170, 170)}):Play()
-                end
-            end
-            TweenService:Create(tabButton, TweenTable["tab_text_colour"], {TextColor3 = Color3.fromRGB(159, 115, 255)}):Play()
-        end)
-
-        local function UpdatePageSize()
-            local correction = pageLayout.AbsoluteContentSize
-            page.CanvasSize = UDim2.new(0, correction.X+13, 0, correction.Y+13)
-        end
-
-        page.ChildAdded:Connect(UpdatePageSize)
-        page.ChildRemoved:Connect(UpdatePageSize)
-
-        TabLibrary.IsFirst = false
-
-        CreateTween("hover", 0.16)
-        
-        local Components = {}
-        
-        -- [Rest of the component methods like NewToggle, NewSlider, etc. would go here]
-        -- For brevity, I'll include a sample toggle with save/load functionality
-        
-        function Components:NewToggle(text, default, callback)
-            text = text or "toggle"
-            default = default or false
-            callback = callback or function() end
-            
-            local settingKey = "toggle_" .. text:gsub("%s+", "_")
-            
-            -- Load saved value
-            if TabLibrary.SavedSettings[settingKey] ~= nil then
-                default = TabLibrary.SavedSettings[settingKey]
-            end
-
-            local toggleButton = Instance.new("TextButton")
-            local toggleLayout = Instance.new("UIListLayout")
-            local toggleEdge = Instance.new("Frame")
-            local toggleEdgeCorner = Instance.new("UICorner")
-            local toggle = Instance.new("Frame")
-            local toggleCorner = Instance.new("UICorner")
-            local toggleGradient = Instance.new("UIGradient")
-            local toggleDesign = Instance.new("Frame")
-            local toggleDesignCorner = Instance.new("UICorner")
-            local toggleDesignGradient = Instance.new("UIGradient")
-            local toggleLabel = Instance.new("TextLabel")
-            local toggleLabelPadding = Instance.new("UIPadding")
-
-            toggleButton.Name = "toggleButton"
-            toggleButton.Parent = page
-            toggleButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            toggleButton.BackgroundTransparency = 1.000
-            toggleButton.ClipsDescendants = false
-            toggleButton.Size = UDim2.new(0, 396, 0, 22)
-            toggleButton.Font = Enum.Font.Code
-            toggleButton.Text = ""
-            toggleButton.TextColor3 = Color3.fromRGB(190, 190, 190)
-            toggleButton.TextSize = 14.000
-            toggleButton.TextXAlignment = Enum.TextXAlignment.Left
-
-            toggleLayout.Name = "toggleLayout"
-            toggleLayout.Parent = toggleButton
-            toggleLayout.FillDirection = Enum.FillDirection.Horizontal
-            toggleLayout.SortOrder = Enum.SortOrder.LayoutOrder
-            toggleLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-
-            toggleEdge.Name = "toggleEdge"
-            toggleEdge.Parent = toggleButton
-            toggleEdge.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-            toggleEdge.BackgroundTransparency = 0.2
-            toggleEdge.Size = UDim2.new(0, 18, 0, 18)
-
-            toggleEdgeCorner.CornerRadius = UDim.new(0, 2)
-            toggleEdgeCorner.Name = "toggleEdgeCorner"
-            toggleEdgeCorner.Parent = toggleEdge
-
-            toggle.Name = "toggle"
-            toggle.Parent = toggleEdge
-            toggle.AnchorPoint = Vector2.new(0.5, 0.5)
-            toggle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            toggle.BackgroundTransparency = 0.15
-            toggle.Position = UDim2.new(0.5, 0, 0.5, 0)
-            toggle.Size = UDim2.new(0, 16, 0, 16)
-
-            toggleCorner.CornerRadius = UDim.new(0, 2)
-            toggleCorner.Name = "toggleCorner"
-            toggleCorner.Parent = toggle
-
-            toggleGradient.Color = ColorSequence.new{
-                ColorSequenceKeypoint.new(0.00, Color3.fromRGB(34, 34, 34)), 
-                ColorSequenceKeypoint.new(1.00, Color3.fromRGB(28, 28, 28))
-            }
-            toggleGradient.Rotation = 90
-            toggleGradient.Transparency = NumberSequence.new{
-                NumberSequenceKeypoint.new(0, 0.3),
-                NumberSequenceKeypoint.new(1, 0.4)
-            }
-            toggleGradient.Name = "toggleGradient"
-            toggleGradient.Parent = toggle
-
-            toggleDesign.Name = "toggleDesign"
-            toggleDesign.Parent = toggle
-            toggleDesign.AnchorPoint = Vector2.new(0.5, 0.5)
-            toggleDesign.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            toggleDesign.BackgroundTransparency = 1.000
-            toggleDesign.Position = UDim2.new(0.5, 0, 0.5, 0)
-
-            toggleDesignCorner.CornerRadius = UDim.new(0, 2)
-            toggleDesignCorner.Name = "toggleDesignCorner"
-            toggleDesignCorner.Parent = toggleDesign
-
-            toggleDesignGradient.Color = ColorSequence.new{
-                ColorSequenceKeypoint.new(0.00, Color3.fromRGB(157, 115, 255)), 
-                ColorSequenceKeypoint.new(1.00, Color3.fromRGB(106, 69, 181))
-            }
-            toggleDesignGradient.Rotation = 90
-            toggleDesignGradient.Name = "toggleDesignGradient"
-            toggleDesignGradient.Parent = toggleDesign
-
-            toggleLabel.Name = "toggleLabel"
-            toggleLabel.Parent = toggleButton
-            toggleLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            toggleLabel.BackgroundTransparency = 1.000
-            toggleLabel.Position = UDim2.new(0.0454545468, 0, 0, 0)
-            toggleLabel.Size = UDim2.new(0, 377, 0, 22)
-            toggleLabel.Font = Enum.Font.Code
-            toggleLabel.LineHeight = 1.150
-            toggleLabel.Text = text
-            toggleLabel.TextColor3 = Color3.fromRGB(190, 190, 190)
-            toggleLabel.TextSize = 14.000
-            toggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-            toggleLabel.RichText = true
-
-            toggleLabelPadding.Name = "toggleLabelPadding"
-            toggleLabelPadding.Parent = toggleLabel
-            toggleLabelPadding.PaddingLeft = UDim.new(0, 6)
-
-            local NewToggleLabelSize = TextService:GetTextSize(toggleLabel.Text, toggleLabel.TextSize, toggleLabel.Font, Vector2.new(math.huge,math.huge))
-            toggleLabel.Size = UDim2.new(0, NewToggleLabelSize.X + 6, 0, 22)
-
-            toggleButton.MouseEnter:Connect(function()
-                TweenService:Create(toggleLabel, TweenTable["hover"], {TextColor3 = Color3.fromRGB(210, 210, 210)}):Play()
-            end)
-            toggleButton.MouseLeave:Connect(function()
-                TweenService:Create(toggleLabel, TweenTable["hover"], {TextColor3 = Color3.fromRGB(190, 190, 190)}):Play()
-            end)
-
-            CreateTween("toggle_form", 0.13)
-            local On = default
-            
-            toggleButton.MouseButton1Click:Connect(function()
-                On = not On
-                local SizeOn = On and UDim2.new(0, 12, 0, 12) or UDim2.new(0, 0, 0, 0)
-                local Transparency = On and 0 or 1
-                TweenService:Create(toggleDesign, TweenTable["toggle_form"], {Size = SizeOn}):Play()
-                TweenService:Create(toggleDesign, TweenTable["toggle_form"], {BackgroundTransparency = Transparency}):Play()
-                
-                -- Save setting
-                if library.configManager then
-                    TabLibrary.SavedSettings[settingKey] = On
-                    library.configManager:Save(TabLibrary.SavedSettings)
-                end
-                
-                callback(On)
-            end)
-
-            local ToggleFunctions = {}
-            function ToggleFunctions:Set(state)
-                On = state
-                local SizeOn = On and UDim2.new(0, 12, 0, 12) or UDim2.new(0, 0, 0, 0)
-                local Transparency = On and 0 or 1
-                TweenService:Create(toggleDesign, TweenTable["toggle_form"], {Size = SizeOn}):Play()
-                TweenService:Create(toggleDesign, TweenTable["toggle_form"], {BackgroundTransparency = Transparency}):Play()
-                
-                if library.configManager then
-                    TabLibrary.SavedSettings[settingKey] = On
-                    library.configManager:Save(TabLibrary.SavedSettings)
-                end
-                
-                callback(On)
-                return ToggleFunctions
-            end
-
-            UpdatePageSize()
-            
-            -- Set initial state visually
-            if default then
-                toggleDesign.Size = UDim2.new(0, 12, 0, 12)
-                toggleDesign.BackgroundTransparency = 0
-                callback(true)
-            end
-            
-            return ToggleFunctions
-        end
-        
-        return Components
-    end
-    
-    return TabLibrary
+	syde:AddConnection(Dragger.InputBegan, onInputBegan)
+	syde:AddConnection(Services.UserInputService.InputChanged, onInputChanged)
+	syde:AddConnection(Dragger.InputEnded, onInputEnded)
 end
 
-function library:ShowKeySystem(validationFunc)
-    -- Create simple key input UI
-    local keyGui = Instance.new("ScreenGui")
-    local keyFrame = Instance.new("Frame")
-    local keyCorner = Instance.new("UICorner")
-    local titleLabel = Instance.new("TextLabel")
-    local keyInput = Instance.new("TextBox")
-    local inputCorner = Instance.new("UICorner")
-    local submitButton = Instance.new("TextButton")
-    local buttonCorner = Instance.new("UICorner")
-    local statusLabel = Instance.new("TextLabel")
-    
-    keyGui.Name = "KeySystem"
-    keyGui.Parent = CoreGuiService
-    
-    keyFrame.Name = "keyFrame"
-    keyFrame.Parent = keyGui
-    keyFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    keyFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    keyFrame.BackgroundTransparency = 0.1
-    keyFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    keyFrame.Size = UDim2.new(0, 400, 0, 250)
-    
-    keyCorner.CornerRadius = UDim.new(0, 8)
-    keyCorner.Parent = keyFrame
-    
-    titleLabel.Name = "title"
-    titleLabel.Parent = keyFrame
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Size = UDim2.new(1, 0, 0, 50)
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.Text = "Key System"
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.TextSize = 24
-    
-    keyInput.Name = "keyInput"
-    keyInput.Parent = keyFrame
-    keyInput.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    keyInput.BackgroundTransparency = 0.2
-    keyInput.Position = UDim2.new(0.1, 0, 0.3, 0)
-    keyInput.Size = UDim2.new(0.8, 0, 0, 40)
-    keyInput.Font = Enum.Font.Code
-    keyInput.PlaceholderText = "Enter your key..."
-    keyInput.Text = ""
-    keyInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-    keyInput.TextSize = 14
-    keyInput.ClearTextOnFocus = false
-    
-    inputCorner.CornerRadius = UDim.new(0, 4)
-    inputCorner.Parent = keyInput
-    
-    submitButton.Name = "submit"
-    submitButton.Parent = keyFrame
-    submitButton.BackgroundColor3 = Color3.fromRGB(159, 115, 255)
-    submitButton.Position = UDim2.new(0.1, 0, 0.55, 0)
-    submitButton.Size = UDim2.new(0.8, 0, 0, 40)
-    submitButton.Font = Enum.Font.GothamBold
-    submitButton.Text = "Submit Key"
-    submitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    submitButton.TextSize = 16
-    
-    buttonCorner.CornerRadius = UDim.new(0, 4)
-    buttonCorner.Parent = submitButton
-    
-    statusLabel.Name = "status"
-    statusLabel.Parent = keyFrame
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Position = UDim2.new(0, 0, 0.8, 0)
-    statusLabel.Size = UDim2.new(1, 0, 0, 30)
-    statusLabel.Font = Enum.Font.Code
-    statusLabel.Text = ""
-    statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-    statusLabel.TextSize = 12
-    
-    submitButton.MouseButton1Click:Connect(function()
-        local key = keyInput.Text
-        if key == "" then
-            statusLabel.Text = "Please enter a key"
-            statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-            return
-        end
-        
-        if validationFunc then
-            local isValid, expiration = validationFunc(key)
-            if isValid then
-                -- Save key with expiration (timestamp)
-                library.keyManager:SaveKey(key, expiration or 0)
-                statusLabel.Text = "Key validated! Loading..."
-                statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-                task.wait(1)
-                keyGui:Destroy()
-                -- Reinitialize UI
-                library:Init({requireKey = false})
-            else
-                statusLabel.Text = "Invalid key!"
-                statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-            end
-        else
-            -- Simple key check
-            statusLabel.Text = "No validation function provided"
-        end
-    end)
-    
-    return false
+-- ============================================================================
+-- TWEEN REGISTRATION SYSTEM
+-- ============================================================================
+function syde:RegisterLoadTween(object, properties, initialState, tweenInfo)
+	assert(typeof(object) == "Instance", "[RegisterLoadTween] Object must be an Instance")
+	assert(typeof(properties) == "table", "[RegisterLoadTween] Properties must be a table")
+	assert(typeof(initialState) == "table", "[RegisterLoadTween] Initial state must be a table")
+	assert(typeof(tweenInfo) == "TweenInfo", "[RegisterLoadTween] TweenInfo must be of type TweenInfo")
+
+	self.LoadTweens[object] = {
+		tween = Services.TweenService:Create(object, tweenInfo, properties),
+		properties = properties,
+		initialState = initialState,
+		tweenInfo = tweenInfo
+	}
 end
 
-return library
+function syde:ResetToInitialState(animated, resetTweenInfo)
+	for object, tweenData in pairs(self.LoadTweens) do
+		if object and object.Parent then
+			tweenData.tween:Cancel()
+
+			if animated then
+				local resetTween = Services.TweenService:Create(object, resetTweenInfo or TweenInfo.new(0.3), tweenData.initialState)
+				resetTween:Play()
+				resetTween.Completed:Wait()
+			else
+				for property, value in pairs(tweenData.initialState) do
+					object[property] = value
+				end
+			end
+		end
+	end
+end
+
+function syde:ReplayLoadTweens(targetObject)
+	syde:ResetToInitialState(false)
+
+	for object, tweenData in pairs(self.LoadTweens) do
+		if object and object.Parent then
+			if not targetObject or object == targetObject then
+				tweenData.tween:Cancel()
+				tweenData.tween:Play()
+			end
+		end
+	end
+end
+
+function syde:RemoveLoadTween(object)
+	if self.LoadTweens[object] then
+		self.LoadTweens[object].tween:Cancel()
+		self.LoadTweens[object] = nil
+	end
+end
+
+-- ============================================================================
+-- COLOR UTILITIES
+-- ============================================================================
+function syde:ColorPack(color)
+	assert(typeof(color) == "Color3", "ColorPack expects a Color3 value.")
+	return {
+		R = math.round(color.R * 255),
+		G = math.round(color.G * 255),
+		B = math.round(color.B * 255)
+	}
+end
+
+function syde:ColorUnpack(color)
+	assert(type(color) == "table" or type(color) == "string", "Invalid color format. Expected table (RGB) or string (HEX).")
+
+	if type(color) == "table" then
+		assert(color.R and color.G and color.B, "RGB table must contain 'R', 'G', and 'B' keys.")
+		return Color3.fromRGB(
+			math.clamp(color.R, 0, 255),
+			math.clamp(color.G, 0, 255),
+			math.clamp(color.B, 0, 255)
+		)
+	elseif type(color) == "string" then
+		local hex = color:match("^#?(%x%x%x%x%x%x)$")
+		assert(hex, "Invalid HEX color format. Expected '#RRGGBB' or 'RRGGBB'.")
+		local r, g, b = tonumber(hex:sub(1, 2), 16), tonumber(hex:sub(3, 4), 16), tonumber(hex:sub(5, 6), 16)
+		return Color3.fromRGB(r, g, b)
+	end
+end
+
+-- ============================================================================
+-- LAYOUT UPDATE SYSTEM
+-- ============================================================================
+function syde:UpdateLayout(container, spacing)
+	spacing = spacing or 5
+	local yOffset = 0
+
+	-- Remove existing UIListLayout
+	for _, v in ipairs(container:GetChildren()) do
+		if v:IsA('UIListLayout') then
+			v:Destroy()
+		end
+	end
+
+	if not GlobalState.Resizing then
+		for _, child in ipairs(container:GetChildren()) do
+			if (child:IsA("Frame") or child:IsA("ImageLabel") or child:IsA("TextLabel") or child:IsA("TextButton")) and child.Visible then
+				Services.TweenService:Create(child, TweenInfo.new(0.45, Enum.EasingStyle.Exponential), {
+					Position = UDim2.new(0, 0, 0, yOffset)
+				}):Play()
+				yOffset = yOffset + child.AbsoluteSize.Y + spacing
+			end
+		end
+	end
+
+	container.CanvasSize = UDim2.new(0, 0, 0, yOffset)
+end
+
+-- ============================================================================
+-- DRAG FUNCTIONALITY
+-- ============================================================================
+local dragSpeed = 0.6
+local LockToScreen = false
+
+function syde:AddDrag(Object, Main, ConstrainToParent)
+	assert(typeof(Object) == "Instance" and Object:IsA("GuiObject"), "[AddDrag] Object must be a GuiObject")
+	assert(typeof(Main) == "Instance" and Main:IsA("GuiObject"), "[AddDrag] Main must be a GuiObject")
+
+	local dragging, dragInput, startMousePos, startFramePos = false, nil, nil, nil
+
+	local function getConstrainedPosition(newPos)
+		if not LockToScreen then
+			return newPos
+		end
+
+		local screenSize = workspace.CurrentCamera.ViewportSize
+		local frameSize = Main.AbsoluteSize
+		local anchorPoint = Main.AnchorPoint
+
+		local absX = newPos.X.Offset
+		local absY = newPos.Y.Offset
+
+		local minX = 0 + (frameSize.X * anchorPoint.X)
+		local maxX = screenSize.X - (frameSize.X * (1 - anchorPoint.X))
+
+		local minY = 0 + (frameSize.Y * anchorPoint.Y)
+		local maxY = screenSize.Y - (frameSize.Y * (1 - anchorPoint.Y))
+
+		local clampedX = math.clamp(absX, minX, maxX)
+		local clampedY = math.clamp(absY, minY, maxY)
+
+		return UDim2.new(0, clampedX, 0, clampedY)
+	end
+
+	local function getInputPos(input)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			return Vector2.new(input.Position.X, input.Position.Y)
+		else
+			return Services.UserInputService:GetMouseLocation()
+		end
+	end
+
+	syde:AddConnection(Object.InputBegan, function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			startMousePos = getInputPos(input)
+
+			local screenSize = workspace.CurrentCamera.ViewportSize
+			local absX = screenSize.X * Main.Position.X.Scale + Main.Position.X.Offset
+			local absY = screenSize.Y * Main.Position.Y.Scale + Main.Position.Y.Offset
+
+			Main.Position = UDim2.new(0, absX, 0, absY)
+			startFramePos = Main.Position
+		end
+	end)
+
+	syde:AddConnection(Services.UserInputService.InputChanged, function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local currentMousePos = getInputPos(input)
+			if currentMousePos and startMousePos then
+				local delta = currentMousePos - startMousePos
+
+				local newPos = UDim2.new(
+					startFramePos.X.Scale, startFramePos.X.Offset + delta.X,
+					startFramePos.Y.Scale, startFramePos.Y.Offset + delta.Y
+				)
+
+				Main:TweenPosition(getConstrainedPosition(newPos), Enum.EasingDirection.Out, Enum.EasingStyle.Quint, dragSpeed, true)
+			end
+		end
+	end)
+
+	syde:AddConnection(Object.InputEnded, function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+end
+
+-- ============================================================================
+-- NOTIFICATION SYSTEM
+-- ============================================================================
+local notifications = {}
+local notificationSpacing = 10
+local notifTweenInfo = TweenInfo.new(0.7, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+
+local function updateNotificationPositions()
+	local screenHeight = workspace.CurrentCamera.ViewportSize.Y - 200
+	local currentY = screenHeight
+
+	for i = #notifications, 1, -1 do
+		local notif = notifications[i]
+		local targetPosition = UDim2.new(0, 250, 0, currentY - notif.Size.Y.Offset + 60)
+		Services.TweenService:Create(notif, notifTweenInfo, { Position = targetPosition }):Play()
+		currentY = currentY - (notif.Size.Y.Offset + notificationSpacing)
+	end
+end
+
+-- Hide notification templates
+for _, temp in ipairs(Library.Notification:GetChildren()) do
+	if temp:IsA("Frame") then
+		temp.Visible = false
+	end
+end
+
+function syde:Notify(Notification)
+	task.spawn(function()
+		local NotifData = {
+			Title = Notification.Title,
+			Content = Notification.Content,
+			Duration = Notification.Duration or 5
+		}
+
+		local notif = Library.Notification.Default:Clone()
+		notif.Visible = true
+		notif.Parent = Library.Notification
+		notif.Title.Text = NotifData.Title
+		notif.Content.Text = NotifData.Content
+		notif.Content.Size = UDim2.new(0, 200, 0, notif.Content.TextBounds.Y)
+		notif.Size = UDim2.new(1, 0, 0, notif.Content.TextBounds.Y + 50)
+
+		table.insert(notifications, notif)
+		updateNotificationPositions()
+
+		-- Initial state
+		notif.UIScale.Scale = 0.9
+		notif.close.ImageTransparency = 0.95
+		notif.BackgroundTransparency = 0.75
+		notif.Title.TextTransparency = 0.5
+		notif.Content.TextTransparency = 0.78
+		notif.Position = UDim2.new(0, 600, 0, 637)
+
+		local function CloseNotif()
+			if notif and notif.Parent then
+				table.remove(notifications, table.find(notifications, notif))
+				
+				Services.TweenService:Create(notif.UIScale, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Scale = 0.9 }):Play()
+				Services.TweenService:Create(notif.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 }):Play()
+				Services.TweenService:Create(notif, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.75 }):Play()
+				Services.TweenService:Create(notif.Title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0.5 }):Play()
+				Services.TweenService:Create(notif.Content, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0.78 }):Play()
+
+				task.wait(0.15)
+				Services.TweenService:Create(notif, TweenInfo.new(0.95, Enum.EasingStyle.Exponential), {
+					Position = UDim2.new(0, notif.Position.X.Offset + 400, 0, notif.Position.Y.Offset)
+				}):Play()
+				task.wait(0.4)
+				notif:Destroy()
+				updateNotificationPositions()
+			end
+		end
+
+		task.wait(0.45)
+
+		-- Animate in
+		Services.TweenService:Create(notif.UIScale, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Scale = 1 }):Play()
+		Services.TweenService:Create(notif.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0.75 }):Play()
+		Services.TweenService:Create(notif, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+		Services.TweenService:Create(notif.Title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+		Services.TweenService:Create(notif.Content, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+
+		notif.close.MouseEnter:Connect(function()
+			Services.TweenService:Create(notif.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0.25 }):Play()
+		end)
+
+		notif.close.MouseLeave:Connect(function()
+			Services.TweenService:Create(notif.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0.75 }):Play()
+		end)
+
+		notif.close.MouseButton1Click:Connect(function()
+			CloseNotif()
+		end)
+
+		task.delay(NotifData.Duration, function()
+			CloseNotif()
+		end)
+	end)
+end
+
+-- ============================================================================
+-- MODAL SYSTEM
+-- ============================================================================
+local activeModals = 0
+
+function syde:Modal(Modal)
+	task.spawn(function()
+		local ModalData = {
+			Title = Modal.Title,
+			Content = Modal.Content,
+			ConfirmCallBack = Modal.ConfimCallBack
+		}
+
+		local ModalInstance = Library.lib.Modal:Clone()
+		ModalInstance.Visible = true
+		ModalInstance.Parent = Library.lib
+		ModalInstance.Title.Text = ModalData.Title
+		ModalInstance.Content.Text = ModalData.Content
+		ModalInstance.Size = UDim2.new(0, 135, 0, 144)
+		
+		-- Set initial transparency
+		ModalInstance.BackgroundTransparency = 1
+		ModalInstance.Title.TextTransparency = 1
+		ModalInstance.Content.TextTransparency = 1
+		ModalInstance.Buttons.Confirm.BackgroundTransparency = 1
+		ModalInstance.Buttons.Confirm.TextLabel.TextTransparency = 1
+		ModalInstance.Buttons.Confirm.UIStroke.Transparency = 1
+		ModalInstance.Buttons.Cancel.BackgroundTransparency = 1
+		ModalInstance.Buttons.Cancel.TextLabel.TextTransparency = 1
+		ModalInstance.Buttons.Cancel.UIStroke.Transparency = 1
+
+		local function openModal()
+			activeModals += 1
+			
+			Services.TweenService:Create(ModalInstance.Content, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {
+				Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)
+			}):Play()
+			
+			Services.TweenService:Create(ModalInstance, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {
+				Size = UDim2.new(0, 455, 0, ModalInstance.Content.TextBounds.Y + 120)
+			}):Play()
+			
+			Services.TweenService:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+			Services.TweenService:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
+			Services.TweenService:Create(ModalInstance.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+			Services.TweenService:Create(ModalInstance.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+			Services.TweenService:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.5 }):Play()
+			Services.TweenService:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+			Services.TweenService:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
+			Services.TweenService:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			Services.TweenService:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+			Services.TweenService:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
+		end
+		
+		openModal()
+
+		local function closeModal()
+			activeModals -= 1
+			ModalInstance.Buttons.Cancel.Interactable = false
+			ModalInstance.Buttons.Confirm.Interactable = false
+			
+			Services.TweenService:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), { Size = UDim2.new(0, 219, 0, 147) }):Play()
+			Services.TweenService:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			Services.TweenService:Create(ModalInstance.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+			Services.TweenService:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+			Services.TweenService:Create(ModalInstance.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+			Services.TweenService:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			Services.TweenService:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+			Services.TweenService:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+			Services.TweenService:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+			Services.TweenService:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+			Services.TweenService:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+			
+			task.wait(0.45)
+			ModalInstance:Destroy()
+		end
+
+		if activeModals == 1 then
+			Library.lib.dim.Visible = true
+			Services.TweenService:Create(Library.lib.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+				BackgroundTransparency = 0.3
+			}):Play()
+		end
+
+		ModalInstance.Buttons.Confirm.MouseButton1Click:Connect(function()
+			if typeof(ModalData.ConfirmCallBack) == "function" then
+				ModalData.ConfirmCallBack()
+			end
+
+			closeModal()
+
+			if activeModals == 0 then
+				Services.TweenService:Create(Library.lib.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+					BackgroundTransparency = 1
+				}):Play()
+				task.wait(0.7)
+				Library.lib.dim.Visible = false
+			end
+		end)
+
+		ModalInstance.Buttons.Cancel.MouseButton1Click:Connect(function()
+			closeModal()
+			Services.TweenService:Create(Library.lib.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+				BackgroundTransparency = 1
+			}):Play()
+			task.wait(0.7)
+			Library.lib.dim.Visible = false
+		end)
+	end)
+end
+
+-- ============================================================================
+-- CONFIGURATION MANAGEMENT
+-- ============================================================================
+function syde:LoadConfig(Configuration)
+	local success, Data = pcall(function()
+		return Services.HttpService:JSONDecode(Configuration)
+	end)
+	
+	if not success then
+		warn("Syde 〡 Failed to decode configuration:", Data)
+		return false
+	end
+
+	local changed = false
+
+	for FlagName, Flag in pairs(syde.Flags) do
+		local FlagValue = Data[FlagName]
+
+		if FlagValue ~= nil then
+			task.spawn(function()
+				local applySuccess, err = pcall(function()
+					if Flag.Set then
+						Flag:Set(Flag.Type == "ColorPicker" and syde:ColorUnpack(FlagValue) or FlagValue)
+					elseif Flag.Type == "ColorPicker" and Flag.Color then
+						Flag.Color = syde:ColorUnpack(FlagValue)
+						changed = true
+					elseif Flag.Value ~= nil then
+						Flag.Value = FlagValue
+						changed = true
+					elseif Flag.StarterValue then
+						Flag.StarterValue = FlagValue
+					else
+						warn("Syde 〡 Unsupported flag type or missing setter for flag: " .. FlagName)
+					end
+				end)
+				
+				if not applySuccess then
+					warn("Syde 〡 Error applying flag " .. FlagName .. ":", err)
+				end
+			end)
+		end
+	end
+
+	return changed
+end
+
+function syde:SaveConfig()
+	if not syde.ConfigEnabled then 
+		return 
+	end
+
+	local Data = {}
+	for i, v in pairs(syde.Flags) do
+		if v.Type == "ColorPicker" then
+			Data[i] = syde:ColorPack(v.Color)
+		else
+			Data[i] = v.Value or v.Color or v.StarterValue or false
+		end
+	end
+
+	-- Save configuration to file
+	if writefile then
+		local filePath = string.format("%s/%s.lua", syde.ConfigFolder, syde.ConfigFile)
+		local success, err = pcall(function()
+			writefile(filePath, Services.HttpService:JSONEncode(Data))
+		end)
+		
+		if success then
+			print("Syde 〡 Configuration saved successfully")
+		else
+			warn("Syde 〡 Failed to save configuration:", err)
+		end
+	end
+end
+
+function syde:AutoLoadConfig()
+	if not syde.ConfigEnabled then 
+		return false
+	end
+	
+	local filePath = string.format("%s/%s.lua", syde.ConfigFolder, syde.ConfigFile)
+	
+	if isfile and isfile(filePath) then
+		local success, content = pcall(function()
+			return readfile(filePath)
+		end)
+		
+		if success and content and content ~= "" and content ~= "-- Protected UI Configuration" then
+			print("Syde 〡 Auto-loading saved configuration...")
+			local loadSuccess = syde:LoadConfig(content)
+			if loadSuccess then
+				print("Syde 〡 Configuration loaded successfully")
+				return true
+			else
+				warn("Syde 〡 Failed to apply loaded configuration")
+			end
+		end
+	end
+	
+	return false
+end
+
+-- ============================================================================
+-- LOADER SYSTEM
+-- ============================================================================
+function syde:Load(Config)
+	print('Syde 〡 Loader Initialized')
+	
+	local LOADER = Loader
+	LOADER.Enabled = true
+	LOADER.Parent = Services.CoreGui
+
+	-- Configuration defaults
+	Config.Name = Config.Name or 'Syde™'
+	Config.Logo = Config.Logo or 'rbxassetid://14554547135'
+	Config.ConfigFolder = Config.ConfigFolder or 'syde'
+	Config.Status = Config.Status or false
+	Config.Accent = Config.Accent or syde.theme.Accent
+	Config.HitBox = Config.HitBox or syde.theme.HitBox
+
+	local LoaderConfig = {
+		Name = Config.Name,
+		Logo = 'rbxassetid://' .. Config.Logo,
+		ConfigFolder = Config.ConfigFolder,
+		Status = Config.Status,
+		Accent = Config.Accent or syde.theme.Accent,
+		Hitbox = Config.HitBox or syde.theme.HitBox,
+		Socials = {}
+	}
+
+	local TweenWorkPos = 315
+	local TweenWorkAppear = 287
+	local TweenWorkDisappear = 270
+
+	local Styles = {
+		GitHub = {
+			BackGroundColor = Color3.fromRGB(39, 39, 39),
+			GradColor = ColorSequence.new{
+				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 255, 255)),
+				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(129, 129, 129))
+			},
+			StrokeColor = Color3.fromRGB(34, 34, 34)
+		},
+		Discord = {
+			BackGroundColor = Color3.fromRGB(88, 141, 255),
+			GradColor = ColorSequence.new{
+				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 255, 255)),
+				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(91, 125, 147))
+			},
+			StrokeColor = Color3.fromRGB(88, 141, 255)
+		},
+		Site = {
+			BackGroundColor = Color3.fromRGB(39, 11, 34),
+			GradColor = ColorSequence.new{
+				ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 255, 255)),
+				ColorSequenceKeypoint.new(1.00, Color3.fromRGB(181, 33, 255))
+			},
+			StrokeColor = Color3.fromRGB(67, 19, 59)
+		}
+	}
+
+	-- Process socials if provided
+	if typeof(Config.Socials) == "table" and #Config.Socials > 0 then
+		LOADER.load.Size = UDim2.new(0, 400, 0, 360)
+		LOADER.load.social.Visible = true
+
+		syde:HidePlaceHolder(LOADER.load.social.largeblock, 'largesocial')
+		syde:HidePlaceHolder(LOADER.load.social, 'little')
+		syde:HidePlaceHolder(LOADER.load.social.little, 'smallblock1')
+		syde:HidePlaceHolder(LOADER.load.social.little, 'smallblock2')
+
+		for _, social in ipairs(Config.Socials) do
+			table.insert(LoaderConfig.Socials, {
+				Name = social.Name or '@None',
+				Discord = social.Discord or 'None',
+				Style = social.Style or "Default",
+				Size = social.Size or "Medium",
+				CopyToClip = social.CopyToClip ~= nil and social.CopyToClip or true
+			})
+		end
+
+		local largeCount, smallCount = 0, 0
+
+		for _, social in ipairs(LoaderConfig.Socials) do
+			if social.Size == "Large" then
+				largeCount += 1
+			elseif social.Size == "Small" then
+				smallCount += 1
+			end
+		end
+
+		if largeCount > 1 or smallCount > 2 then
+			warn("[SYDE] Only 1 Large block and 2 Small blocks are allowed in Socials.")
+			LoaderConfig.Socials = nil
+		else
+			for _, social in ipairs(LoaderConfig.Socials) do
+				if social.Size == "Large" then
+					local LargeSocial = LOADER.load.social.largeblock.largesocial:Clone()
+					LargeSocial.Visible = true
+					LargeSocial.Parent = LOADER.load.social.largeblock
+
+					if social.CopyToClip and LargeSocial:FindFirstChild("interact") then
+						LargeSocial.interact.MouseButton1Click:Connect(function()
+							if social.Style == 'Discord' then
+								setclipboard(social.Discord)
+							elseif social.Style == 'WebSite' then
+								setclipboard(social.Name)
+							elseif social.Style == 'GitHub' then
+								setclipboard(social.GitHub)
+							end
+						end)
+					end
+
+					-- Style handle for large blocks
+					if social.Style == 'GitHub' then
+						LargeSocial.BackgroundColor3 = Styles.GitHub.BackGroundColor
+						LargeSocial.UIStroke.Color = Styles.GitHub.StrokeColor
+						LargeSocial.UIGradient.Color = Styles.GitHub.GradColor
+						LargeSocial.DiscordTitle.Visible = false
+						LargeSocial.Visit.Visible = false
+						LargeSocial.SocialName.Position = UDim2.new(0, 45, 0, 25)
+						LargeSocial.SocialName.Text = 'GitHub'
+						LargeSocial.GitName.Visible = true
+						LargeSocial.GitName.Text = '@' .. social.GitHub
+						LargeSocial.ImageLabel.Image = 'rbxassetid://86992377698608'
+						
+						if LargeSocial.UIStroke:FindFirstChild("UIGradient") then
+							LargeSocial.UIStroke.UIGradient:Destroy()
+						end
+					elseif social.Style == 'Discord' then
+						LargeSocial.BackgroundColor3 = Styles.Discord.BackGroundColor
+						LargeSocial.UIStroke.Color = Styles.Discord.StrokeColor
+						LargeSocial.UIGradient.Color = Styles.Discord.GradColor
+						LargeSocial.ImageLabel.Image = 'rbxassetid://108012241529487'
+						LargeSocial.SocialName.Text = social.Discord
+
+						if not LargeSocial.UIStroke:FindFirstChild("UIGradient") then
+							local strokeGrad = Instance.new('UIGradient', LargeSocial.UIStroke)
+							strokeGrad.Color = ColorSequence.new{
+								ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 255, 255)),
+								ColorSequenceKeypoint.new(1.00, Color3.fromRGB(91, 125, 147))
+							}
+							strokeGrad.Rotation = -34
+						else
+							LargeSocial.UIStroke.UIGradient.Color = ColorSequence.new{
+								ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 255, 255)),
+								ColorSequenceKeypoint.new(1.00, Color3.fromRGB(91, 125, 147))
+							}
+						end
+
+						LargeSocial.DiscordTitle.Visible = true
+						LargeSocial.Visit.Visible = true
+						LargeSocial.GitName.Visible = false
+						LargeSocial.SocialName.Position = UDim2.new(0, 45, 0, 30)
+						LargeSocial.Visit.Position = UDim2.new(1, -95, 0.5, 0)
+						LargeSocial.Visit.ImageLabel.Visible = true
+					elseif social.Style == 'WebSite' then
+						LargeSocial.BackgroundColor3 = Styles.Site.BackGroundColor
+						LargeSocial.UIStroke.Color = Styles.Site.StrokeColor
+						LargeSocial.UIGradient.Color = Styles.Site.GradColor
+						LargeSocial.ImageLabel.Image = 'rbxassetid://74915074739925'
+						LargeSocial.DiscordTitle.Visible = false
+						LargeSocial.Visit.Visible = true
+						LargeSocial.GitName.Visible = false
+
+						if not LargeSocial.UIStroke:FindFirstChild("UIGradient") then
+							local strokeGrad = Instance.new('UIGradient', LargeSocial.UIStroke)
+							strokeGrad.Color = ColorSequence.new{
+								ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 255, 255)),
+								ColorSequenceKeypoint.new(1.00, Color3.fromRGB(181, 33, 225))
+							}
+							strokeGrad.Rotation = -25
+						else
+							LargeSocial.UIStroke.UIGradient.Color = ColorSequence.new{
+								ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 255, 255)),
+								ColorSequenceKeypoint.new(1.00, Color3.fromRGB(181, 33, 225))
+							}
+						end
+
+						LargeSocial.SocialName.Text = social.Name
+						LargeSocial.Visit.ImageLabel.Visible = false
+						LargeSocial.Visit.TextColor3 = Color3.fromRGB(255, 255, 255)
+						LargeSocial.Visit.Text = 'Visit site'
+						LargeSocial.Visit.Position = UDim2.new(1, -80, 0.5, 0)
+					end
+				end
+
+				if social.Size == "Small" then
+					LOADER.load.social.little.Visible = true
+					local SmallSocial = LOADER.load.social.little.smallblock1:Clone()
+					SmallSocial.Visible = true
+					SmallSocial.Parent = LOADER.load.social.little
+
+					if social.CopyToClip and SmallSocial:FindFirstChild("interact") then
+						SmallSocial.interact.MouseButton1Click:Connect(function()
+							if social.Style == 'WebSite' then
+								setclipboard(social.Name)
+							elseif social.Style == 'GitHub' then
+								setclipboard(social.GitHub)
+							end
+						end)
+					end
+
+					if social.Style == "GitHub" then
+						SmallSocial.BackgroundColor3 = Styles.GitHub.BackGroundColor
+						SmallSocial.UIStroke.Color = Styles.GitHub.StrokeColor
+						SmallSocial.UIGradient.Color = Styles.GitHub.GradColor
+						SmallSocial.SocialName.Text = 'GitHub'
+						SmallSocial.Text.Visible = true
+						SmallSocial.Text.TextColor3 = Color3.fromRGB(90, 90, 90)
+						SmallSocial.Text.Text = '@' .. social.Name
+						SmallSocial.ImageLabel.Image = 'rbxassetid://86992377698608'
+					elseif social.Style == 'WebSite' then
+						SmallSocial.BackgroundColor3 = Styles.Site.BackGroundColor
+						SmallSocial.UIStroke.Color = Styles.Site.StrokeColor
+						SmallSocial.UIGradient.Color = Styles.Site.GradColor
+						SmallSocial.SocialName.Text = social.Name
+						SmallSocial.Text.Visible = true
+						SmallSocial.Text.TextColor3 = Color3.fromRGB(255, 255, 255)
+						SmallSocial.Text.Text = 'Visit Site'
+						SmallSocial.ImageLabel.Image = 'rbxassetid://74915074739925'
+						SmallSocial.ImageLabel.ImageColor3 = Color3.fromRGB(231, 160, 255)
+					end
+				end
+			end
+		end
+
+		local function updateSize()
+			LOADER.load.Size = UDim2.new(
+				LOADER.load.Size.X.Scale, 
+				LOADER.load.Size.X.Offset, 
+				0, 
+				LOADER.load.social.UIListLayout.AbsoluteContentSize.Y + 235
+			)
+		end
+
+		LOADER.load.social.UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateSize)
+		updateSize()
+	else
+		LoaderConfig.Socials = nil
+	end
+
+	if LoaderConfig.Socials == nil then
+		LOADER.load.Size = UDim2.new(0, 400, 0, 250)
+		LOADER.load.social.Visible = false
+		TweenWorkPos = 200
+		TweenWorkDisappear = 150
+		TweenWorkAppear = 177
+	end
+
+	LOADER.load.logo.Image = LoaderConfig.Logo
+	syde.theme.Accent = Config.Accent
+	syde.theme.HitBox = Config.HitBox
+	LOADER.load.info.build.Text = syde.Build
+
+	if LoaderConfig.Status == false then
+		LOADER.load.logo.stroke.UIStroke.Color = Color3.fromRGB(24, 24, 24)
+		LOADER.load.logo["Title/Status"].Text = 'Jannis Hub'
+	end
+
+	local statusColors = {
+		Stable = { Color = Color3.fromRGB(25, 229, 22), Text = '<font color="#24bf48">Stable</font>' },
+		Unstable = { Color = Color3.fromRGB(227, 229, 81), Text = '<font color="#e3e551">Unstable</font>' },
+		Detected = { Color = Color3.fromRGB(229, 44, 47), Text = '<font color="#e52c2f">Detected</font>' },
+		Patched = { Color = Color3.fromRGB(229, 44, 47), Text = '<font color="#e52c2f">Patched</font>' }
+	}
+
+	local statusData = statusColors[LoaderConfig.Status]
+	if statusData then
+		LOADER.load.logo.stroke.UIStroke.Color = statusData.Color
+		LOADER.load.logo["Title/Status"].Text = string.format('%s  <font color="#363636">•</font>  %s', LoaderConfig.Name, statusData.Text)
+	end
+
+	local function initLoader()
+		Services.TweenService:Create(LOADER.load.Salt, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {
+			Size = UDim2.new(0, 25, 0, 25)
+		}):Play()
+		Services.TweenService:Create(LOADER.load.Salt, TweenInfo.new(0.65, Enum.EasingStyle.Exponential), {
+			TextTransparency = 1
+		}):Play()
+	end
+
+	local function TweenWorkLabel(Finish, icon, Text)
+		LOADER.load.work.Position = UDim2.new(0.5, 0, 1, -40)
+		LOADER.load.work.Text = Text
+		LOADER.load.work.ImageLabel.Image = icon
+		
+		Services.TweenService:Create(LOADER.load.work, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+		Services.TweenService:Create(LOADER.load.work.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+		Services.TweenService:Create(LOADER.load.work, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0, 1, -73) }):Play()
+		
+		task.wait(Finish)
+		
+		Services.TweenService:Create(LOADER.load.work, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+		Services.TweenService:Create(LOADER.load.work.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+		Services.TweenService:Create(LOADER.load.work, TweenInfo.new(0.5, Enum.EasingStyle.Quint), { Position = UDim2.new(0.5, 0, 1, -100) }):Play()
+		
+		task.wait(0.6)
+	end
+
+	local function load()
+		TweenWorkLabel(1, 'rbxassetid://136002400178503', 'Verifying Configuration...')
+
+		-- Configuration saving setup
+		if Config.ConfigurationSaving and Config.ConfigurationSaving.Enabled then
+			local folderName = Config.ConfigurationSaving.FolderName or "SydeSec"
+			local fileName = Config.ConfigurationSaving.FileName or "default_config"
+			local fullPath = folderName .. "/" .. fileName .. ".lua"
+
+			syde.ConfigEnabled = true
+			syde.ConfigFolder = folderName
+			syde.ConfigFile = fileName
+
+			-- Ensure folder exists
+			if isfolder and not isfolder(folderName) then
+				local success, err = pcall(function()
+					makefolder(folderName)
+				end)
+				if not success then
+					warn("Syde 〡 Failed to create folder:", err)
+				end
+			end
+
+			-- File validation
+			local success, err = pcall(function()
+				if isfile and not isfile(fullPath) then
+					writefile(fullPath, "-- Protected UI Configuration")
+				else
+					local content = readfile(fullPath)
+				end
+			end)
+
+			if not success then
+				warn("Syde 〡 File write/read blocked or failed:", err)
+			end
+		end
+
+		TweenWorkLabel(1, 'rbxassetid://105810189969774', 'Cleaning Things Up...')
+		
+		local UI_TAG = "sydeUILoader"
+		local MARKER_NAME = "SYDEUIDetector"
+		local INTERNAL_UUID = ("SYDE-" .. tostring(game.JobId):gsub("-", "") .. tostring(tick())):gsub("%.", "")
+
+		-- Cleanup old UI
+		local function deepCleanup()
+			for _, v in ipairs(Services.CoreGui:GetChildren()) do
+				if v:IsA("ScreenGui") and v:FindFirstChild(MARKER_NAME) then
+					pcall(function()
+						v:Destroy()
+					end)
+				end
+			end
+		end
+		deepCleanup()
+
+		-- Load the Library
+		local successLibrary, lib = pcall(function()
+			return Library
+		end)
+
+		if not successLibrary or not lib then
+			warn("Syde 〡 Failed to load Library.")
+			return
+		end
+
+		Library.Name = UI_TAG
+		Library.ResetOnSpawn = false
+
+		local marker = Instance.new("StringValue")
+		marker.Name = MARKER_NAME
+		marker.Value = INTERNAL_UUID
+		marker.Parent = Library
+
+		pcall(function()
+			Library.Parent = Services.CoreGui
+		end)
+
+		-- Ensure Library stays in CoreGui
+		task.spawn(function()
+			while Library and Library.Parent do
+				task.wait(1)
+				if Library.Parent ~= Services.CoreGui then
+					warn("Syde 〡 UI moved. Restoring...")
+					pcall(function()
+						Library.Parent = Services.CoreGui
+					end)
+				end
+			end
+		end)
+
+		-- Reinject if removed
+		task.spawn(function()
+			while Library and Library.Parent do
+				task.wait(2)
+			end
+
+			warn("Syde 〡 UI removed. Reinjection in progress...")
+			local success, lib = pcall(function()
+				return Library
+			end)
+			if success and lib then
+				lib.Name = UI_TAG
+				local m = Instance.new("StringValue")
+				m.Name = MARKER_NAME
+				m.Value = INTERNAL_UUID
+				m.Parent = lib
+				lib.ResetOnSpawn = false
+				pcall(function()
+					lib.Parent = Services.CoreGui
+				end)
+			end
+		end)
+
+		TweenWorkLabel(1, 'rbxassetid://108012241529487', 'Checking For Discord...')
+
+		-- Discord auto-join
+		if Config.AutoJoinDiscord and Config.AutoJoinDiscord.Enabled then
+			local discordConfig = Config.AutoJoinDiscord
+			local rootFolder = Config.ConfigurationSaving and Config.ConfigurationSaving.FolderName or "SydeSec"
+			local discordFolder = rootFolder .. "/DiscordInvites"
+			local inviteCode = discordConfig.Invite
+			local inviteFilePath = discordFolder .. "/" .. inviteCode .. ".txt"
+
+			warn("Syde 〡 Discord AutoJoin enabled. Preparing to send invite:", inviteCode)
+
+			-- Ensure folder exists
+			if isfolder and not isfolder(discordFolder) then
+				local folderSuccess, folderErr = pcall(function()
+					makefolder(discordFolder)
+				end)
+				if folderSuccess then
+					print("Syde 〡 Created DiscordInvites folder at:", discordFolder)
+				else
+					warn("Syde 〡 Failed to create DiscordInvites folder:", folderErr)
+				end
+			end
+
+			local shouldPrompt = true
+			if isfile and discordConfig.RememberJoins and isfile(inviteFilePath) then
+				print("Syde 〡 Discord invite '" .. inviteCode .. "' already joined. Skipping prompt.")
+				shouldPrompt = false
+			end
+
+			if shouldPrompt then
+				if request then
+					local reqSuccess, reqErr = pcall(function()
+						request({
+							Url = "http://127.0.0.1:6463/rpc?v=1",
+							Method = "POST",
+							Headers = {
+								["Content-Type"] = "application/json",
+								["Origin"] = "https://discord.com"
+							},
+							Body = Services.HttpService:JSONEncode({
+								cmd = "INVITE_BROWSER",
+								nonce = Services.HttpService:GenerateGUID(false),
+								args = {
+									code = inviteCode
+								}
+							})
+						})
+					end)
+
+					if reqSuccess then
+						print("Syde 〡 Discord invite sent successfully to:", inviteCode)
+					else
+						warn("Syde 〡 Failed to send Discord invite:", reqErr)
+					end
+				else
+					warn("Syde 〡 Request function not available — cannot send Discord invite.")
+				end
+
+				if discordConfig.RememberJoins then
+					local writeSuccess, writeErr = pcall(function()
+						writefile(inviteFilePath, "Joined Discord via invite '" .. inviteCode .. "' at " .. os.date())
+					end)
+
+					if writeSuccess then
+						print("Syde 〡 Logged Discord invite join for:", inviteCode)
+					else
+						warn("Syde 〡 Failed to write join log for invite:", writeErr)
+					end
+				end
+			end
+		end
+
+		TweenWorkLabel(1, 'rbxassetid://136405833725573', 'Loading UI...')
+		task.wait(1)
+		GlobalState.Loaded = true
+		
+		Services.TweenService:Create(LOADER.load.Salt, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {
+			Size = UDim2.new(0, 146, 0, 25)
+		}):Play()
+		Services.TweenService:Create(LOADER.load.Salt.ImageLabel, TweenInfo.new(0.65, Enum.EasingStyle.Exponential), {
+			ImageTransparency = 0
+		}):Play()
+	end
+
+	local TimeTillLoad = 1.5
+
+	while TimeTillLoad > 0 do
+		LOADER.load.info.TimeTill.Text = string.format("%.2f", TimeTillLoad)
+		task.wait(0.01)
+		TimeTillLoad -= 0.01
+	end
+
+	LOADER.load.info.TimeTill.Text = '0.00'
+	task.wait(TimeTillLoad)
+
+	initLoader()
+	task.wait(0.08)
+	load()
+	task.wait(2)
+
+	Library.Enabled = true
+	LOADER:Destroy()
+end
+
+-- ============================================================================
+-- UI CONTROL FUNCTIONS
+-- ============================================================================
+local WINDOW = Library.lib
+local TOPBAR = WINDOW.Top
+local TABS = WINDOW.Tab.ScrollingFrame
+local PAGES = WINDOW.Pages
+
+local function SetUserInfo()
+	local LocalPlayer = Services.Players.LocalPlayer
+	local PLACEHOLDER_IMAGE = "rbxassetid://0"
+	local THUMBNAIL_TYPE = Enum.ThumbnailType.HeadShot
+	local THUMBNAIL_SIZE = Enum.ThumbnailSize.Size420x420
+
+	local imageLabel = WINDOW:WaitForChild("UserInfo"):WaitForChild("ImageLabel")
+	imageLabel.Image = PLACEHOLDER_IMAGE
+
+	local success, thumbnail = pcall(function()
+		return Services.Players:GetUserThumbnailAsync(LocalPlayer.UserId, THUMBNAIL_TYPE, THUMBNAIL_SIZE)
+	end)
+
+	if success and thumbnail then
+		imageLabel.Image = thumbnail
+		WINDOW.UserInfo.ImageLabel.text.Username.Text = LocalPlayer.Name
+		WINDOW.UserInfo.ImageLabel.text.Display.Text = "@" .. LocalPlayer.DisplayName
+	else
+		imageLabel.Image = PLACEHOLDER_IMAGE
+	end
+end
+
+local function CloseUI()
+	task.wait(0.3)
+	PAGES.Visible = false
+	WINDOW.Tab.Visible = false
+	GlobalState.UIClosed = true
+	
+	Services.TweenService:Create(WINDOW, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {
+		Size = UDim2.new(WINDOW.Size.X.Scale, WINDOW.Size.X.Offset, WINDOW.Size.Y.Scale, 200)
+	}):Play()
+	Services.TweenService:Create(WINDOW.Top.div, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.Top.Title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.Top.Title.Sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.Shadow.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Util.Mini.interact, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Util.Close.interact, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Util.Plugin.interact, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Util.Settings.interact, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.expand, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Util.Plugin, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Util.Settings, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Frame, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ImageLabel.UIStroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ImageLabel.text.Username, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ImageLabel.text.Display, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ConnectionStatus.Status, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ConnectionStatus.Status.TextLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+	
+	task.wait(0.8)
+	if GlobalState.UIClosed == true then
+		syde:Notify({
+			Title = 'UI Is Closed',
+			Content = 'Use ' .. GlobalState.UIToggle.Name .. ' To Open Back.'
+		})
+	end
+
+	WINDOW.Visible = false
+end
+
+local function OpenUI()
+	PAGES.Visible = true
+	WINDOW.Tab.Visible = true
+	WINDOW.Visible = true
+	GlobalState.UIClosed = false
+	
+	Services.TweenService:Create(WINDOW, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {
+		Size = UDim2.new(WINDOW.Size.X.Scale, WINDOW.Size.X.Offset, WINDOW.Size.Y.Scale, 575)
+	}):Play()
+	Services.TweenService:Create(WINDOW.Top.div, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.7 }):Play()
+	Services.TweenService:Create(WINDOW.Top.Title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW.Top.Title.Sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW.Shadow.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 0.5 }):Play()
+	Services.TweenService:Create(WINDOW.resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Util.Mini.interact, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Util.Close.interact, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Util.Plugin.interact, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 0.7 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Util.Settings.interact, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 0.7 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.expand, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 0.8 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Util.Plugin, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.05 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Util.Settings, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.05 }):Play()
+	Services.TweenService:Create(WINDOW.Top.UHolder.Frame, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ImageLabel.UIStroke, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ImageLabel.text.Username, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ImageLabel.text.Display, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ConnectionStatus.Status, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
+	Services.TweenService:Create(WINDOW.UserInfo.ConnectionStatus.Status.TextLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+end
+
+local function ToggleUI()
+	if GlobalState.Bounce then return end
+	GlobalState.Bounce = true
+
+	if Library and Library.Parent == Services.CoreGui then
+		if GlobalState.UIClosed then
+			OpenUI()
+		else
+			CloseUI()
+		end
+	end
+
+	task.delay(0.4, function()
+		GlobalState.Bounce = false
+	end)
+end
+
+-- ============================================================================
+-- INITIALIZATION
+-- ============================================================================
+syde:HidePlaceHolder(TABS, 'Tb')
+syde:HidePlaceHolder(PAGES, 'Page')
+
+function syde:Init(library)
+	Library.Enabled = true
+
+	if not GlobalState.Loaded then
+		local UI_TAG = "sydeUILoader"
+		local MARKER_NAME = "SYDEUIDetector"
+		local INTERNAL_UUID = ("SYDE-" .. tostring(game.JobId):gsub("-", "") .. tostring(tick())):gsub("%.", "")
+
+		-- Cleanup old UI
+		local function deepCleanup()
+			for _, v in ipairs(Services.CoreGui:GetChildren()) do
+				if v:IsA("ScreenGui") and v:FindFirstChild(MARKER_NAME) then
+					pcall(function()
+						v:Destroy()
+					end)
+				end
+			end
+		end
+		deepCleanup()
+
+		-- Load the Library
+		local successLibrary, lib = pcall(function()
+			return Library
+		end)
+
+		if not successLibrary or not lib then
+			warn("Syde 〡 Failed to load Library.")
+			return
+		end
+
+		Library.Name = UI_TAG
+		Library.ResetOnSpawn = false
+
+		local marker = Instance.new("StringValue")
+		marker.Name = MARKER_NAME
+		marker.Value = INTERNAL_UUID
+		marker.Parent = Library
+
+		pcall(function()
+			Library.Parent = Services.CoreGui
+		end)
+
+		-- Ensure Library stays in CoreGui
+		task.spawn(function()
+			while Library and Library.Parent do
+				task.wait(1)
+				if Library.Parent ~= Services.CoreGui then
+					warn("Syde 〡 UI moved. Restoring...")
+					pcall(function()
+						Library.Parent = Services.CoreGui
+					end)
+				end
+			end
+		end)
+
+		-- Reinject if removed
+		task.spawn(function()
+			while Library and Library.Parent do
+				task.wait(2)
+			end
+
+			warn("Syde 〡 UI removed. Reinjection in progress...")
+			local success, lib = pcall(function()
+				return Library
+			end)
+			if success and lib then
+				lib.Name = UI_TAG
+				local m = Instance.new("StringValue")
+				m.Name = MARKER_NAME
+				m.Value = INTERNAL_UUID
+				m.Parent = lib
+				lib.ResetOnSpawn = false
+				pcall(function()
+					lib.Parent = Services.CoreGui
+				end)
+			end
+		end)
+	end
+
+	Services.TweenService:Create(workspace.CurrentCamera, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {
+		FieldOfView = 70
+	}):Play()
+
+	local Data = {
+		Title = library.Title or "Syde",
+		SubText = library.SubText or "Google"
+	}
+
+	-- Setup UI Elements
+	TOPBAR.Title.Text = Data.Title
+	TOPBAR.Title.Sub.Text = Data.SubText
+
+	-- Setup Dragging & Resizing
+	syde:AddDrag(TOPBAR, WINDOW, true)
+	syde:MakeResizable(WINDOW.resize, WINDOW, Vector2.new(654, 428))
+
+	-- Initial Transparency Setup
+	TOPBAR.Title.TextTransparency = 1
+	TOPBAR.Title.Sub.TextTransparency = 1
+
+	local function applyLayout(isMobile)
+		Library.lib.Size = isMobile and UDim2.new(0, 543, 0, 321) or UDim2.new(0, 715, 0, 575)
+		local shadow = WINDOW:FindFirstChild("Shadow")
+		if shadow then
+			shadow.Visible = not isMobile
+		end
+	end
+
+	local function updateLayout()
+		local screenSize = GlobalState.Camera.ViewportSize
+		local mobile = Services.UserInputService.TouchEnabled
+		applyLayout(mobile)
+	end
+
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+		GlobalState.ScreenSize = workspace.CurrentCamera.ViewportSize
+		GlobalState.IsMobile = Services.UserInputService.TouchEnabled
+		updateLayout()
+	end)
+
+	updateLayout()
+
+	-- Reapply on resize
+	GlobalState.Camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateLayout)
+	Services.UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(updateLayout)
+
+	-- User Info Setup
+	SetUserInfo()
+
+	if not GlobalState.UserInfoDisabled then
+		Services.TweenService:Create(WINDOW.Tab, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {
+			Size = UDim2.new(0, 200, 1, -150)
+		}):Play()
+	else
+		Services.TweenService:Create(WINDOW.Tab, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {
+			Size = UDim2.new(0, 200, 1, -50)
+		}):Play()
+	end
+
+	-- Settings Page Init
+	if not GlobalState.SettingsOpen then
+		WINDOW.Settings.Visible = false
+		WINDOW.dim.Visible = false
+		WINDOW.Settings.Position = UDim2.new(0.5, 176, 0.5, -200)
+		WINDOW.Settings.Size = UDim2.new(0, 200, 0, 110)
+		WINDOW.dim.BackgroundTransparency = 1
+		WINDOW.Settings.void.BackgroundTransparency = 1
+		WINDOW.Settings.void2.BackgroundTransparency = 1
+		WINDOW.Settings.BackgroundTransparency = 1
+		WINDOW.Settings.TabBlock.UIStroke.Transparency = 1
+		WINDOW.Settings.Shadow.ImageLabel.ImageTransparency = 1
+		WINDOW.Settings.TabBlock.Theme.BackgroundTransparency = 1
+		WINDOW.Settings.TabBlock.Theme.TextTransparency = 1
+		WINDOW.Settings.TabBlock.Theme.d.BackgroundTransparency = 1
+		WINDOW.Settings.TabBlock.Theme.Frame.BackgroundTransparency = 1
+		WINDOW.Settings.TabBlock.Info.BackgroundTransparency = 1
+		WINDOW.Settings.TabBlock.Info.TextTransparency = 1
+		WINDOW.Settings.TabBlock.Info.d.BackgroundTransparency = 1
+		WINDOW.Settings.TabBlock.Info.Frame.BackgroundTransparency = 1
+		WINDOW.Settings.TabBlock.Privacy.BackgroundTransparency = 1
+		WINDOW.Settings.TabBlock.Privacy.TextTransparency = 1
+	end
+
+	-- Play Intro Animations
+	task.spawn(function()
+		task.wait(0.5)
+		local titleTween = Services.TweenService:Create(TOPBAR.Title, TweenInfo.new(1.65, Enum.EasingStyle.Exponential), {
+			TextTransparency = 0
+		})
+		titleTween:Play()
+
+		task.wait(0.1)
+		local subTitleTween = Services.TweenService:Create(TOPBAR.Title.Sub, TweenInfo.new(1.65, Enum.EasingStyle.Exponential), {
+			TextTransparency = 0
+		})
+		subTitleTween:Play()
+
+		task.wait()
+		local textSize = TOPBAR.Title.TextBounds.X + 5
+
+		Services.TweenService:Create(TOPBAR.Title, TweenInfo.new(1.55, Enum.EasingStyle.Quint), {
+			Size = UDim2.new(0, textSize, 1, 0)
+		}):Play()
+	end)
+
+	-- Resize Hover Animations
+	local function animateResizeButton(isHovered)
+		local targetColor = isHovered and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(35, 35, 35)
+		Services.TweenService:Create(WINDOW.resize, TweenInfo.new(0.95, Enum.EasingStyle.Exponential), {
+			ImageColor3 = targetColor
+		}):Play()
+	end
+
+	WINDOW.resize.MouseEnter:Connect(function() animateResizeButton(true) end)
+	WINDOW.resize.MouseLeave:Connect(function() animateResizeButton(false) end)
+
+	-- Settings Handle
+	WINDOW.Settings.Close.MouseEnter:Connect(function()
+		Services.TweenService:Create(WINDOW.Settings.Close, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), {
+			ImageColor3 = Color3.fromRGB(255, 255, 255)
+		}):Play()
+	end)
+
+	WINDOW.Settings.Close.MouseLeave:Connect(function()
+		Services.TweenService:Create(WINDOW.Settings.Close, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), {
+			ImageColor3 = Color3.fromRGB(48, 48, 48)
+		}):Play()
+	end)
+
+	-- Expand button
+	local expand = TOPBAR.UHolder:WaitForChild('expand')
+	local expanded = false
+
+	if not expanded then
+		Services.TweenService:Create(TOPBAR.UHolder, TweenInfo.new(1.4, Enum.EasingStyle.Quint), {
+			Size = UDim2.new(0, 70, 1, 0)
+		}):Play()
+		Services.TweenService:Create(expand, TweenInfo.new(1.4, Enum.EasingStyle.Exponential), { Rotation = 0 }):Play()
+	end
+
+	expand.MouseButton1Click:Connect(function()
+		if not expanded then
+			expanded = true
+			Services.TweenService:Create(TOPBAR.UHolder, TweenInfo.new(1.4, Enum.EasingStyle.Quint), {
+				Size = UDim2.new(0, 140, 1, 0)
+			}):Play()
+			Services.TweenService:Create(expand, TweenInfo.new(1.4, Enum.EasingStyle.Exponential), { Rotation = -180 }):Play()
+		else
+			expanded = false
+			Services.TweenService:Create(TOPBAR.UHolder, TweenInfo.new(1.4, Enum.EasingStyle.Quint), {
+				Size = UDim2.new(0, 70, 1, 0)
+			}):Play()
+			Services.TweenService:Create(expand, TweenInfo.new(1.4, Enum.EasingStyle.Exponential), { Rotation = 0 }):Play()
+		end
+	end)
+
+	expand.MouseEnter:Connect(function()
+		Services.TweenService:Create(expand, TweenInfo.new(1.4, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	end)
+
+	expand.MouseLeave:Connect(function()
+		Services.TweenService:Create(expand, TweenInfo.new(1.4, Enum.EasingStyle.Exponential), { ImageTransparency = 0.8 }):Play()
+	end)
+
+	-- Button handlers
+	WINDOW.Top.UHolder.Util.Mini.interact.MouseButton1Click:Connect(function()
+		ToggleUI()
+	end)
+
+	WINDOW.Top.UHolder.Util.Close.interact.MouseButton1Click:Connect(function()
+		syde:Modal({
+			Title = 'Please Confirm Below.',
+			Content = 'Are You Sure You Want To Close This UI?',
+			ConfimCallBack = function()
+				-- Save configuration before closing
+				if syde.ConfigEnabled then
+					syde:SaveConfig()
+				end
+				task.wait(1)
+				Library:Destroy()
+			end
+		})
+	end)
+
+	-- Settings tab handler
+	local tabBlock = WINDOW.Settings.TabBlock
+	local pageLayout = WINDOW.Settings.Pages.UIPageLayout
+	local pagesFolder = WINDOW.Settings.Pages
+
+	for _, v in pairs(tabBlock:GetChildren()) do
+		if v:IsA('TextButton') then
+			v.MouseButton1Click:Connect(function()
+				local targetPage = pagesFolder:FindFirstChild(v.Name)
+
+				for _, other in pairs(tabBlock:GetChildren()) do
+					if other:IsA('TextButton') then
+						Services.TweenService:Create(other, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), {
+							BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+						}):Play()
+						Services.TweenService:Create(other, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), {
+							TextColor3 = Color3.fromRGB(44, 44, 44)
+						}):Play()
+
+						if other.Name == 'Theme' then
+							Services.TweenService:Create(other.d, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), {
+								BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+							}):Play()
+						elseif other.Name == 'Info' then
+							Services.TweenService:Create(other.d, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), {
+								BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+							}):Play()
+						end
+					end
+				end
+
+				Services.TweenService:Create(v, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), {
+					BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+				}):Play()
+				Services.TweenService:Create(v, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), {
+					TextColor3 = Color3.fromRGB(255, 255, 255)
+				}):Play()
+				
+				if v.Name == 'Theme' then
+					Services.TweenService:Create(v.d, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), {
+						BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+					}):Play()
+				elseif v.Name == 'Info' then
+					Services.TweenService:Create(v.d, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), {
+						BackgroundColor3 = Color3.fromRGB(26, 26, 26)
+					}):Play()
+				end
+
+				if targetPage then
+					pageLayout:JumpTo(targetPage)
+				else
+					warn("Page not found for tab:", v.Name)
+				end
+			end)
+		end
+	end
+
+	syde:AddConnection(syde.Comms.Event, function(p, color)
+		if p == 'DropShadow' then
+			WINDOW.Shadow.ImageLabel.ImageColor3 = color
+		end
+	end)
+
+	-- Auto-load configuration after UI initializes
+	task.spawn(function()
+		task.wait(1) -- Wait for UI to fully initialize
+		syde:AutoLoadConfig()
+	end)
+
+	-- Auto-save on flag changes
+	for flagName, flag in pairs(syde.Flags) do
+		if flag.Set then
+			local originalSet = flag.Set
+			flag.Set = function(self, value)
+				originalSet(self, value)
+				if syde.ConfigEnabled then
+					syde:SaveConfig()
+				end
+			end
+		end
+	end
+
+	-- Input handler for UI toggle
+	Services.UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if not gameProcessed and input.KeyCode == GlobalState.UIToggle then
+			ToggleUI()
+		end
+	end)
+
+	print("Syde 〡 UI Initialized Successfully")
+end
+
+-- ============================================================================
+-- RETURN MODULE
+-- ============================================================================
+return syde
