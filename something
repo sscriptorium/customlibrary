@@ -1,1198 +1,1453 @@
--- MacUI Library - Clean & Modern UI Library
--- Modified from HyperLib with enhanced visual clarity and MacOS-inspired design
+-- [Modified version - Box-like Linoria Style with Autosave]
+-- [Based on Hyperion UI Library]
 
 if not game:IsLoaded() then
 	game.Loaded:Wait()
 end
 
-local Players = game:GetService('Players')
-local TweenService = game:GetService('TweenService')
-local RunService = game:GetService('RunService')
-local UserInputService = game:GetService('UserInputService')
+local LocalPlayer = game:GetService('Players').LocalPlayer
+local Tween = game:GetService('TweenService')
+local Run = game:GetService('RunService')
+local Core = (gethui and gethui()) or game:FindFirstChild'CoreGui' or LocalPlayer.PlayerGui
+local UIS = game:GetService('UserInputService')
 local TextService = game:GetService('TextService')
 local HttpService = game:GetService('HttpService')
+local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end)
 
-local LocalPlayer = Players.LocalPlayer
-local CoreGui = (gethui and gethui()) or game:FindFirstChild('CoreGui') or LocalPlayer.PlayerGui
-local ProtectGui = protectgui or (syn and syn.protect_gui) or function() end
-
--- Library Configuration
-local MacUI = {
-	Theme = {
-		Background = Color3.fromRGB(245, 245, 247),
-		Secondary = Color3.fromRGB(255, 255, 255),
-		Accent = Color3.fromRGB(0, 122, 255),
-		Stroke = Color3.fromRGB(220, 220, 225),
-		Text = Color3.fromRGB(28, 28, 30),
-		SubText = Color3.fromRGB(142, 142, 147),
-		Hover = Color3.fromRGB(229, 229, 234),
-		Active = Color3.fromRGB(0, 106, 224)
-	},
-	ConfigFolder = "MacUIConfigs",
-	AutoUpdate = {},
-	SectionWidth = 0.95
+-- Config System
+local ConfigSystem = {
+	CurrentConfig = {},
+	ConfigFolder = "LinoriaBox_Configs",
+	AutoSaveEnabled = true,
+	AutoSaveInterval = 30
 }
 
--- Theme Presets
-function MacUI:SetTheme(themeName)
-	themeName = themeName:lower()
-	
-	if themeName == "light" or themeName == "mac" then
-		self.Theme.Background = Color3.fromRGB(245, 245, 247)
-		self.Theme.Secondary = Color3.fromRGB(255, 255, 255)
-		self.Theme.Accent = Color3.fromRGB(0, 122, 255)
-		self.Theme.Stroke = Color3.fromRGB(220, 220, 225)
-		self.Theme.Text = Color3.fromRGB(28, 28, 30)
-		self.Theme.SubText = Color3.fromRGB(142, 142, 147)
-		self.Theme.Hover = Color3.fromRGB(229, 229, 234)
-		self.Theme.Active = Color3.fromRGB(0, 106, 224)
-	elseif themeName == "dark" then
-		self.Theme.Background = Color3.fromRGB(28, 28, 30)
-		self.Theme.Secondary = Color3.fromRGB(44, 44, 46)
-		self.Theme.Accent = Color3.fromRGB(10, 132, 255)
-		self.Theme.Stroke = Color3.fromRGB(58, 58, 60)
-		self.Theme.Text = Color3.fromRGB(255, 255, 255)
-		self.Theme.SubText = Color3.fromRGB(174, 174, 178)
-		self.Theme.Hover = Color3.fromRGB(58, 58, 60)
-		self.Theme.Active = Color3.fromRGB(10, 132, 255)
-	elseif themeName == "purple" then
-		self.Theme.Background = Color3.fromRGB(32, 28, 42)
-		self.Theme.Secondary = Color3.fromRGB(46, 40, 58)
-		self.Theme.Accent = Color3.fromRGB(138, 99, 210)
-		self.Theme.Stroke = Color3.fromRGB(58, 52, 70)
-		self.Theme.Text = Color3.fromRGB(255, 255, 255)
-		self.Theme.SubText = Color3.fromRGB(178, 174, 188)
-		self.Theme.Hover = Color3.fromRGB(68, 60, 82)
-		self.Theme.Active = Color3.fromRGB(156, 112, 234)
-	elseif themeName == "green" then
-		self.Theme.Background = Color3.fromRGB(27, 35, 30)
-		self.Theme.Secondary = Color3.fromRGB(38, 48, 42)
-		self.Theme.Accent = Color3.fromRGB(52, 199, 89)
-		self.Theme.Stroke = Color3.fromRGB(52, 64, 56)
-		self.Theme.Text = Color3.fromRGB(255, 255, 255)
-		self.Theme.SubText = Color3.fromRGB(174, 186, 178)
-		self.Theme.Hover = Color3.fromRGB(58, 72, 62)
-		self.Theme.Active = Color3.fromRGB(64, 219, 104)
-	end
+local function SaveConfig(name)
+	name = name or "default"
+	local success, err = pcall(function()
+		if not isfolder(ConfigSystem.ConfigFolder) then
+			makefolder(ConfigSystem.ConfigFolder)
+		end
+		local configPath = ConfigSystem.ConfigFolder .. "/" .. name .. ".json"
+		writefile(configPath, HttpService:JSONEncode(ConfigSystem.CurrentConfig))
+	end)
+	return success
 end
 
--- Helper Functions
-local function CreateButton(parent)
+local function LoadConfig(name)
+	name = name or "default"
+	local success, data = pcall(function()
+		local configPath = ConfigSystem.ConfigFolder .. "/" .. name .. ".json"
+		if isfile(configPath) then
+			return HttpService:JSONDecode(readfile(configPath))
+		end
+		return nil
+	end)
+	if success and data then
+		ConfigSystem.CurrentConfig = data
+		return data
+	end
+	return nil
+end
+
+local function cretate_button(asd)
 	local button = Instance.new('TextButton')
-	button.Size = UDim2.new(1, 0, 1, 0)
+	button.Size = UDim2.new(1,0,1,0)
 	button.BackgroundTransparency = 1
 	button.TextTransparency = 1
 	button.Text = ""
-	button.Parent = parent
+	button.Parent = asd
 	button.ZIndex = 5000
 	return button
 end
 
-local function Default(value, default)
-	return value or default
+local function ToDefault(val,def)
+	return val or def
 end
 
-local function ScrollingConnect(scrollFrame)
+local LinoriaBox = {
+	Theme = {
+		BACKGROUND = Color3.fromRGB(20, 20, 25),
+		SECTION = Color3.fromRGB(25, 25, 30),
+		MAIN = Color3.fromRGB(160, 120, 255),
+		STROKE = Color3.fromRGB(60, 60, 70),
+		TOUCH = Color3.fromRGB(140, 100, 235),
+		SYSTEM = Color3.fromRGB(180, 140, 255),
+		BOX_ACCENT = Color3.fromRGB(45, 45, 55)
+	},
+	AutoUpdate = {},
+	SectionWidth = 0.98
+}
+
+function LinoriaBox.set_theme(name:string)
+	if name:lower() == 'linoria' then
+		LinoriaBox.Theme.BACKGROUND = Color3.fromRGB(20, 20, 25)
+		LinoriaBox.Theme.SECTION = Color3.fromRGB(25, 25, 30)
+		LinoriaBox.Theme.MAIN = Color3.fromRGB(160, 120, 255)
+		LinoriaBox.Theme.STROKE = Color3.fromRGB(60, 60, 70)
+		LinoriaBox.Theme.TOUCH = Color3.fromRGB(140, 100, 235)
+		LinoriaBox.Theme.SYSTEM = Color3.fromRGB(180, 140, 255)
+		LinoriaBox.Theme.BOX_ACCENT = Color3.fromRGB(45, 45, 55)
+	elseif name:lower() == 'dark' then
+		LinoriaBox.Theme.BACKGROUND = Color3.fromRGB(15, 15, 18)
+		LinoriaBox.Theme.SECTION = Color3.fromRGB(20, 20, 25)
+		LinoriaBox.Theme.MAIN = Color3.fromRGB(100, 150, 255)
+		LinoriaBox.Theme.STROKE = Color3.fromRGB(50, 50, 60)
+		LinoriaBox.Theme.TOUCH = Color3.fromRGB(80, 130, 235)
+		LinoriaBox.Theme.SYSTEM = Color3.fromRGB(120, 170, 255)
+		LinoriaBox.Theme.BOX_ACCENT = Color3.fromRGB(35, 35, 45)
+	elseif name:lower() == 'green' then
+		LinoriaBox.Theme.BACKGROUND = Color3.fromRGB(18, 22, 20)
+		LinoriaBox.Theme.SECTION = Color3.fromRGB(23, 28, 25)
+		LinoriaBox.Theme.MAIN = Color3.fromRGB(100, 220, 150)
+		LinoriaBox.Theme.STROKE = Color3.fromRGB(50, 65, 55)
+		LinoriaBox.Theme.TOUCH = Color3.fromRGB(80, 200, 130)
+		LinoriaBox.Theme.SYSTEM = Color3.fromRGB(120, 240, 170)
+		LinoriaBox.Theme.BOX_ACCENT = Color3.fromRGB(35, 45, 40)
+	end
+end
+
+local function Signal(list:{{name:string,callback:FunctionalTest}})
+	local k = {}
+
+	for i,v in ipairs(list) do
+		k[v.name] = v.callback
+	end
+
+	return k
+end
+
+local function scrolling_connect(scrollframe:ScrollingFrame)
 	task.spawn(function()
-		local padding = 12
-		local layout = scrollFrame:WaitForChild('UIListLayout', 9999999)
-		scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + padding)
-		
-		layout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
-			scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + padding)
+		local addres = 45
+		local UIListLayout:UIListLayout = scrollframe:WaitForChild('UIListLayout',9999999)
+		scrollframe.CanvasSize = UDim2.new(0,0,0,UIListLayout.AbsoluteContentSize.Y+addres)
+
+		UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+			scrollframe.CanvasSize = UDim2.new(0,0,0,UIListLayout.AbsoluteContentSize.Y+addres)
 		end)
 	end)
 end
 
-local function Signal(callbacks)
-	local signals = {}
-	for _, callback in ipairs(callbacks) do
-		signals[callback.name] = callback.callback
+local function SetImage(name:string,image:ImageLabel)
+	name = name or "ADS"
+	name = name:lower()
+
+	local NigImage = "rbxassetid://3926305904"
+
+	if name == "ads" then
+		image.Image = NigImage
+		image.ImageRectOffset = Vector2.new(205,565)
+		image.ImageRectSize = Vector2.new(35,35)
+		return
 	end
-	return signals
+
+	if name == "list" then
+		image.Image = NigImage
+		image.ImageRectOffset = Vector2.new(485,205)
+		image.ImageRectSize = Vector2.new(35,35)
+		return
+	end
+
+	if name == "folder" then
+		image.Image = NigImage
+		image.ImageRectOffset = Vector2.new(805,45)
+		image.ImageRectSize = Vector2.new(35,35)
+		return
+	end
+
+	if name == "earth" then
+		image.Image = NigImage
+		image.ImageRectOffset = Vector2.new(604,324)
+		image.ImageRectSize = Vector2.new(35,35)
+		return
+	end
+
+	if name == "locked" then
+		image.Image = NigImage
+		image.ImageRectOffset = Vector2.new(524, 644)
+		image.ImageRectSize = Vector2.new(35,35)
+		return
+	end
+
+	if name == "home" then
+		image.Image = NigImage
+		image.ImageRectOffset = Vector2.new(964, 205)
+		image.ImageRectSize = Vector2.new(35,35)
+		return
+	end
+
+	if name == "positon" or name == 'gps' then
+		image.Image = NigImage
+		image.ImageRectOffset = Vector2.new(325, 565)
+		image.ImageRectSize = Vector2.new(35,35)
+		return
+	end
+
+	if name == "notify" or name == 'notification' then
+		image.Image = NigImage
+		image.ImageRectOffset = Vector2.new(325, 565)
+		image.ImageRectSize = Vector2.new(35,35)
+		return
+	end
+
+	if name == "close" or name == 'no' then
+		image.Image = NigImage
+		image.ImageRectOffset = Vector2.new(284, 4)
+		image.ImageRectSize = Vector2.new(24, 24)
+		return
+	end
+
+	if name == "color" then
+		image.Image = NigImage
+		image.ImageRectOffset = Vector2.new(44, 964)
+		image.ImageRectSize = Vector2.new(36, 36)
+		return
+	end
+
+	image.ImageRectOffset = Vector2.new(0,0)
+	image.ImageRectSize = Vector2.new(0,0)
+
+	if name == "settings" then
+		image.Image = "rbxassetid://7734053495"
+	end
+
+	if name == "smartphone" then
+		image.Image = "rbxassetid://7734058979"
+	end
+
+	if name == "crown" then
+		image.Image = "rbxassetid://7733765398"
+	end
+
+	if name == "save" then
+		image.Image = "rbxassetid://7734052335"
+	end
+
+	if name == "hash" then
+		image.Image = "rbxassetid://7733955740"
+	end
+
+	if name == "server" then
+		image.Image = "rbxassetid://7734053426"
+	end
+
+	if name == "option" then
+		image.Image = "rbxassetid://7734021300"
+	end
+
+	if name == "link" then
+		image.Image = "rbxassetid://7733978098"
+	end
+
+	if name == "copy" then
+		image.Image = "rbxassetid://7733764083"
+	end
+
+	if name == "cpu" then
+		image.Image = "rbxassetid://7733765045"
+	end
+
+	if name == "moon" then
+		image.Image = "rbxassetid://7743870134"
+	end
+
+	if name == "wallet" then
+		image.Image = "rbxassetid://7743877573"
+	end
 end
 
--- Config System
-function MacUI:SaveConfig(configName, data)
-	local success, result = pcall(function()
-		if not isfolder(self.ConfigFolder) then
-			makefolder(self.ConfigFolder)
-		end
-		
-		local filePath = self.ConfigFolder .. "/" .. configName .. ".json"
-		local jsonData = HttpService:JSONEncode(data)
-		writefile(filePath, jsonData)
-		return true
-	end)
-	
-	return success
-end
-
-function MacUI:LoadConfig(configName)
-	local success, result = pcall(function()
-		local filePath = self.ConfigFolder .. "/" .. configName .. ".json"
-		if not isfile(filePath) then
-			return nil
-		end
-		
-		local fileContent = readfile(filePath)
-		return HttpService:JSONDecode(fileContent)
-	end)
-	
-	return success and result or nil
-end
-
-function MacUI:ListConfigs()
-	local success, result = pcall(function()
-		if not isfolder(self.ConfigFolder) then
-			return {}
-		end
-		
-		local files = listfiles(self.ConfigFolder)
-		local configs = {}
-		
-		for _, file in ipairs(files) do
-			local name = file:match("([^/]+)%.json$")
-			if name then
-				table.insert(configs, name)
-			end
-		end
-		
-		return configs
-	end)
-	
-	return success and result or {}
-end
-
-function MacUI:DeleteConfig(configName)
-	local success = pcall(function()
-		local filePath = self.ConfigFolder .. "/" .. configName .. ".json"
-		if isfile(filePath) then
-			delfile(filePath)
-		end
-	end)
-	
-	return success
-end
-
--- Main Window Creation
-function MacUI:CreateWindow(options)
-	options = options or {}
-	local windowName = Default(options.Name, 'MacUI Library')
-	local windowIcon = Default(options.Icon, 'rbxassetid://7734053495')
-	local windowSubtitle = Default(options.Subtitle, 'Welcome!')
-	
-	local Window = {
+function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
+	local BoxWindow = {
 		Tabs = {},
-		Size = UDim2.new(0, 560, 0, 380),
-		ToggleKey = Enum.KeyCode.RightControl,
-		ConfigData = {}
+		Size = UDim2.new(0, 600, 0, 400),
+		Toggle = Enum.KeyCode.LeftControl,
+		ConfigName = "default"
 	}
-	
-	-- Create UI
-	local ScreenGui = Instance.new("ScreenGui")
+
+	WindowName = ToDefault(WindowName,'LinoriaBox UI')
+	WindowLogo = ToDefault(WindowLogo,'http://www.roblox.com/asset/?id=16530565354')
+	WindowDescription = ToDefault(WindowDescription,'Box-style UI Library')
+
+	local LinoriaUI = Instance.new("ScreenGui")
 	local MainFrame = Instance.new("Frame")
+	local Frame = Instance.new("Frame")
 	local UICorner = Instance.new("UICorner")
 	local UIStroke = Instance.new("UIStroke")
-	local Shadow = Instance.new("ImageLabel")
 	
 	local TopBar = Instance.new("Frame")
-	local TopBarCorner = Instance.new("UICorner")
-	local WindowIcon = Instance.new("ImageLabel")
-	local WindowTitle = Instance.new("TextLabel")
-	local WindowSubtitle = Instance.new("TextLabel")
-	local CloseButton = Instance.new("TextButton")
-	local CloseIcon = Instance.new("ImageLabel")
+	local TopBarLine = Instance.new("Frame")
+	local LogoHub = Instance.new("ImageLabel")
+	local MainText = Instance.new("TextLabel")
+	local DescriptionText = Instance.new("TextLabel")
+	local CloseButton = Instance.new("ImageButton")
 	
-	local Divider = Instance.new("Frame")
-	local TabContainer = Instance.new("Frame")
-	local TabScroll = Instance.new("ScrollingFrame")
-	local TabLayout = Instance.new("UIListLayout")
+	local TabButtonList = Instance.new("Frame")
+	local ScrollingFrame = Instance.new("ScrollingFrame")
+	local UIListLayout_2 = Instance.new("UIListLayout")
+	local TabSystem = Instance.new("Frame")
 	
-	local ContentFrame = Instance.new("Frame")
-	
-	-- Configure ScreenGui
-	ScreenGui.Name = "MacUI_" .. tostring(math.random(1000, 9999))
-	ScreenGui.Parent = CoreGui
-	ScreenGui.ResetOnSpawn = false
-	ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-	ProtectGui(ScreenGui)
-	
-	Window.ScreenGui = ScreenGui
-	
-	-- Configure MainFrame
+	local DropShadow = Instance.new("ImageLabel")
+
+	LinoriaUI:GetPropertyChangedSignal('Enabled'):Connect(function()
+		if not LinoriaUI.Enabled then
+			LinoriaUI.Enabled = true
+		end
+	end)
+
+	BoxWindow.ScreenSource = LinoriaUI
+
+	LinoriaUI.Name = tostring("ui.protect.")..tostring(math.random(1,100))..tostring(Random.new():NextNumber(0.1,0.9))
+	LinoriaUI.Parent = Core
+	LinoriaUI.ResetOnSpawn = false
+	LinoriaUI.IgnoreGuiInset = true
+	LinoriaUI.ZIndexBehavior = Enum.ZIndexBehavior.Global
+	ProtectGui(LinoriaUI)
+
 	MainFrame.Name = "MainFrame"
-	MainFrame.Parent = ScreenGui
+	MainFrame.Parent = LinoriaUI
 	MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-	MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-	MainFrame.Size = Window.Size
-	MainFrame.BackgroundColor3 = MacUI.Theme.Background
+	MainFrame.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
+	MainFrame.BackgroundTransparency = 1.000
+	MainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	MainFrame.BorderSizePixel = 0
 	MainFrame.ClipsDescendants = true
+	MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+	MainFrame.Size = BoxWindow.Size
 	MainFrame.Active = true
-	
-	UICorner.CornerRadius = UDim.new(0, 12)
-	UICorner.Parent = MainFrame
-	
-	UIStroke.Color = MacUI.Theme.Stroke
-	UIStroke.Thickness = 1
+
+	Frame.Parent = MainFrame
+	Frame.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
+	Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	Frame.BorderSizePixel = 0
+	Frame.Size = UDim2.new(1, 0, 1, 0)
+	Frame.Position = UDim2.fromScale(-1,0)
+	Frame.ClipsDescendants = true
+
+	UICorner.Parent = Frame
+	UICorner.CornerRadius = UDim.new(0, 6)
+
+	UIStroke.Parent = Frame
+	UIStroke.Color = LinoriaBox.Theme.STROKE
+	UIStroke.Thickness = 2
 	UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	UIStroke.Parent = MainFrame
-	
-	-- Shadow
-	Shadow.Name = "Shadow"
-	Shadow.Parent = MainFrame
-	Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-	Shadow.Position = UDim2.new(0.5, 0, 0.5, 0)
-	Shadow.Size = UDim2.new(1, 40, 1, 40)
-	Shadow.BackgroundTransparency = 1
-	Shadow.Image = "rbxassetid://6015897843"
-	Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-	Shadow.ImageTransparency = 0.7
-	Shadow.ScaleType = Enum.ScaleType.Slice
-	Shadow.SliceCenter = Rect.new(49, 49, 450, 450)
-	Shadow.ZIndex = 0
-	
-	-- TopBar
+
+	-- Top Bar (Box Style)
 	TopBar.Name = "TopBar"
-	TopBar.Parent = MainFrame
-	TopBar.Size = UDim2.new(1, 0, 0, 56)
-	TopBar.BackgroundColor3 = MacUI.Theme.Secondary
+	TopBar.Parent = Frame
+	TopBar.BackgroundColor3 = LinoriaBox.Theme.BOX_ACCENT
 	TopBar.BorderSizePixel = 0
-	
-	TopBarCorner.CornerRadius = UDim.new(0, 12)
-	TopBarCorner.Parent = TopBar
-	
-	local TopBarFix = Instance.new("Frame")
-	TopBarFix.Parent = TopBar
-	TopBarFix.Position = UDim2.new(0, 0, 1, -12)
-	TopBarFix.Size = UDim2.new(1, 0, 0, 12)
-	TopBarFix.BackgroundColor3 = MacUI.Theme.Secondary
-	TopBarFix.BorderSizePixel = 0
-	
-	-- Window Icon
-	WindowIcon.Name = "WindowIcon"
-	WindowIcon.Parent = TopBar
-	WindowIcon.AnchorPoint = Vector2.new(0, 0.5)
-	WindowIcon.Position = UDim2.new(0, 16, 0.5, 0)
-	WindowIcon.Size = UDim2.new(0, 32, 0, 32)
-	WindowIcon.BackgroundTransparency = 1
-	WindowIcon.Image = windowIcon
-	WindowIcon.ScaleType = Enum.ScaleType.Fit
-	
-	-- Window Title
-	WindowTitle.Name = "WindowTitle"
-	WindowTitle.Parent = TopBar
-	WindowTitle.AnchorPoint = Vector2.new(0, 0)
-	WindowTitle.Position = UDim2.new(0, 56, 0, 10)
-	WindowTitle.Size = UDim2.new(0.6, -56, 0, 20)
-	WindowTitle.BackgroundTransparency = 1
-	WindowTitle.Font = Enum.Font.GothamMedium
-	WindowTitle.Text = windowName
-	WindowTitle.TextColor3 = MacUI.Theme.Text
-	WindowTitle.TextSize = 16
-	WindowTitle.TextXAlignment = Enum.TextXAlignment.Left
-	
-	-- Window Subtitle
-	WindowSubtitle.Name = "WindowSubtitle"
-	WindowSubtitle.Parent = TopBar
-	WindowSubtitle.AnchorPoint = Vector2.new(0, 0)
-	WindowSubtitle.Position = UDim2.new(0, 56, 0, 30)
-	WindowSubtitle.Size = UDim2.new(0.6, -56, 0, 16)
-	WindowSubtitle.BackgroundTransparency = 1
-	WindowSubtitle.Font = Enum.Font.Gotham
-	WindowSubtitle.Text = windowSubtitle
-	WindowSubtitle.TextColor3 = MacUI.Theme.SubText
-	WindowSubtitle.TextSize = 13
-	WindowSubtitle.TextXAlignment = Enum.TextXAlignment.Left
-	
-	-- Close Button
+	TopBar.Size = UDim2.new(1, 0, 0, 35)
+	TopBar.Position = UDim2.new(0, 0, 0, 0)
+
+	TopBarLine.Name = "TopBarLine"
+	TopBarLine.Parent = TopBar
+	TopBarLine.BackgroundColor3 = LinoriaBox.Theme.MAIN
+	TopBarLine.BorderSizePixel = 0
+	TopBarLine.Size = UDim2.new(1, 0, 0, 2)
+	TopBarLine.Position = UDim2.new(0, 0, 1, 0)
+
+	LogoHub.Name = "LogoHub"
+	LogoHub.Parent = TopBar
+	LogoHub.AnchorPoint = Vector2.new(0, 0.5)
+	LogoHub.BackgroundTransparency = 1
+	LogoHub.Position = UDim2.new(0, 8, 0.5, 0)
+	LogoHub.Size = UDim2.new(0, 24, 0, 24)
+	LogoHub.Image = tostring(WindowLogo)
+	LogoHub.ScaleType = Enum.ScaleType.Fit
+	LogoHub.ImageTransparency = 1
+
+	MainText.Name = "MainText"
+	MainText.Parent = TopBar
+	MainText.BackgroundTransparency = 1
+	MainText.Position = UDim2.new(0, 38, 0, 0)
+	MainText.Size = UDim2.new(0, 250, 0, 20)
+	MainText.Font = Enum.Font.GothamBold
+	MainText.Text = tostring(WindowName)
+	MainText.TextColor3 = Color3.fromRGB(255, 255, 255)
+	MainText.TextSize = 14
+	MainText.TextXAlignment = Enum.TextXAlignment.Left
+	MainText.TextTransparency = 1
+
+	DescriptionText.Name = "DescriptionText"
+	DescriptionText.Parent = TopBar
+	DescriptionText.BackgroundTransparency = 1
+	DescriptionText.Position = UDim2.new(0, 38, 0, 18)
+	DescriptionText.Size = UDim2.new(0, 250, 0, 14)
+	DescriptionText.Font = Enum.Font.Gotham
+	DescriptionText.Text = tostring(WindowDescription)
+	DescriptionText.TextColor3 = Color3.fromRGB(180, 180, 180)
+	DescriptionText.TextSize = 11
+	DescriptionText.TextXAlignment = Enum.TextXAlignment.Left
+	DescriptionText.TextTransparency = 1
+
 	CloseButton.Name = "CloseButton"
 	CloseButton.Parent = TopBar
 	CloseButton.AnchorPoint = Vector2.new(1, 0.5)
-	CloseButton.Position = UDim2.new(1, -12, 0.5, 0)
-	CloseButton.Size = UDim2.new(0, 32, 0, 32)
-	CloseButton.BackgroundColor3 = MacUI.Theme.Hover
 	CloseButton.BackgroundTransparency = 1
-	CloseButton.Text = ""
-	CloseButton.AutoButtonColor = false
-	
-	local CloseCorner = Instance.new("UICorner")
-	CloseCorner.CornerRadius = UDim.new(0, 8)
-	CloseCorner.Parent = CloseButton
-	
-	CloseIcon.Parent = CloseButton
-	CloseIcon.AnchorPoint = Vector2.new(0.5, 0.5)
-	CloseIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
-	CloseIcon.Size = UDim2.new(0, 20, 0, 20)
-	CloseIcon.BackgroundTransparency = 1
-	CloseIcon.Image = "rbxassetid://10002398990"
-	CloseIcon.ImageColor3 = MacUI.Theme.Text
-	
-	-- Divider
-	Divider.Name = "Divider"
-	Divider.Parent = MainFrame
-	Divider.Position = UDim2.new(0, 0, 0, 56)
-	Divider.Size = UDim2.new(1, 0, 0, 1)
-	Divider.BackgroundColor3 = MacUI.Theme.Stroke
-	Divider.BorderSizePixel = 0
-	
-	-- Tab Container
-	TabContainer.Name = "TabContainer"
-	TabContainer.Parent = MainFrame
-	TabContainer.Position = UDim2.new(0, 12, 0, 68)
-	TabContainer.Size = UDim2.new(0, 140, 1, -80)
-	TabContainer.BackgroundTransparency = 1
-	TabContainer.ClipsDescendants = true
-	
-	TabScroll.Name = "TabScroll"
-	TabScroll.Parent = TabContainer
-	TabScroll.Size = UDim2.new(1, 0, 1, 0)
-	TabScroll.BackgroundTransparency = 1
-	TabScroll.BorderSizePixel = 0
-	TabScroll.ScrollBarThickness = 4
-	TabScroll.ScrollBarImageColor3 = MacUI.Theme.Stroke
-	
-	TabLayout.Parent = TabScroll
-	TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	TabLayout.Padding = UDim.new(0, 6)
-	
-	ScrollingConnect(TabScroll)
-	
-	-- Content Frame
-	ContentFrame.Name = "ContentFrame"
-	ContentFrame.Parent = MainFrame
-	ContentFrame.Position = UDim2.new(0, 164, 0, 68)
-	ContentFrame.Size = UDim2.new(1, -176, 1, -80)
-	ContentFrame.BackgroundTransparency = 1
-	ContentFrame.ClipsDescendants = true
-	
-	-- Tab Creation
-	function Window:CreateTab(options)
-		options = options or {}
-		local tabName = Default(options.Name, 'Tab')
-		local tabIcon = Default(options.Icon, 'rbxassetid://7734053495')
-		
-		local Tab = {
-			Sections = {}
+	CloseButton.Position = UDim2.new(1, -8, 0.5, 0)
+	CloseButton.Size = UDim2.new(0, 20, 0, 20)
+	CloseButton.Image = "rbxassetid://10002398990"
+	CloseButton.ImageTransparency = 1
+
+	TabButtonList.Name = "TabButtonList"
+	TabButtonList.Parent = Frame
+	TabButtonList.BackgroundColor3 = LinoriaBox.Theme.SECTION
+	TabButtonList.BorderSizePixel = 0
+	TabButtonList.Position = UDim2.new(0, 8, 0, 45)
+	TabButtonList.Size = UDim2.new(0, 130, 1, -53)
+	TabButtonList.ClipsDescendants = true
+
+	local TabStroke = Instance.new("UIStroke")
+	TabStroke.Parent = TabButtonList
+	TabStroke.Color = LinoriaBox.Theme.STROKE
+	TabStroke.Thickness = 1
+
+	local TabCorner = Instance.new("UICorner")
+	TabCorner.Parent = TabButtonList
+	TabCorner.CornerRadius = UDim.new(0, 4)
+
+	ScrollingFrame.Parent = TabButtonList
+	ScrollingFrame.Active = true
+	ScrollingFrame.BackgroundTransparency = 1
+	ScrollingFrame.Position = UDim2.new(0, 4, 0, 4)
+	ScrollingFrame.Size = UDim2.new(1, -8, 1, -8)
+	ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+	ScrollingFrame.ScrollBarThickness = 4
+	ScrollingFrame.ScrollBarImageColor3 = LinoriaBox.Theme.MAIN
+
+	UIListLayout_2.Parent = ScrollingFrame
+	UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
+	UIListLayout_2.Padding = UDim.new(0, 4)
+
+	scrolling_connect(ScrollingFrame)
+
+	TabSystem.Name = "TabSystem"
+	TabSystem.Parent = Frame
+	TabSystem.BackgroundTransparency = 1
+	TabSystem.Position = UDim2.new(0, 146, 0, 45)
+	TabSystem.Size = UDim2.new(1, -154, 1, -53)
+	TabSystem.ClipsDescendants = true
+
+	DropShadow.Name = "DropShadow"
+	DropShadow.Parent = Frame
+	DropShadow.AnchorPoint = Vector2.new(0.5, 0.5)
+	DropShadow.BackgroundTransparency = 1
+	DropShadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+	DropShadow.Size = UDim2.new(1, 47, 1, 47)
+	DropShadow.ZIndex = 0
+	DropShadow.Image = "rbxassetid://6015897843"
+	DropShadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+	DropShadow.ImageTransparency = 1
+	DropShadow.ScaleType = Enum.ScaleType.Slice
+	DropShadow.SliceCenter = Rect.new(49, 49, 450, 450)
+
+	local cs = Tween:Create(Frame,TweenInfo.new(0.5),{
+		Position = UDim2.fromScale(0,0)
+	})
+
+	cs:Play()
+	cs.Completed:Connect(function()
+		Tween:Create(DropShadow,TweenInfo.new(1),{
+			ImageTransparency = 0.4,
+		}):Play()
+	end)
+
+	delay(0.3,function()
+		Tween:Create(CloseButton,TweenInfo.new(0.3),{ImageTransparency = 0}):Play()
+		Tween:Create(DescriptionText,TweenInfo.new(0.3),{TextTransparency = 0.3}):Play()
+		Tween:Create(MainText,TweenInfo.new(0.3),{TextTransparency = 0}):Play()
+		Tween:Create(LogoHub,TweenInfo.new(0.3),{ImageTransparency = 0}):Play()
+	end)
+
+	-- Auto-save system
+	if ConfigSystem.AutoSaveEnabled then
+		task.spawn(function()
+			while wait(ConfigSystem.AutoSaveInterval) do
+				SaveConfig(BoxWindow.ConfigName)
+			end
+		end)
+	end
+
+	function BoxWindow:NewTab(TabName:string,TabIcon:string)
+		local TabBox = {
+			Section = {}
 		}
-		
-		-- Tab Button
+
 		local TabButton = Instance.new("TextButton")
-		local TabCorner = Instance.new("UICorner")
-		local TabIcon = Instance.new("ImageLabel")
+		local TabIcon_img = Instance.new("ImageLabel")
 		local TabLabel = Instance.new("TextLabel")
-		
-		TabButton.Name = tabName
-		TabButton.Parent = TabScroll
-		TabButton.Size = UDim2.new(1, 0, 0, 40)
-		TabButton.BackgroundColor3 = MacUI.Theme.Hover
+
+		TabButton.Name = TabName or "TabButton"
+		TabButton.Parent = ScrollingFrame
+		TabButton.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
 		TabButton.BackgroundTransparency = 1
+		TabButton.BorderSizePixel = 0
+		TabButton.Size = UDim2.new(1, 0, 0, 32)
+		TabButton.Font = Enum.Font.Gotham
 		TabButton.Text = ""
-		TabButton.AutoButtonColor = false
-		
-		TabCorner.CornerRadius = UDim.new(0, 8)
-		TabCorner.Parent = TabButton
-		
-		TabIcon.Parent = TabButton
-		TabIcon.AnchorPoint = Vector2.new(0, 0.5)
-		TabIcon.Position = UDim2.new(0, 10, 0.5, 0)
-		TabIcon.Size = UDim2.new(0, 20, 0, 20)
-		TabIcon.BackgroundTransparency = 1
-		TabIcon.Image = tabIcon
-		TabIcon.ImageColor3 = MacUI.Theme.SubText
-		TabIcon.ScaleType = Enum.ScaleType.Fit
-		
+		TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+		local TabButtonCorner = Instance.new("UICorner")
+		TabButtonCorner.Parent = TabButton
+		TabButtonCorner.CornerRadius = UDim.new(0, 4)
+
+		TabIcon_img.Name = "Icon"
+		TabIcon_img.Parent = TabButton
+		TabIcon_img.BackgroundTransparency = 1
+		TabIcon_img.Position = UDim2.new(0, 8, 0.5, -8)
+		TabIcon_img.Size = UDim2.new(0, 16, 0, 16)
+		SetImage(TabIcon,TabIcon_img)
+
+		TabLabel.Name = "Label"
 		TabLabel.Parent = TabButton
-		TabLabel.AnchorPoint = Vector2.new(0, 0.5)
-		TabLabel.Position = UDim2.new(0, 38, 0.5, 0)
-		TabLabel.Size = UDim2.new(1, -48, 1, 0)
 		TabLabel.BackgroundTransparency = 1
+		TabLabel.Position = UDim2.new(0, 30, 0, 0)
+		TabLabel.Size = UDim2.new(1, -35, 1, 0)
 		TabLabel.Font = Enum.Font.GothamMedium
-		TabLabel.Text = tabName
-		TabLabel.TextColor3 = MacUI.Theme.SubText
-		TabLabel.TextSize = 14
+		TabLabel.Text = TabName or "Tab"
+		TabLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+		TabLabel.TextSize = 13
 		TabLabel.TextXAlignment = Enum.TextXAlignment.Left
-		
-		-- Tab Content
-		local TabContent = Instance.new("Frame")
-		local LeftColumn = Instance.new("ScrollingFrame")
-		local LeftLayout = Instance.new("UIListLayout")
-		local RightColumn = Instance.new("ScrollingFrame")
-		local RightLayout = Instance.new("UIListLayout")
-		
-		TabContent.Name = tabName .. "_Content"
-		TabContent.Parent = ContentFrame
-		TabContent.Size = UDim2.new(1, 0, 1, 0)
-		TabContent.BackgroundTransparency = 1
-		TabContent.Visible = false
-		
-		-- Left Column
-		LeftColumn.Name = "LeftColumn"
-		LeftColumn.Parent = TabContent
-		LeftColumn.Position = UDim2.new(0, 0, 0, 0)
-		LeftColumn.Size = UDim2.new(0.5, -4, 1, 0)
-		LeftColumn.BackgroundTransparency = 1
-		LeftColumn.BorderSizePixel = 0
-		LeftColumn.ScrollBarThickness = 4
-		LeftColumn.ScrollBarImageColor3 = MacUI.Theme.Stroke
-		
-		LeftLayout.Parent = LeftColumn
-		LeftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-		LeftLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		LeftLayout.Padding = UDim.new(0, 8)
-		
-		ScrollingConnect(LeftColumn)
-		
-		-- Right Column
-		RightColumn.Name = "RightColumn"
-		RightColumn.Parent = TabContent
-		RightColumn.Position = UDim2.new(0.5, 4, 0, 0)
-		RightColumn.Size = UDim2.new(0.5, -4, 1, 0)
-		RightColumn.BackgroundTransparency = 1
-		RightColumn.BorderSizePixel = 0
-		RightColumn.ScrollBarThickness = 4
-		RightColumn.ScrollBarImageColor3 = MacUI.Theme.Stroke
-		
-		RightLayout.Parent = RightColumn
-		RightLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-		RightLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		RightLayout.Padding = UDim.new(0, 8)
-		
-		ScrollingConnect(RightColumn)
-		
-		-- Tab Selection Logic
-		local function SelectTab(selected)
-			if selected then
-				TabContent.Visible = true
-				TweenService:Create(TabButton, TweenInfo.new(0.2), {
-					BackgroundTransparency = 0
-				}):Play()
-				TweenService:Create(TabIcon, TweenInfo.new(0.2), {
-					ImageColor3 = MacUI.Theme.Accent
-				}):Play()
-				TweenService:Create(TabLabel, TweenInfo.new(0.2), {
-					TextColor3 = MacUI.Theme.Accent
-				}):Play()
+
+		local TabFrame = Instance.new("ScrollingFrame")
+		local LeftFrame = Instance.new("Frame")
+		local RightFrame = Instance.new("Frame")
+		local UIListLayout = Instance.new("UIListLayout")
+		local UIListLayout_2 = Instance.new("UIListLayout")
+
+		TabFrame.Name = "TabFrame"
+		TabFrame.Parent = TabSystem
+		TabFrame.Active = true
+		TabFrame.BackgroundTransparency = 1
+		TabFrame.BorderSizePixel = 0
+		TabFrame.Size = UDim2.new(1, 0, 1, 0)
+		TabFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+		TabFrame.ScrollBarThickness = 4
+		TabFrame.ScrollBarImageColor3 = LinoriaBox.Theme.MAIN
+		TabFrame.Visible = false
+
+		LeftFrame.Name = "LeftFrame"
+		LeftFrame.Parent = TabFrame
+		LeftFrame.BackgroundTransparency = 1
+		LeftFrame.Position = UDim2.new(0, 0, 0, 0)
+		LeftFrame.Size = UDim2.new(0.48, 0, 1, 0)
+
+		UIListLayout.Parent = LeftFrame
+		UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		UIListLayout.Padding = UDim.new(0, 8)
+
+		RightFrame.Name = "RightFrame"
+		RightFrame.Parent = TabFrame
+		RightFrame.BackgroundTransparency = 1
+		RightFrame.Position = UDim2.new(0.52, 0, 0, 0)
+		RightFrame.Size = UDim2.new(0.48, 0, 1, 0)
+
+		UIListLayout_2.Parent = RightFrame
+		UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
+		UIListLayout_2.Padding = UDim.new(0, 8)
+
+		local call = function(val)
+			if val then
+				TabFrame.Visible = true
+				Tween:Create(TabButton,TweenInfo.new(0.15),{BackgroundTransparency = 0, BackgroundColor3 = LinoriaBox.Theme.TOUCH}):Play()
+				Tween:Create(TabLabel,TweenInfo.new(0.15),{TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+				Tween:Create(TabIcon_img,TweenInfo.new(0.15),{ImageColor3 = LinoriaBox.Theme.MAIN}):Play()
 			else
-				TabContent.Visible = false
-				TweenService:Create(TabButton, TweenInfo.new(0.2), {
-					BackgroundTransparency = 1
-				}):Play()
-				TweenService:Create(TabIcon, TweenInfo.new(0.2), {
-					ImageColor3 = MacUI.Theme.SubText
-				}):Play()
-				TweenService:Create(TabLabel, TweenInfo.new(0.2), {
-					TextColor3 = MacUI.Theme.SubText
-				}):Play()
+				TabFrame.Visible = false
+				Tween:Create(TabButton,TweenInfo.new(0.15),{BackgroundTransparency = 1}):Play()
+				Tween:Create(TabLabel,TweenInfo.new(0.15),{TextColor3 = Color3.fromRGB(200, 200, 200)}):Play()
+				Tween:Create(TabIcon_img,TweenInfo.new(0.15),{ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 			end
 		end
-		
-		-- Auto-select first tab
-		if #Window.Tabs == 0 then
-			task.spawn(SelectTab, true)
+
+		if not BoxWindow.Tabs[1] then
+			task.spawn(call,true)
 		else
-			task.spawn(SelectTab, false)
+			task.spawn(call,false)
 		end
-		
-		table.insert(Window.Tabs, {
-			Content = TabContent,
-			Select = SelectTab
+
+		table.insert(BoxWindow.Tabs,{
+			TabFrame,
+			call
 		})
-		
+
 		TabButton.MouseButton1Click:Connect(function()
-			for _, tab in ipairs(Window.Tabs) do
-				if tab.Content == TabContent then
-					task.spawn(tab.Select, true)
+			for i,v in ipairs(BoxWindow.Tabs) do
+				if v[1] == TabFrame then
+					task.spawn(v[2],true)
 				else
-					task.spawn(tab.Select, false)
+					task.spawn(v[2],false)
 				end
 			end
 		end)
-		
-		-- Hover Effects
-		TabButton.MouseEnter:Connect(function()
-			if TabButton.BackgroundTransparency == 1 then
-				TweenService:Create(TabButton, TweenInfo.new(0.15), {
-					BackgroundTransparency = 0.5
-				}):Play()
-			end
-		end)
-		
-		TabButton.MouseLeave:Connect(function()
-			if TabContent.Visible == false then
-				TweenService:Create(TabButton, TweenInfo.new(0.15), {
-					BackgroundTransparency = 1
-				}):Play()
-			end
-		end)
-		
-		-- Section Creation
-		function Tab:CreateSection(options)
-			options = options or {}
-			local sectionName = Default(options.Name, 'Section')
-			local sectionSide = Default(options.Side, 'Left')
-			
-			local Section = {
-				Elements = {}
-			}
-			
-			local parent = sectionSide:lower():find('left') and LeftColumn or RightColumn
-			
-			-- Section Container
-			local SectionFrame = Instance.new("Frame")
+
+		function TabBox:NewSection(SectionName:string,SectionIcon:string,Position:string)
+			local Section_Box = {}
+
+			SectionName = ToDefault(SectionName,'Section')
+			SectionIcon = ToDefault(SectionIcon,'home')
+			Position = (Position and (Position:lower():find('left') and LeftFrame) or RightFrame) or LeftFrame
+
+			local Section = Instance.new("Frame")
+			local SectionHeader = Instance.new("Frame")
+			local SectionTitle = Instance.new("TextLabel")
+			local SectionIcon_img = Instance.new("ImageLabel")
+			local SectionContent = Instance.new("Frame")
+			local UIListLayout = Instance.new("UIListLayout")
+
+			Section.Name = "Section"
+			Section.Parent = Position
+			Section.BackgroundColor3 = LinoriaBox.Theme.SECTION
+			Section.BorderSizePixel = 0
+			Section.Size = UDim2.new(1, 0, 0, 40)
+
 			local SectionCorner = Instance.new("UICorner")
+			SectionCorner.Parent = Section
+			SectionCorner.CornerRadius = UDim.new(0, 4)
+
 			local SectionStroke = Instance.new("UIStroke")
-			local SectionHeader = Instance.new("TextLabel")
-			local SectionDivider = Instance.new("Frame")
-			local ElementContainer = Instance.new("Frame")
-			local ElementLayout = Instance.new("UIListLayout")
-			
-			SectionFrame.Name = sectionName
-			SectionFrame.Parent = parent
-			SectionFrame.Size = UDim2.new(MacUI.SectionWidth, 0, 0, 50)
-			SectionFrame.BackgroundColor3 = MacUI.Theme.Secondary
-			SectionFrame.BorderSizePixel = 0
-			
-			SectionCorner.CornerRadius = UDim.new(0, 10)
-			SectionCorner.Parent = SectionFrame
-			
-			SectionStroke.Color = MacUI.Theme.Stroke
+			SectionStroke.Parent = Section
+			SectionStroke.Color = LinoriaBox.Theme.STROKE
 			SectionStroke.Thickness = 1
-			SectionStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-			SectionStroke.Parent = SectionFrame
-			
-			SectionHeader.Name = "Header"
-			SectionHeader.Parent = SectionFrame
-			SectionHeader.Position = UDim2.new(0, 14, 0, 12)
-			SectionHeader.Size = UDim2.new(1, -28, 0, 18)
-			SectionHeader.BackgroundTransparency = 1
-			SectionHeader.Font = Enum.Font.GothamBold
-			SectionHeader.Text = sectionName
-			SectionHeader.TextColor3 = MacUI.Theme.Text
-			SectionHeader.TextSize = 15
-			SectionHeader.TextXAlignment = Enum.TextXAlignment.Left
-			
-			SectionDivider.Name = "Divider"
-			SectionDivider.Parent = SectionFrame
-			SectionDivider.Position = UDim2.new(0, 12, 0, 38)
-			SectionDivider.Size = UDim2.new(1, -24, 0, 1)
-			SectionDivider.BackgroundColor3 = MacUI.Theme.Stroke
-			SectionDivider.BorderSizePixel = 0
-			
-			ElementContainer.Name = "Elements"
-			ElementContainer.Parent = SectionFrame
-			ElementContainer.Position = UDim2.new(0, 0, 0, 44)
-			ElementContainer.Size = UDim2.new(1, 0, 1, -44)
-			ElementContainer.BackgroundTransparency = 1
-			
-			ElementLayout.Parent = ElementContainer
-			ElementLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-			ElementLayout.SortOrder = Enum.SortOrder.LayoutOrder
-			ElementLayout.Padding = UDim.new(0, 6)
-			
-			local function UpdateSectionSize()
-				local totalHeight = 50
-				for _, element in ipairs(ElementContainer:GetChildren()) do
-					if element:IsA('Frame') or element:IsA('TextButton') then
-						totalHeight = totalHeight + element.AbsoluteSize.Y + ElementLayout.Padding.Offset
+
+			SectionHeader.Name = "SectionHeader"
+			SectionHeader.Parent = Section
+			SectionHeader.BackgroundColor3 = LinoriaBox.Theme.BOX_ACCENT
+			SectionHeader.BorderSizePixel = 0
+			SectionHeader.Size = UDim2.new(1, 0, 0, 28)
+
+			local HeaderCorner = Instance.new("UICorner")
+			HeaderCorner.Parent = SectionHeader
+			HeaderCorner.CornerRadius = UDim.new(0, 4)
+
+			local HeaderLine = Instance.new("Frame")
+			HeaderLine.Parent = SectionHeader
+			HeaderLine.BackgroundColor3 = LinoriaBox.Theme.MAIN
+			HeaderLine.BorderSizePixel = 0
+			HeaderLine.Position = UDim2.new(0, 0, 1, -1)
+			HeaderLine.Size = UDim2.new(1, 0, 0, 1)
+
+			SectionIcon_img.Name = "Icon"
+			SectionIcon_img.Parent = SectionHeader
+			SectionIcon_img.BackgroundTransparency = 1
+			SectionIcon_img.Position = UDim2.new(0, 8, 0.5, -8)
+			SectionIcon_img.Size = UDim2.new(0, 16, 0, 16)
+			SectionIcon_img.ImageColor3 = LinoriaBox.Theme.MAIN
+			SetImage(SectionIcon,SectionIcon_img)
+
+			SectionTitle.Name = "SectionTitle"
+			SectionTitle.Parent = SectionHeader
+			SectionTitle.BackgroundTransparency = 1
+			SectionTitle.Position = UDim2.new(0, 30, 0, 0)
+			SectionTitle.Size = UDim2.new(1, -35, 1, 0)
+			SectionTitle.Font = Enum.Font.GothamBold
+			SectionTitle.Text = SectionName
+			SectionTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+			SectionTitle.TextSize = 13
+			SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+			SectionContent.Name = "SectionContent"
+			SectionContent.Parent = Section
+			SectionContent.BackgroundTransparency = 1
+			SectionContent.Position = UDim2.new(0, 0, 0, 28)
+			SectionContent.Size = UDim2.new(1, 0, 1, -28)
+
+			UIListLayout.Parent = SectionContent
+			UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+			UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+			UIListLayout.Padding = UDim.new(0, 6)
+
+			function Section_Box.update()
+				local old = 28
+
+				for i,v in ipairs(SectionContent:GetChildren()) do
+					if v:IsA('Frame') then
+						old += (v.AbsoluteSize.Y or 0) + UIListLayout.Padding.Offset
 					end
 				end
-				TweenService:Create(SectionFrame, TweenInfo.new(0.15), {
-					Size = UDim2.new(MacUI.SectionWidth, 0, 0, totalHeight)
-				}):Play()
+
+				Section.Size = UDim2.new(1, 0, 0, old + 8)
 			end
-			
-			table.insert(MacUI.AutoUpdate, UpdateSectionSize)
-			ElementContainer.ChildAdded:Connect(UpdateSectionSize)
-			
-			-- Button Element
-			function Section:AddButton(options)
-				options = options or {}
-				local buttonName = Default(options.Name, 'Button')
-				local callback = Default(options.Callback, function() end)
-				
-				local ButtonFrame = Instance.new("TextButton")
-				local ButtonCorner = Instance.new("UICorner")
+
+			table.insert(LinoriaBox.AutoUpdate,Section_Box.update)
+
+			function Section_Box.text(...)
+				SectionTitle.Text = tostring(...)
+			end
+
+			function Section_Box:AddButton(ButtonName,callback)
+				local configKey = "Button_" .. ButtonName
+
+				local ButtonFrame = Instance.new("Frame")
+				local Button = Instance.new("TextButton")
 				local ButtonLabel = Instance.new("TextLabel")
-				
+
 				ButtonFrame.Name = "Button"
-				ButtonFrame.Parent = ElementContainer
-				ButtonFrame.Size = UDim2.new(0.92, 0, 0, 36)
-				ButtonFrame.BackgroundColor3 = MacUI.Theme.Hover
-				ButtonFrame.BackgroundTransparency = 0.5
-				ButtonFrame.Text = ""
-				ButtonFrame.AutoButtonColor = false
-				
-				ButtonCorner.CornerRadius = UDim.new(0, 8)
-				ButtonCorner.Parent = ButtonFrame
-				
-				ButtonLabel.Parent = ButtonFrame
-				ButtonLabel.Size = UDim2.new(1, -16, 1, 0)
-				ButtonLabel.Position = UDim2.new(0, 8, 0, 0)
+				ButtonFrame.Parent = SectionContent
+				ButtonFrame.BackgroundTransparency = 1
+				ButtonFrame.Size = UDim2.new(0.95, 0, 0, 28)
+
+				Button.Parent = ButtonFrame
+				Button.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
+				Button.BorderSizePixel = 0
+				Button.Size = UDim2.new(1, 0, 1, 0)
+				Button.Font = Enum.Font.Gotham
+				Button.Text = ""
+
+				local ButtonCorner = Instance.new("UICorner")
+				ButtonCorner.Parent = Button
+				ButtonCorner.CornerRadius = UDim.new(0, 4)
+
+				local ButtonStroke = Instance.new("UIStroke")
+				ButtonStroke.Parent = Button
+				ButtonStroke.Color = LinoriaBox.Theme.STROKE
+				ButtonStroke.Thickness = 1
+
+				ButtonLabel.Parent = Button
 				ButtonLabel.BackgroundTransparency = 1
+				ButtonLabel.Size = UDim2.new(1, 0, 1, 0)
 				ButtonLabel.Font = Enum.Font.GothamMedium
-				ButtonLabel.Text = buttonName
-				ButtonLabel.TextColor3 = MacUI.Theme.Text
-				ButtonLabel.TextSize = 14
-				ButtonLabel.TextXAlignment = Enum.TextXAlignment.Center
-				
-				ButtonFrame.MouseEnter:Connect(function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.15), {
-						BackgroundTransparency = 0
-					}):Play()
+				ButtonLabel.Text = ButtonName
+				ButtonLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+				ButtonLabel.TextSize = 12
+
+				Button.MouseEnter:Connect(function()
+					Tween:Create(Button,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.TOUCH}):Play()
+					Tween:Create(ButtonLabel,TweenInfo.new(0.1),{TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 				end)
-				
-				ButtonFrame.MouseLeave:Connect(function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.15), {
-						BackgroundTransparency = 0.5
-					}):Play()
+
+				Button.MouseLeave:Connect(function()
+					Tween:Create(Button,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.BACKGROUND}):Play()
+					Tween:Create(ButtonLabel,TweenInfo.new(0.1),{TextColor3 = Color3.fromRGB(200, 200, 200)}):Play()
 				end)
-				
-				ButtonFrame.MouseButton1Down:Connect(function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.1), {
-						BackgroundColor3 = MacUI.Theme.Accent
-					}):Play()
-					TweenService:Create(ButtonLabel, TweenInfo.new(0.1), {
-						TextColor3 = Color3.fromRGB(255, 255, 255)
-					}):Play()
-				end)
-				
-				ButtonFrame.MouseButton1Up:Connect(function()
-					TweenService:Create(ButtonFrame, TweenInfo.new(0.1), {
-						BackgroundColor3 = MacUI.Theme.Hover
-					}):Play()
-					TweenService:Create(ButtonLabel, TweenInfo.new(0.1), {
-						TextColor3 = MacUI.Theme.Text
-					}):Play()
-				end)
-				
-				ButtonFrame.MouseButton1Click:Connect(callback)
-				
-				UpdateSectionSize()
-				
+
+				Button.MouseButton1Click:Connect(callback or function() end)
+
+				Section_Box.update()
+
 				return Signal({
-					{name = 'SetText', callback = function(text)
-						ButtonLabel.Text = tostring(text)
-					end},
-					{name = 'Fire', callback = callback}
+					{
+						name = 'Text',
+						callback = function(...)
+							ButtonLabel.Text = tostring(...)
+						end,
+					},
+					{
+						name = 'Fire',
+						callback = callback,
+					}
 				})
 			end
-			
-			-- Toggle Element
-			function Section:AddToggle(options)
-				options = options or {}
-				local toggleName = Default(options.Name, 'Toggle')
-				local defaultValue = Default(options.Default, false)
-				local callback = Default(options.Callback, function() end)
-				
-				local currentValue = defaultValue
-				
+
+			function Section_Box:AddToggle(ToggleName:string,Default:boolean,callback:FunctionalTest)
+				Default = Default or false
+				callback = ToDefault(callback,function() end)
+
+				local configKey = "Toggle_" .. ToggleName
+
+				-- Load from config
+				if ConfigSystem.CurrentConfig[configKey] ~= nil then
+					Default = ConfigSystem.CurrentConfig[configKey]
+				end
+
 				local ToggleFrame = Instance.new("Frame")
 				local ToggleLabel = Instance.new("TextLabel")
+				local ToggleBox = Instance.new("Frame")
 				local ToggleButton = Instance.new("TextButton")
-				local ToggleCorner = Instance.new("UICorner")
-				local ToggleIndicator = Instance.new("Frame")
-				local IndicatorCorner = Instance.new("UICorner")
-				
+				local ToggleCheck = Instance.new("ImageLabel")
+
 				ToggleFrame.Name = "Toggle"
-				ToggleFrame.Parent = ElementContainer
-				ToggleFrame.Size = UDim2.new(0.92, 0, 0, 36)
+				ToggleFrame.Parent = SectionContent
 				ToggleFrame.BackgroundTransparency = 1
-				
+				ToggleFrame.Size = UDim2.new(0.95, 0, 0, 24)
+
 				ToggleLabel.Parent = ToggleFrame
-				ToggleLabel.AnchorPoint = Vector2.new(0, 0.5)
-				ToggleLabel.Position = UDim2.new(0, 8, 0.5, 0)
-				ToggleLabel.Size = UDim2.new(1, -60, 1, 0)
 				ToggleLabel.BackgroundTransparency = 1
-				ToggleLabel.Font = Enum.Font.GothamMedium
-				ToggleLabel.Text = toggleName
-				ToggleLabel.TextColor3 = MacUI.Theme.Text
-				ToggleLabel.TextSize = 14
+				ToggleLabel.Position = UDim2.new(0, 0, 0, 0)
+				ToggleLabel.Size = UDim2.new(1, -30, 1, 0)
+				ToggleLabel.Font = Enum.Font.Gotham
+				ToggleLabel.Text = ToggleName or "Toggle"
+				ToggleLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+				ToggleLabel.TextSize = 12
 				ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
-				
-				ToggleButton.Name = "ToggleButton"
+
+				ToggleBox.Name = "Box"
+				ToggleBox.Parent = ToggleFrame
+				ToggleBox.AnchorPoint = Vector2.new(1, 0.5)
+				ToggleBox.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
+				ToggleBox.BorderSizePixel = 0
+				ToggleBox.Position = UDim2.new(1, 0, 0.5, 0)
+				ToggleBox.Size = UDim2.new(0, 18, 0, 18)
+
+				local BoxCorner = Instance.new("UICorner")
+				BoxCorner.Parent = ToggleBox
+				BoxCorner.CornerRadius = UDim.new(0, 3)
+
+				local BoxStroke = Instance.new("UIStroke")
+				BoxStroke.Parent = ToggleBox
+				BoxStroke.Color = LinoriaBox.Theme.STROKE
+				BoxStroke.Thickness = 1
+
+				ToggleCheck.Name = "Check"
+				ToggleCheck.Parent = ToggleBox
+				ToggleCheck.BackgroundTransparency = 1
+				ToggleCheck.Size = UDim2.new(1, 0, 1, 0)
+				ToggleCheck.Image = "rbxassetid://3944680095"
+				ToggleCheck.Visible = false
+
 				ToggleButton.Parent = ToggleFrame
-				ToggleButton.AnchorPoint = Vector2.new(1, 0.5)
-				ToggleButton.Position = UDim2.new(1, -8, 0.5, 0)
-				ToggleButton.Size = UDim2.new(0, 44, 0, 24)
-				ToggleButton.BackgroundColor3 = MacUI.Theme.Stroke
+				ToggleButton.BackgroundTransparency = 1
+				ToggleButton.Size = UDim2.new(1, 0, 1, 0)
 				ToggleButton.Text = ""
-				ToggleButton.AutoButtonColor = false
-				
-				ToggleCorner.CornerRadius = UDim.new(1, 0)
-				ToggleCorner.Parent = ToggleButton
-				
-				ToggleIndicator.Name = "Indicator"
-				ToggleIndicator.Parent = ToggleButton
-				ToggleIndicator.AnchorPoint = Vector2.new(0, 0.5)
-				ToggleIndicator.Position = UDim2.new(0, 3, 0.5, 0)
-				ToggleIndicator.Size = UDim2.new(0, 18, 0, 18)
-				ToggleIndicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-				
-				IndicatorCorner.CornerRadius = UDim.new(1, 0)
-				IndicatorCorner.Parent = ToggleIndicator
-				
-				local function UpdateToggle(value)
-					currentValue = value
-					
-					if value then
-						TweenService:Create(ToggleButton, TweenInfo.new(0.2), {
-							BackgroundColor3 = MacUI.Theme.Accent
-						}):Play()
-						TweenService:Create(ToggleIndicator, TweenInfo.new(0.2), {
-							Position = UDim2.new(1, -21, 0.5, 0)
-						}):Play()
+				ToggleButton.ZIndex = 10
+
+				local function Effect(val)
+					if val then
+						ToggleCheck.Visible = true
+						Tween:Create(ToggleBox,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.MAIN}):Play()
+						Tween:Create(BoxStroke,TweenInfo.new(0.1),{Color = LinoriaBox.Theme.MAIN}):Play()
 					else
-						TweenService:Create(ToggleButton, TweenInfo.new(0.2), {
-							BackgroundColor3 = MacUI.Theme.Stroke
-						}):Play()
-						TweenService:Create(ToggleIndicator, TweenInfo.new(0.2), {
-							Position = UDim2.new(0, 3, 0.5, 0)
-						}):Play()
+						ToggleCheck.Visible = false
+						Tween:Create(ToggleBox,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.BACKGROUND}):Play()
+						Tween:Create(BoxStroke,TweenInfo.new(0.1),{Color = LinoriaBox.Theme.STROKE}):Play()
 					end
-					
-					callback(value)
+					ConfigSystem.CurrentConfig[configKey] = val
 				end
-				
-				UpdateToggle(defaultValue)
-				
+
+				Effect(Default)
+
 				ToggleButton.MouseButton1Click:Connect(function()
-					UpdateToggle(not currentValue)
+					Default = not Default
+					Effect(Default)
+					callback(Default)
 				end)
-				
-				UpdateSectionSize()
-				
+
+				Section_Box.update()
+
 				return Signal({
-					{name = 'SetText', callback = function(text)
-						ToggleLabel.Text = tostring(text)
-					end},
-					{name = 'SetValue', callback = UpdateToggle},
-					{name = 'GetValue', callback = function()
-						return currentValue
-					end}
+					{
+						name = 'Text',
+						callback = function(...)
+							ToggleLabel.Text = tostring(...)
+						end,
+					},
+					{
+						name = 'Fire',
+						callback = callback,
+					},
+					{
+						name = 'Value',
+						callback = function(v)
+							Default = v
+							Effect(v)
+							callback(v)
+						end,
+					}
 				})
 			end
-			
-			-- Slider Element
-			function Section:AddSlider(options)
-				options = options or {}
-				local sliderName = Default(options.Name, 'Slider')
-				local min = Default(options.Min, 0)
-				local max = Default(options.Max, 100)
-				local defaultValue = Default(options.Default, min)
-				local suffix = Default(options.Suffix, '')
-				local callback = Default(options.Callback, function() end)
-				
-				local currentValue = defaultValue
-				local dragging = false
-				
+
+			function Section_Box:AddKeybind(KeybindName:string,Default:Enum.KeyCode,callback)
+				callback = ToDefault(callback,function() end)
+
+				local configKey = "Keybind_" .. KeybindName
+
+				if typeof(Default) == 'string' then
+					pcall(function()
+						if Enum.KeyCode[tostring(Default)] then
+							Default = Enum.KeyCode[tostring(Default)]
+						end
+					end)
+				end
+
+				-- Load from config
+				if ConfigSystem.CurrentConfig[configKey] ~= nil then
+					local savedKey = ConfigSystem.CurrentConfig[configKey]
+					if typeof(savedKey) == 'string' and Enum.KeyCode[savedKey] then
+						Default = Enum.KeyCode[savedKey]
+					end
+				end
+
+				local function toname(v:Enum.KeyCode)
+					if v then
+						return v.Name
+					end
+					return 'None'
+				end
+
+				local KeybindFrame = Instance.new("Frame")
+				local KeybindLabel = Instance.new("TextLabel")
+				local KeybindBox = Instance.new("TextButton")
+				local KeybindText = Instance.new("TextLabel")
+
+				KeybindFrame.Name = "Keybind"
+				KeybindFrame.Parent = SectionContent
+				KeybindFrame.BackgroundTransparency = 1
+				KeybindFrame.Size = UDim2.new(0.95, 0, 0, 24)
+
+				KeybindLabel.Parent = KeybindFrame
+				KeybindLabel.BackgroundTransparency = 1
+				KeybindLabel.Size = UDim2.new(1, -60, 1, 0)
+				KeybindLabel.Font = Enum.Font.Gotham
+				KeybindLabel.Text = KeybindName or "Keybind"
+				KeybindLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+				KeybindLabel.TextSize = 12
+				KeybindLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+				KeybindBox.Name = "Box"
+				KeybindBox.Parent = KeybindFrame
+				KeybindBox.AnchorPoint = Vector2.new(1, 0.5)
+				KeybindBox.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
+				KeybindBox.BorderSizePixel = 0
+				KeybindBox.Position = UDim2.new(1, 0, 0.5, 0)
+				KeybindBox.Size = UDim2.new(0, 50, 0, 20)
+				KeybindBox.Font = Enum.Font.Gotham
+				KeybindBox.Text = ""
+
+				local BoxCorner = Instance.new("UICorner")
+				BoxCorner.Parent = KeybindBox
+				BoxCorner.CornerRadius = UDim.new(0, 3)
+
+				local BoxStroke = Instance.new("UIStroke")
+				BoxStroke.Parent = KeybindBox
+				BoxStroke.Color = LinoriaBox.Theme.STROKE
+				BoxStroke.Thickness = 1
+
+				KeybindText.Parent = KeybindBox
+				KeybindText.BackgroundTransparency = 1
+				KeybindText.Size = UDim2.new(1, 0, 1, 0)
+				KeybindText.Font = Enum.Font.GothamMedium
+				KeybindText.Text = toname(Default)
+				KeybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
+				KeybindText.TextSize = 11
+
+				local BindConnect
+
+				KeybindBox.MouseEnter:Connect(function()
+					if BindConnect then return end
+					Tween:Create(KeybindBox,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.TOUCH}):Play()
+				end)
+
+				KeybindBox.MouseLeave:Connect(function()
+					if BindConnect then return end
+					Tween:Create(KeybindBox,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.BACKGROUND}):Play()
+				end)
+
+				KeybindBox.MouseButton1Click:Connect(function()
+					if BindConnect then return end
+
+					KeybindText.Text = '...'
+					Tween:Create(KeybindBox,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.SYSTEM}):Play()
+					BindConnect = 'wait'
+					BindConnect = UIS.InputBegan:Wait()
+
+					if BindConnect.KeyCode ~= Enum.KeyCode.Unknown then
+						KeybindText.Text = toname(BindConnect.KeyCode)
+						Default = BindConnect.KeyCode
+						ConfigSystem.CurrentConfig[configKey] = BindConnect.KeyCode.Name
+						pcall(function()
+							task.spawn(callback,BindConnect.KeyCode)
+						end)
+					else
+						KeybindText.Text = toname(Default)
+					end
+
+					Tween:Create(KeybindBox,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.BACKGROUND}):Play()
+					BindConnect = nil
+				end)
+
+				Section_Box.update()
+
+				return Signal({
+					{
+						name = 'Text',
+						callback = function(...)
+							KeybindLabel.Text = tostring(...)
+						end,
+					},
+					{
+						name = 'Fire',
+						callback = callback,
+					},
+					{
+						name = 'Value',
+						callback = function(v)
+							Default = v
+							KeybindText.Text = toname(v)
+							callback(v)
+						end,
+					},
+					{
+						name = 'Get',
+						callback = function()
+							return Default
+						end,
+					},
+				})
+			end
+
+			function Section_Box:AddSlider(SliderName,Value:{Min:number,Max:number,Default:number,ValueT:string},callback)
+				Value = Value or {}
+				Value.Min = Value.Min or 1
+				Value.Max = Value.Max or 100
+				Value.Default = Value.Default or Value.Min
+				Value.ValueT = Value.ValueT or ''
+
+				callback = ToDefault(callback,function() end)
+
+				local configKey = "Slider_" .. SliderName
+
+				-- Load from config
+				if ConfigSystem.CurrentConfig[configKey] ~= nil then
+					Value.Default = ConfigSystem.CurrentConfig[configKey]
+				end
+
 				local SliderFrame = Instance.new("Frame")
 				local SliderLabel = Instance.new("TextLabel")
-				local SliderValue = Instance.new("TextLabel")
+				local SliderValueLabel = Instance.new("TextLabel")
 				local SliderBar = Instance.new("Frame")
-				local SliderCorner = Instance.new("UICorner")
 				local SliderFill = Instance.new("Frame")
-				local FillCorner = Instance.new("UICorner")
 				local SliderButton = Instance.new("TextButton")
-				
+
 				SliderFrame.Name = "Slider"
-				SliderFrame.Parent = ElementContainer
-				SliderFrame.Size = UDim2.new(0.92, 0, 0, 52)
+				SliderFrame.Parent = SectionContent
 				SliderFrame.BackgroundTransparency = 1
-				
+				SliderFrame.Size = UDim2.new(0.95, 0, 0, 38)
+
 				SliderLabel.Parent = SliderFrame
-				SliderLabel.Position = UDim2.new(0, 8, 0, 0)
-				SliderLabel.Size = UDim2.new(0.7, -8, 0, 20)
 				SliderLabel.BackgroundTransparency = 1
-				SliderLabel.Font = Enum.Font.GothamMedium
-				SliderLabel.Text = sliderName
-				SliderLabel.TextColor3 = MacUI.Theme.Text
-				SliderLabel.TextSize = 14
+				SliderLabel.Position = UDim2.new(0, 0, 0, 0)
+				SliderLabel.Size = UDim2.new(0.7, 0, 0, 16)
+				SliderLabel.Font = Enum.Font.Gotham
+				SliderLabel.Text = SliderName or "Slider"
+				SliderLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+				SliderLabel.TextSize = 12
 				SliderLabel.TextXAlignment = Enum.TextXAlignment.Left
-				
-				SliderValue.Parent = SliderFrame
-				SliderValue.AnchorPoint = Vector2.new(1, 0)
-				SliderValue.Position = UDim2.new(1, -8, 0, 0)
-				SliderValue.Size = UDim2.new(0.3, 0, 0, 20)
-				SliderValue.BackgroundTransparency = 1
-				SliderValue.Font = Enum.Font.GothamMedium
-				SliderValue.Text = tostring(defaultValue) .. suffix
-				SliderValue.TextColor3 = MacUI.Theme.SubText
-				SliderValue.TextSize = 13
-				SliderValue.TextXAlignment = Enum.TextXAlignment.Right
-				
+
+				SliderValueLabel.Parent = SliderFrame
+				SliderValueLabel.BackgroundTransparency = 1
+				SliderValueLabel.Position = UDim2.new(0.7, 0, 0, 0)
+				SliderValueLabel.Size = UDim2.new(0.3, 0, 0, 16)
+				SliderValueLabel.Font = Enum.Font.GothamMedium
+				SliderValueLabel.Text = tostring(Value.Default)..Value.ValueT
+				SliderValueLabel.TextColor3 = LinoriaBox.Theme.MAIN
+				SliderValueLabel.TextSize = 11
+				SliderValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+
 				SliderBar.Name = "Bar"
 				SliderBar.Parent = SliderFrame
-				SliderBar.Position = UDim2.new(0, 8, 0, 28)
-				SliderBar.Size = UDim2.new(1, -16, 0, 18)
-				SliderBar.BackgroundColor3 = MacUI.Theme.Hover
+				SliderBar.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
 				SliderBar.BorderSizePixel = 0
-				
-				SliderCorner.CornerRadius = UDim.new(1, 0)
-				SliderCorner.Parent = SliderBar
-				
+				SliderBar.Position = UDim2.new(0, 0, 0, 20)
+				SliderBar.Size = UDim2.new(1, 0, 0, 14)
+
+				local BarCorner = Instance.new("UICorner")
+				BarCorner.Parent = SliderBar
+				BarCorner.CornerRadius = UDim.new(0, 3)
+
+				local BarStroke = Instance.new("UIStroke")
+				BarStroke.Parent = SliderBar
+				BarStroke.Color = LinoriaBox.Theme.STROKE
+				BarStroke.Thickness = 1
+
 				SliderFill.Name = "Fill"
 				SliderFill.Parent = SliderBar
-				SliderFill.Size = UDim2.new((defaultValue - min) / (max - min), 0, 1, 0)
-				SliderFill.BackgroundColor3 = MacUI.Theme.Accent
+				SliderFill.BackgroundColor3 = LinoriaBox.Theme.MAIN
 				SliderFill.BorderSizePixel = 0
-				
-				FillCorner.CornerRadius = UDim.new(1, 0)
+				SliderFill.Size = UDim2.fromScale((Value.Default - Value.Min) / (Value.Max - Value.Min), 1)
+
+				local FillCorner = Instance.new("UICorner")
 				FillCorner.Parent = SliderFill
-				
-				SliderButton.Name = "SliderButton"
-				SliderButton.Parent = SliderBar
-				SliderButton.Size = UDim2.new(1, 0, 1, 0)
+				FillCorner.CornerRadius = UDim.new(0, 3)
+
+				SliderButton.Parent = SliderFrame
 				SliderButton.BackgroundTransparency = 1
+				SliderButton.Position = UDim2.new(0, 0, 0, 20)
+				SliderButton.Size = UDim2.new(1, 0, 0, 14)
 				SliderButton.Text = ""
-				SliderButton.ZIndex = 5
-				
-				local function UpdateSlider(input)
-					local sizeScale = math.clamp((input.Position.X - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X, 0, 1)
-					local value = math.floor(((max - min) * sizeScale) + min)
-					
-					currentValue = value
-					SliderValue.Text = tostring(value) .. suffix
-					
-					TweenService:Create(SliderFill, TweenInfo.new(0.1), {
-						Size = UDim2.new(sizeScale, 0, 1, 0)
-					}):Play()
-					
-					callback(value)
+				SliderButton.ZIndex = 10
+
+				local Touch = false
+
+				local function update(Input)
+					local SizeScale = math.clamp((((Input.Position.X) - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X), 0, 1)
+					local Valuea = math.floor(((Value.Max - Value.Min) * SizeScale) + Value.Min)
+					local Size = UDim2.fromScale(SizeScale, 1)
+					SliderValueLabel.Text = tostring(Valuea)..Value.ValueT
+					Tween:Create(SliderFill,TweenInfo.new(0.05),{Size = Size}):Play()
+					Value.Default = Valuea
+					ConfigSystem.CurrentConfig[configKey] = Valuea
+					callback(Valuea)
 				end
-				
-				SliderButton.InputBegan:Connect(function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-						dragging = true
-						UpdateSlider(input)
+
+				SliderButton.InputBegan:Connect(function(Input)
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+						Touch = true
+						update(Input)
 					end
 				end)
-				
-				SliderButton.InputEnded:Connect(function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-						dragging = false
+
+				SliderButton.InputEnded:Connect(function(Input)
+					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+						Touch = false
 					end
 				end)
-				
-				UserInputService.InputChanged:Connect(function(input)
-					if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-						UpdateSlider(input)
+
+				UIS.InputChanged:Connect(function(Input)
+					if Touch then
+						if (Input.UserInputType==Enum.UserInputType.MouseMovement or Input.UserInputType==Enum.UserInputType.Touch) then
+							update(Input)
+						end
 					end
 				end)
-				
-				UpdateSectionSize()
-				
+
+				Section_Box.update()
+
 				return Signal({
-					{name = 'SetText', callback = function(text)
-						SliderLabel.Text = tostring(text)
-					end},
-					{name = 'SetValue', callback = function(value)
-						currentValue = math.clamp(value, min, max)
-						SliderValue.Text = tostring(currentValue) .. suffix
-						local sizeScale = (currentValue - min) / (max - min)
-						TweenService:Create(SliderFill, TweenInfo.new(0.1), {
-							Size = UDim2.new(sizeScale, 0, 1, 0)
-						}):Play()
-						callback(currentValue)
-					end},
-					{name = 'GetValue', callback = function()
-						return currentValue
-					end}
+					{
+						name = 'Text',
+						callback = function(...)
+							SliderLabel.Text = tostring(...)
+						end,
+					},
+					{
+						name = 'Fire',
+						callback = callback,
+					},
+					{
+						name = 'Value',
+						callback = function(v)
+							Value.Default = v
+							local Size = UDim2.fromScale((v - Value.Min) / (Value.Max - Value.Min), 1)
+							SliderValueLabel.Text = tostring(v)..Value.ValueT
+							Tween:Create(SliderFill,TweenInfo.new(0.1),{Size = Size}):Play()
+							callback(v)
+						end,
+					},
+					{
+						name = 'Get',
+						callback = function()
+							return Value.Default
+						end,
+					},
 				})
 			end
-			
-			-- Dropdown Element
-			function Section:AddDropdown(options)
-				options = options or {}
-				local dropdownName = Default(options.Name, 'Dropdown')
-				local items = Default(options.Items, {})
-				local defaultValue = Default(options.Default, items[1])
-				local callback = Default(options.Callback, function() end)
-				
-				local currentValue = defaultValue
-				local isOpen = false
-				
+
+			function Section_Box:AddDropdown(DropdownName:string,DropdownInfo:{any},DropdownDefault:any,callback)
+				DropdownInfo = DropdownInfo or {}
+				DropdownDefault = DropdownDefault or DropdownInfo[1]
+
+				local configKey = "Dropdown_" .. DropdownName
+
+				-- Load from config
+				if ConfigSystem.CurrentConfig[configKey] ~= nil then
+					DropdownDefault = ConfigSystem.CurrentConfig[configKey]
+				end
+
 				local DropdownFrame = Instance.new("Frame")
 				local DropdownLabel = Instance.new("TextLabel")
-				local DropdownButton = Instance.new("TextButton")
-				local DropdownCorner = Instance.new("UICorner")
+				local DropdownBox = Instance.new("TextButton")
 				local DropdownValue = Instance.new("TextLabel")
 				local DropdownIcon = Instance.new("ImageLabel")
 				local DropdownList = Instance.new("Frame")
-				local ListCorner = Instance.new("UICorner")
-				local ListStroke = Instance.new("UIStroke")
-				local ListScroll = Instance.new("ScrollingFrame")
-				local ListLayout = Instance.new("UIListLayout")
-				
+				local DropdownScroll = Instance.new("ScrollingFrame")
+				local UIListLayout = Instance.new("UIListLayout")
+
+				local DOPWN = 'rbxassetid://7733717447'
+				local UP = 'rbxassetid://7072706796'
+
 				DropdownFrame.Name = "Dropdown"
-				DropdownFrame.Parent = ElementContainer
-				DropdownFrame.Size = UDim2.new(0.92, 0, 0, 62)
+				DropdownFrame.Parent = SectionContent
 				DropdownFrame.BackgroundTransparency = 1
+				DropdownFrame.Size = UDim2.new(0.95, 0, 0, 24)
 				DropdownFrame.ClipsDescendants = false
-				
+
 				DropdownLabel.Parent = DropdownFrame
-				DropdownLabel.Position = UDim2.new(0, 8, 0, 0)
-				DropdownLabel.Size = UDim2.new(1, -16, 0, 20)
 				DropdownLabel.BackgroundTransparency = 1
-				DropdownLabel.Font = Enum.Font.GothamMedium
-				DropdownLabel.Text = dropdownName
-				DropdownLabel.TextColor3 = MacUI.Theme.Text
-				DropdownLabel.TextSize = 14
+				DropdownLabel.Size = UDim2.new(1, 0, 0, 12)
+				DropdownLabel.Font = Enum.Font.Gotham
+				DropdownLabel.Text = DropdownName or "Dropdown"
+				DropdownLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+				DropdownLabel.TextSize = 12
 				DropdownLabel.TextXAlignment = Enum.TextXAlignment.Left
-				
-				DropdownButton.Name = "Button"
-				DropdownButton.Parent = DropdownFrame
-				DropdownButton.Position = UDim2.new(0, 8, 0, 26)
-				DropdownButton.Size = UDim2.new(1, -16, 0, 32)
-				DropdownButton.BackgroundColor3 = MacUI.Theme.Hover
-				DropdownButton.Text = ""
-				DropdownButton.AutoButtonColor = false
-				DropdownButton.ZIndex = 2
-				
-				DropdownCorner.CornerRadius = UDim.new(0, 8)
-				DropdownCorner.Parent = DropdownButton
-				
-				DropdownValue.Parent = DropdownButton
-				DropdownValue.AnchorPoint = Vector2.new(0, 0.5)
-				DropdownValue.Position = UDim2.new(0, 12, 0.5, 0)
-				DropdownValue.Size = UDim2.new(1, -40, 1, 0)
+
+				DropdownBox.Name = "Box"
+				DropdownBox.Parent = DropdownFrame
+				DropdownBox.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
+				DropdownBox.BorderSizePixel = 0
+				DropdownBox.Position = UDim2.new(0, 0, 0, 14)
+				DropdownBox.Size = UDim2.new(1, 0, 0, 22)
+				DropdownBox.Text = ""
+				DropdownBox.ZIndex = 10
+
+				local BoxCorner = Instance.new("UICorner")
+				BoxCorner.Parent = DropdownBox
+				BoxCorner.CornerRadius = UDim.new(0, 3)
+
+				local BoxStroke = Instance.new("UIStroke")
+				BoxStroke.Parent = DropdownBox
+				BoxStroke.Color = LinoriaBox.Theme.STROKE
+				BoxStroke.Thickness = 1
+
+				DropdownValue.Parent = DropdownBox
 				DropdownValue.BackgroundTransparency = 1
+				DropdownValue.Position = UDim2.new(0, 6, 0, 0)
+				DropdownValue.Size = UDim2.new(1, -26, 1, 0)
 				DropdownValue.Font = Enum.Font.Gotham
-				DropdownValue.Text = tostring(defaultValue)
-				DropdownValue.TextColor3 = MacUI.Theme.Text
-				DropdownValue.TextSize = 13
+				DropdownValue.Text = tostring(DropdownDefault or 'None')
+				DropdownValue.TextColor3 = Color3.fromRGB(200, 200, 200)
+				DropdownValue.TextSize = 11
 				DropdownValue.TextXAlignment = Enum.TextXAlignment.Left
-				DropdownValue.ZIndex = 3
-				
-				DropdownIcon.Parent = DropdownButton
+
+				DropdownIcon.Parent = DropdownBox
 				DropdownIcon.AnchorPoint = Vector2.new(1, 0.5)
-				DropdownIcon.Position = UDim2.new(1, -10, 0.5, 0)
-				DropdownIcon.Size = UDim2.new(0, 16, 0, 16)
 				DropdownIcon.BackgroundTransparency = 1
-				DropdownIcon.Image = "rbxassetid://7733717447"
-				DropdownIcon.ImageColor3 = MacUI.Theme.SubText
-				DropdownIcon.ZIndex = 3
-				
+				DropdownIcon.Position = UDim2.new(1, -6, 0.5, 0)
+				DropdownIcon.Size = UDim2.new(0, 14, 0, 14)
+				DropdownIcon.Image = DOPWN
+
 				DropdownList.Name = "List"
 				DropdownList.Parent = DropdownFrame
-				DropdownList.Position = UDim2.new(0, 8, 0, 62)
-				DropdownList.Size = UDim2.new(1, -16, 0, 0)
-				DropdownList.BackgroundColor3 = MacUI.Theme.Secondary
+				DropdownList.BackgroundColor3 = LinoriaBox.Theme.SECTION
 				DropdownList.BorderSizePixel = 0
+				DropdownList.Position = UDim2.new(0, 0, 0, 38)
+				DropdownList.Size = UDim2.new(1, 0, 0, 0)
 				DropdownList.Visible = false
+				DropdownList.ZIndex = 20
 				DropdownList.ClipsDescendants = true
-				DropdownList.ZIndex = 10
-				
-				ListCorner.CornerRadius = UDim.new(0, 8)
+
+				local ListCorner = Instance.new("UICorner")
 				ListCorner.Parent = DropdownList
-				
-				ListStroke.Color = MacUI.Theme.Stroke
-				ListStroke.Thickness = 1
-				ListStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+				ListCorner.CornerRadius = UDim.new(0, 3)
+
+				local ListStroke = Instance.new("UIStroke")
 				ListStroke.Parent = DropdownList
-				
-				ListScroll.Parent = DropdownList
-				ListScroll.Size = UDim2.new(1, 0, 1, 0)
-				ListScroll.BackgroundTransparency = 1
-				ListScroll.BorderSizePixel = 0
-				ListScroll.ScrollBarThickness = 4
-				ListScroll.ScrollBarImageColor3 = MacUI.Theme.Stroke
-				ListScroll.ZIndex = 11
-				
-				ListLayout.Parent = ListScroll
-				ListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-				ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-				ListLayout.Padding = UDim.new(0, 4)
-				
-				local function CreateItem(itemName)
-					local ItemButton = Instance.new("TextButton")
-					local ItemCorner = Instance.new("UICorner")
-					
-					ItemButton.Name = itemName
-					ItemButton.Parent = ListScroll
-					ItemButton.Size = UDim2.new(0.92, 0, 0, 28)
-					ItemButton.BackgroundColor3 = MacUI.Theme.Hover
-					ItemButton.BackgroundTransparency = itemName == currentValue and 0 or 1
-					ItemButton.Text = itemName
-					ItemButton.Font = Enum.Font.Gotham
-					ItemButton.TextColor3 = itemName == currentValue and MacUI.Theme.Accent or MacUI.Theme.Text
-					ItemButton.TextSize = 13
-					ItemButton.AutoButtonColor = false
-					ItemButton.ZIndex = 12
-					
-					ItemCorner.CornerRadius = UDim.new(0, 6)
-					ItemCorner.Parent = ItemButton
-					
-					ItemButton.MouseEnter:Connect(function()
-						if itemName ~= currentValue then
-							TweenService:Create(ItemButton, TweenInfo.new(0.15), {
-								BackgroundTransparency = 0.5
-							}):Play()
+				ListStroke.Color = LinoriaBox.Theme.STROKE
+				ListStroke.Thickness = 1
+
+				DropdownScroll.Parent = DropdownList
+				DropdownScroll.Active = true
+				DropdownScroll.BackgroundTransparency = 1
+				DropdownScroll.Position = UDim2.new(0, 4, 0, 4)
+				DropdownScroll.Size = UDim2.new(1, -8, 1, -8)
+				DropdownScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+				DropdownScroll.ScrollBarThickness = 4
+				DropdownScroll.ScrollBarImageColor3 = LinoriaBox.Theme.MAIN
+
+				UIListLayout.Parent = DropdownScroll
+				UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+				UIListLayout.Padding = UDim.new(0, 2)
+
+				scrolling_connect(DropdownScroll)
+
+				local function getItemHeight()
+					local height = 8
+					for i,v in ipairs(DropdownScroll:GetChildren()) do
+						if v:IsA('TextButton') then
+							height = height + v.AbsoluteSize.Y + UIListLayout.Padding.Offset
 						end
-					end)
-					
-					ItemButton.MouseLeave:Connect(function()
-						if itemName ~= currentValue then
-							TweenService:Create(ItemButton, TweenInfo.new(0.15), {
-								BackgroundTransparency = 1
-							}):Play()
-						end
-					end)
-					
-					ItemButton.MouseButton1Click:Connect(function()
-						for _, child in ipairs(ListScroll:GetChildren()) do
-							if child:IsA("TextButton") then
-								TweenService:Create(child, TweenInfo.new(0.2), {
-									BackgroundTransparency = 1,
-									TextColor3 = MacUI.Theme.Text
-								}):Play()
-							end
-						end
-						
-						TweenService:Create(ItemButton, TweenInfo.new(0.2), {
-							BackgroundTransparency = 0,
-							TextColor3 = MacUI.Theme.Accent
-						}):Play()
-						
-						currentValue = itemName
-						DropdownValue.Text = itemName
-						callback(itemName)
-						
-						-- Close dropdown
-						isOpen = false
-						TweenService:Create(DropdownList, TweenInfo.new(0.2), {
-							Size = UDim2.new(1, -16, 0, 0)
-						}):Play()
-						TweenService:Create(DropdownIcon, TweenInfo.new(0.2), {
-							Rotation = 0
-						}):Play()
-						task.wait(0.2)
-						DropdownList.Visible = false
-					end)
-				end
-				
-				for _, item in ipairs(items) do
-					CreateItem(tostring(item))
-				end
-				
-				ScrollingConnect(ListScroll)
-				
-				DropdownButton.MouseButton1Click:Connect(function()
-					isOpen = not isOpen
-					
-					if isOpen then
-						DropdownList.Visible = true
-						local listHeight = math.min(#items * 32 + 8, 120)
-						TweenService:Create(DropdownList, TweenInfo.new(0.2), {
-							Size = UDim2.new(1, -16, 0, listHeight)
-						}):Play()
-						TweenService:Create(DropdownIcon, TweenInfo.new(0.2), {
-							Rotation = 180
-						}):Play()
-					else
-						TweenService:Create(DropdownList, TweenInfo.new(0.2), {
-							Size = UDim2.new(1, -16, 0, 0)
-						}):Play()
-						TweenService:Create(DropdownIcon, TweenInfo.new(0.2), {
-							Rotation = 0
-						}):Play()
-						task.wait(0.2)
-						DropdownList.Visible = false
 					end
-				end)
-				
-				UpdateSectionSize()
-				
-				return Signal({
-					{name = 'SetText', callback = function(text)
-						DropdownLabel.Text = tostring(text)
-					end},
-					{name = 'SetValue', callback = function(value)
-						currentValue = tostring(value)
-						DropdownValue.Text = currentValue
-						callback(currentValue)
-					end},
-					{name = 'GetValue', callback = function()
-						return currentValue
-					end},
-					{name = 'Refresh', callback = function(newItems)
-						for _, child in ipairs(ListScroll:GetChildren()) do
-							if child:IsA("TextButton") then
-								child:Destroy()
+					return math.min(height, 120)
+				end
+
+				local function Toggle(open)
+					if open then
+						DropdownIcon.Image = UP
+						DropdownList.Visible = true
+						Tween:Create(DropdownList,TweenInfo.new(0.15),{
+							Size = UDim2.new(1, 0, 0, getItemHeight())
+						}):Play()
+						Tween:Create(DropdownBox,TweenInfo.new(0.15),{BackgroundColor3 = LinoriaBox.Theme.TOUCH}):Play()
+					else
+						DropdownIcon.Image = DOPWN
+						Tween:Create(DropdownList,TweenInfo.new(0.15),{
+							Size = UDim2.new(1, 0, 0, 0)
+						}):Play()
+						Tween:Create(DropdownBox,TweenInfo.new(0.15),{BackgroundColor3 = LinoriaBox.Theme.BACKGROUND}):Play()
+						delay(0.15, function()
+							DropdownList.Visible = false
+						end)
+					end
+				end
+
+				local function Render()
+					for i,v in ipairs(DropdownScroll:GetChildren()) do
+						if v:IsA('TextButton') then
+							v:Destroy()
+						end
+					end
+
+					for i,v in pairs(DropdownInfo) do
+						local OptionButton = Instance.new("TextButton")
+						local OptionCheck = Instance.new("Frame")
+
+						OptionButton.Name = "Option"
+						OptionButton.Parent = DropdownScroll
+						OptionButton.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
+						OptionButton.BackgroundTransparency = 1
+						OptionButton.BorderSizePixel = 0
+						OptionButton.Size = UDim2.new(1, 0, 0, 20)
+						OptionButton.Font = Enum.Font.Gotham
+						OptionButton.Text = "  " .. tostring(v)
+						OptionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+						OptionButton.TextSize = 11
+						OptionButton.TextXAlignment = Enum.TextXAlignment.Left
+						OptionButton.ZIndex = 25
+
+						OptionCheck.Name = "Check"
+						OptionCheck.Parent = OptionButton
+						OptionCheck.AnchorPoint = Vector2.new(1, 0.5)
+						OptionCheck.BackgroundColor3 = LinoriaBox.Theme.MAIN
+						OptionCheck.BorderSizePixel = 0
+						OptionCheck.Position = UDim2.new(1, 0, 0.5, 0)
+						OptionCheck.Size = UDim2.new(0, v == DropdownDefault and 3 or 0, 0, 16)
+
+						local CheckCorner = Instance.new("UICorner")
+						CheckCorner.Parent = OptionCheck
+						CheckCorner.CornerRadius = UDim.new(0, 2)
+
+						OptionButton.MouseButton1Click:Connect(function()
+							for _,btn in pairs(DropdownScroll:GetChildren()) do
+								if btn:IsA('TextButton') and btn:FindFirstChild('Check') then
+									Tween:Create(btn.Check,TweenInfo.new(0.1),{Size = UDim2.new(0, 0, 0, 16)}):Play()
+								end
 							end
-						end
-						items = newItems
-						for _, item in ipairs(items) do
-							CreateItem(tostring(item))
-						end
-					end}
-				})
-			end
-			
-			-- Label Element
-			function Section:AddLabel(options)
-				options = options or {}
-				local labelText = Default(options.Text, 'Label')
-				
-				local LabelFrame = Instance.new("Frame")
-				local Label = Instance.new("TextLabel")
-				
-				LabelFrame.Name = "Label"
-				LabelFrame.Parent = ElementContainer
-				LabelFrame.Size = UDim2.new(0.92, 0, 0, 24)
-				LabelFrame.BackgroundTransparency = 1
-				
-				Label.Parent = LabelFrame
-				Label.Position = UDim2.new(0, 8, 0, 0)
-				Label.Size = UDim2.new(1, -16, 1, 0)
-				Label.BackgroundTransparency = 1
-				Label.Font = Enum.Font.Gotham
-				Label.Text = labelText
-				Label.TextColor3 = MacUI.Theme.SubText
-				Label.TextSize = 13
-				Label.TextXAlignment = Enum.TextXAlignment.Left
-				Label.TextWrapped = true
-				
-				UpdateSectionSize()
-				
+
+							Tween:Create(OptionCheck,TweenInfo.new(0.1),{Size = UDim2.new(0, 3, 0, 16)}):Play()
+							DropdownDefault = v
+							DropdownValue.Text = tostring(v)
+							ConfigSystem.CurrentConfig[configKey] = v
+							callback(v)
+							Toggle(false)
+						end)
+
+						OptionButton.MouseEnter:Connect(function()
+							Tween:Create(OptionButton,TweenInfo.new(0.1),{BackgroundTransparency = 0.8, TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+						end)
+
+						OptionButton.MouseLeave:Connect(function()
+							Tween:Create(OptionButton,TweenInfo.new(0.1),{BackgroundTransparency = 1, TextColor3 = Color3.fromRGB(200, 200, 200)}):Play()
+						end)
+					end
+				end
+
+				local isOpen = false
+
+				Render()
+
+				DropdownBox.MouseButton1Click:Connect(function()
+					isOpen = not isOpen
+					Toggle(isOpen)
+				end)
+
+				Section_Box.update()
+
 				return Signal({
-					{name = 'SetText', callback = function(text)
-						Label.Text = tostring(text)
-					end}
+					{
+						name = 'Text',
+						callback = function(...)
+							DropdownLabel.Text = tostring(...)
+						end,
+					},
+					{
+						name = 'Fire',
+						callback = callback,
+					},
+					{
+						name = 'Value',
+						callback = function(v)
+							DropdownDefault = v
+							DropdownValue.Text = tostring(v)
+							callback(v)
+						end,
+					},
+					{
+						name = 'Get',
+						callback = function()
+							return DropdownDefault
+						end,
+					},
+					{
+						name = 'Refresh',
+						callback = function(value)
+							DropdownInfo = value
+							Render()
+						end,
+					},
 				})
 			end
-			
-			UpdateSectionSize()
-			return Section
+
+			Section_Box.update()
+
+			return Section_Box
 		end
-		
-		return Tab
+
+		return TabBox
 	end
-	
-	-- Window Controls
-	local isVisible = true
-	local dragToggle = false
+
+	function BoxWindow:NewSize(v)
+		BoxWindow.Size = v
+		MainFrame.Size = v
+	end
+
+	function BoxWindow:SetConfigName(name)
+		BoxWindow.ConfigName = name
+	end
+
+	function BoxWindow:SaveConfig(name)
+		return SaveConfig(name or BoxWindow.ConfigName)
+	end
+
+	function BoxWindow:LoadConfig(name)
+		local data = LoadConfig(name or BoxWindow.ConfigName)
+		if data then
+			-- Refresh all elements with loaded data
+			print("Config loaded successfully")
+		end
+		return data
+	end
+
+	-- UI Toggle System
+	local Status = true
+	local buton = cretate_button(Frame)
+	buton.Visible = false
+
+	UIS.InputBegan:Connect(function(input)
+		if input.KeyCode == BoxWindow.Toggle then
+			Status = not Status
+			MainFrame.Visible = Status
+			if not Status then
+				SaveConfig(BoxWindow.ConfigName)
+			end
+		end
+	end)
+
+	CloseButton.MouseButton1Click:Connect(function()
+		Status = not Status
+		MainFrame.Visible = Status
+		if not Status then
+			SaveConfig(BoxWindow.ConfigName)
+		end
+	end)
+
+	-- Dragging System
+	local dragToggle = nil
+	local dragSpeed = 0.13
 	local dragStart = nil
 	local startPos = nil
-	
-	local function UpdateInput(input)
+
+	local function updateInput(input)
 		local delta = input.Position - dragStart
-		local position = UDim2.new(
-			startPos.X.Scale,
-			startPos.X.Offset + delta.X,
-			startPos.Y.Scale,
-			startPos.Y.Offset + delta.Y
-		)
-		TweenService:Create(MainFrame, TweenInfo.new(0.1), {Position = position}):Play()
+		local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+			startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		Tween:Create(MainFrame, TweenInfo.new(dragSpeed), {Position = position}):Play()
 	end
-	
+
 	TopBar.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then 
 			dragToggle = true
 			dragStart = input.Position
 			startPos = MainFrame.Position
-			
 			input.Changed:Connect(function()
 				if input.UserInputState == Enum.UserInputState.End then
 					dragToggle = false
@@ -1200,87 +1455,31 @@ function MacUI:CreateWindow(options)
 			end)
 		end
 	end)
-	
-	UserInputService.InputChanged:Connect(function(input)
-		if dragToggle and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			UpdateInput(input)
+
+	UIS.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			if dragToggle then
+				updateInput(input)
+			end
 		end
 	end)
-	
-	function Window:Toggle(visible)
-		if visible == nil then
-			isVisible = not isVisible
-		else
-			isVisible = visible
-		end
-		
-		if isVisible then
-			ScreenGui.Enabled = true
-		else
-			ScreenGui.Enabled = false
-		end
-	end
-	
-	CloseButton.MouseEnter:Connect(function()
-		TweenService:Create(CloseButton, TweenInfo.new(0.15), {
-			BackgroundTransparency = 0
-		}):Play()
-	end)
-	
-	CloseButton.MouseLeave:Connect(function()
-		TweenService:Create(CloseButton, TweenInfo.new(0.15), {
-			BackgroundTransparency = 1
-		}):Play()
-	end)
-	
-	CloseButton.MouseButton1Click:Connect(function()
-		Window:Toggle(false)
-	end)
-	
-	UserInputService.InputBegan:Connect(function(input)
-		if input.KeyCode == Window.ToggleKey then
-			Window:Toggle()
-		end
-	end)
-	
-	-- Config Functions
-	function Window:SaveConfig(configName)
-		return MacUI:SaveConfig(configName, self.ConfigData)
-	end
-	
-	function Window:LoadConfig(configName)
-		local data = MacUI:LoadConfig(configName)
-		if data then
-			self.ConfigData = data
-			return true
-		end
-		return false
-	end
-	
-	function Window:GetConfigData()
-		return self.ConfigData
-	end
-	
-	function Window:SetConfigData(data)
-		self.ConfigData = data
-	end
-	
-	return Window
+
+	-- Load config on startup
+	LoadConfig(BoxWindow.ConfigName)
+
+	return BoxWindow
 end
 
--- Auto-update loop
-function MacUI:StartAutoUpdate()
+function LinoriaBox:LoopUpdate()
 	task.spawn(function()
-		while true do
-			task.wait()
+		while true do task.wait()
 			pcall(function()
-				for _, updateFunc in ipairs(self.AutoUpdate) do
-					task.wait()
-					pcall(updateFunc)
+				for i,v in ipairs(LinoriaBox.AutoUpdate) do task.wait()
+					pcall(v)
 				end
 			end)
 		end
 	end)
 end
 
-return MacUI
+return LinoriaBox
