@@ -1,5 +1,5 @@
--- [Modified version - Box-like Linoria Style with Autosave]
--- [Based on Hyperion UI Library]
+-- [Modified by Hyperion : Enhanced with Config System & Box-Style UI]
+-- [[https://hyperion.vip/]]
 
 if not game:IsLoaded() then
 	game.Loaded:Wait()
@@ -16,43 +16,93 @@ local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end)
 
 -- Config System
 local ConfigSystem = {
-	CurrentConfig = {},
-	ConfigFolder = "LinoriaBox_Configs",
+	FolderName = "HyperLibConfigs",
+	CurrentConfig = "default",
+	ConfigData = {},
 	AutoSaveEnabled = true,
 	AutoSaveInterval = 30
 }
 
-local function SaveConfig(name)
-	name = name or "default"
+function ConfigSystem:Initialize()
+	if not isfolder(self.FolderName) then
+		makefolder(self.FolderName)
+	end
+end
+
+function ConfigSystem:SaveConfig(configName)
+	configName = configName or self.CurrentConfig
 	local success, err = pcall(function()
-		if not isfolder(ConfigSystem.ConfigFolder) then
-			makefolder(ConfigSystem.ConfigFolder)
-		end
-		local configPath = ConfigSystem.ConfigFolder .. "/" .. name .. ".json"
-		writefile(configPath, HttpService:JSONEncode(ConfigSystem.CurrentConfig))
+		local data = HttpService:JSONEncode(self.ConfigData)
+		writefile(self.FolderName .. "/" .. configName .. ".json", data)
 	end)
 	return success
 end
 
-local function LoadConfig(name)
-	name = name or "default"
-	local success, data = pcall(function()
-		local configPath = ConfigSystem.ConfigFolder .. "/" .. name .. ".json"
-		if isfile(configPath) then
-			return HttpService:JSONDecode(readfile(configPath))
+function ConfigSystem:LoadConfig(configName)
+	configName = configName or self.CurrentConfig
+	local success, result = pcall(function()
+		if isfile(self.FolderName .. "/" .. configName .. ".json") then
+			local data = readfile(self.FolderName .. "/" .. configName .. ".json")
+			return HttpService:JSONDecode(data)
 		end
 		return nil
 	end)
-	if success and data then
-		ConfigSystem.CurrentConfig = data
-		return data
+	
+	if success and result then
+		self.ConfigData = result
+		return true
 	end
-	return nil
+	return false
 end
+
+function ConfigSystem:DeleteConfig(configName)
+	if isfile(self.FolderName .. "/" .. configName .. ".json") then
+		delfile(self.FolderName .. "/" .. configName .. ".json")
+		return true
+	end
+	return false
+end
+
+function ConfigSystem:GetConfigs()
+	local configs = {}
+	if isfolder(self.FolderName) then
+		for _, file in ipairs(listfiles(self.FolderName)) do
+			local name = file:match("([^/]+)%.json$")
+			if name then
+				table.insert(configs, name)
+			end
+		end
+	end
+	return configs
+end
+
+function ConfigSystem:SetValue(key, value)
+	self.ConfigData[key] = value
+	if self.AutoSaveEnabled then
+		self:SaveConfig()
+	end
+end
+
+function ConfigSystem:GetValue(key, default)
+	return self.ConfigData[key] or default
+end
+
+function ConfigSystem:StartAutoSave()
+	task.spawn(function()
+		while self.AutoSaveEnabled do
+			task.wait(self.AutoSaveInterval)
+			if self.AutoSaveEnabled then
+				self:SaveConfig()
+			end
+		end
+	end)
+end
+
+ConfigSystem:Initialize()
 
 local function cretate_button(asd)
 	local button = Instance.new('TextButton')
-	button.Size = UDim2.new(1,0,1,0)
+	button.Size = UDim2.new(1, 0, 1, 0)
 	button.BackgroundTransparency = 1
 	button.TextTransparency = 1
 	button.Text = ""
@@ -61,49 +111,83 @@ local function cretate_button(asd)
 	return button
 end
 
-local function ToDefault(val,def)
+local function ToDefault(val, def)
 	return val or def
 end
 
-local LinoriaBox = {
+local NoHyper = {
 	Theme = {
-		BACKGROUND = Color3.fromRGB(20, 20, 25),
-		SECTION = Color3.fromRGB(25, 25, 30),
-		MAIN = Color3.fromRGB(160, 120, 255),
-		STROKE = Color3.fromRGB(60, 60, 70),
-		TOUCH = Color3.fromRGB(140, 100, 235),
-		SYSTEM = Color3.fromRGB(180, 140, 255),
-		BOX_ACCENT = Color3.fromRGB(45, 45, 55)
+		BACKGROUND = Color3.fromRGB(24, 24, 28),
+		SECTION = Color3.fromRGB(30, 30, 35),
+		MAIN = Color3.fromRGB(99, 102, 241),
+		STROKE = Color3.fromRGB(45, 45, 52),
+		TOUCH = Color3.fromRGB(67, 70, 180),
+		SYSTEM = Color3.fromRGB(129, 132, 255),
+		ACCENT = Color3.fromRGB(99, 102, 241),
+		TEXT = Color3.fromRGB(220, 220, 230),
+		SUBTEXT = Color3.fromRGB(160, 160, 170)
 	},
 	AutoUpdate = {},
-	SectionWidth = 0.98
+	SectionWidth = 0.95,
+	Config = ConfigSystem
 }
 
-function LinoriaBox.set_theme(name:string)
-	if name:lower() == 'linoria' then
-		LinoriaBox.Theme.BACKGROUND = Color3.fromRGB(20, 20, 25)
-		LinoriaBox.Theme.SECTION = Color3.fromRGB(25, 25, 30)
-		LinoriaBox.Theme.MAIN = Color3.fromRGB(160, 120, 255)
-		LinoriaBox.Theme.STROKE = Color3.fromRGB(60, 60, 70)
-		LinoriaBox.Theme.TOUCH = Color3.fromRGB(140, 100, 235)
-		LinoriaBox.Theme.SYSTEM = Color3.fromRGB(180, 140, 255)
-		LinoriaBox.Theme.BOX_ACCENT = Color3.fromRGB(45, 45, 55)
-	elseif name:lower() == 'dark' then
-		LinoriaBox.Theme.BACKGROUND = Color3.fromRGB(15, 15, 18)
-		LinoriaBox.Theme.SECTION = Color3.fromRGB(20, 20, 25)
-		LinoriaBox.Theme.MAIN = Color3.fromRGB(100, 150, 255)
-		LinoriaBox.Theme.STROKE = Color3.fromRGB(50, 50, 60)
-		LinoriaBox.Theme.TOUCH = Color3.fromRGB(80, 130, 235)
-		LinoriaBox.Theme.SYSTEM = Color3.fromRGB(120, 170, 255)
-		LinoriaBox.Theme.BOX_ACCENT = Color3.fromRGB(35, 35, 45)
+function NoHyper.set_theme(name:string)
+	if name:lower() == 'fluent' or name:lower() == 'default' then
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(24, 24, 28)
+		NoHyper.Theme.SECTION = Color3.fromRGB(30, 30, 35)
+		NoHyper.Theme.MAIN = Color3.fromRGB(99, 102, 241)
+		NoHyper.Theme.STROKE = Color3.fromRGB(45, 45, 52)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(67, 70, 180)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(129, 132, 255)
+		NoHyper.Theme.ACCENT = Color3.fromRGB(99, 102, 241)
+		NoHyper.Theme.TEXT = Color3.fromRGB(220, 220, 230)
+		NoHyper.Theme.SUBTEXT = Color3.fromRGB(160, 160, 170)
+	elseif name:lower() == 'nohyper' then
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(34, 37, 42)
+		NoHyper.Theme.SECTION = Color3.fromRGB(39, 42, 48)
+		NoHyper.Theme.MAIN = Color3.fromRGB(189, 48, 37)
+		NoHyper.Theme.STROKE = Color3.fromRGB(27, 30, 34)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(103, 26, 20)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(225, 57, 44)
+		NoHyper.Theme.TEXT = Color3.fromRGB(220, 220, 230)
+		NoHyper.Theme.SUBTEXT = Color3.fromRGB(160, 160, 170)
+	elseif name:lower() == 'bedol' then
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(34, 37, 42)
+		NoHyper.Theme.SECTION = Color3.fromRGB(39, 42, 48)
+		NoHyper.Theme.MAIN = Color3.fromRGB(189, 0, 0)
+		NoHyper.Theme.STROKE = Color3.fromRGB(27, 30, 34)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(103, 0, 0)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(225, 0, 0)
+		NoHyper.Theme.TEXT = Color3.fromRGB(220, 220, 230)
+		NoHyper.Theme.SUBTEXT = Color3.fromRGB(160, 160, 170)
+	elseif name:lower() == 'neverlose' then
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(3, 15, 32)
+		NoHyper.Theme.SECTION = Color3.fromRGB(4, 19, 43)
+		NoHyper.Theme.MAIN = Color3.fromRGB(69, 185, 217)
+		NoHyper.Theme.STROKE = Color3.fromRGB(12, 55, 111)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(69, 181, 248)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(74, 202, 234)
+		NoHyper.Theme.TEXT = Color3.fromRGB(220, 220, 230)
+		NoHyper.Theme.SUBTEXT = Color3.fromRGB(160, 160, 170)
 	elseif name:lower() == 'green' then
-		LinoriaBox.Theme.BACKGROUND = Color3.fromRGB(18, 22, 20)
-		LinoriaBox.Theme.SECTION = Color3.fromRGB(23, 28, 25)
-		LinoriaBox.Theme.MAIN = Color3.fromRGB(100, 220, 150)
-		LinoriaBox.Theme.STROKE = Color3.fromRGB(50, 65, 55)
-		LinoriaBox.Theme.TOUCH = Color3.fromRGB(80, 200, 130)
-		LinoriaBox.Theme.SYSTEM = Color3.fromRGB(120, 240, 170)
-		LinoriaBox.Theme.BOX_ACCENT = Color3.fromRGB(35, 45, 40)
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(3, 24, 19)
+		NoHyper.Theme.SECTION = Color3.fromRGB(4, 29, 23)
+		NoHyper.Theme.MAIN = Color3.fromRGB(75, 246, 138)
+		NoHyper.Theme.STROKE = Color3.fromRGB(15, 35, 31)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(57, 186, 104)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(75, 246, 138)
+		NoHyper.Theme.TEXT = Color3.fromRGB(220, 220, 230)
+		NoHyper.Theme.SUBTEXT = Color3.fromRGB(160, 160, 170)
+	elseif name:lower() == 'tokyo' then
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(26, 27, 38)
+		NoHyper.Theme.SECTION = Color3.fromRGB(22, 22, 32)
+		NoHyper.Theme.MAIN = Color3.fromRGB(181, 186, 209)
+		NoHyper.Theme.STROKE = Color3.fromRGB(68, 72, 89)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(36, 36, 51)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(189, 194, 218)
+		NoHyper.Theme.TEXT = Color3.fromRGB(220, 220, 230)
+		NoHyper.Theme.SUBTEXT = Color3.fromRGB(160, 160, 170)
 	end
 end
 
@@ -120,16 +204,16 @@ end
 local function scrolling_connect(scrollframe:ScrollingFrame)
 	task.spawn(function()
 		local addres = 45
-		local UIListLayout:UIListLayout = scrollframe:WaitForChild('UIListLayout',9999999)
-		scrollframe.CanvasSize = UDim2.new(0,0,0,UIListLayout.AbsoluteContentSize.Y+addres)
+		local UIListLayout:UIListLayout = scrollframe:WaitForChild('UIListLayout', 9999999)
+		scrollframe.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + addres)
 
 		UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
-			scrollframe.CanvasSize = UDim2.new(0,0,0,UIListLayout.AbsoluteContentSize.Y+addres)
+			scrollframe.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y + addres)
 		end)
 	end)
 end
 
-local function SetImage(name:string,image:ImageLabel)
+local function SetImage(name:string, image:ImageLabel)
 	name = name or "ADS"
 	name = name:lower()
 
@@ -137,57 +221,57 @@ local function SetImage(name:string,image:ImageLabel)
 
 	if name == "ads" then
 		image.Image = NigImage
-		image.ImageRectOffset = Vector2.new(205,565)
-		image.ImageRectSize = Vector2.new(35,35)
+		image.ImageRectOffset = Vector2.new(205, 565)
+		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
 
 	if name == "list" then
 		image.Image = NigImage
-		image.ImageRectOffset = Vector2.new(485,205)
-		image.ImageRectSize = Vector2.new(35,35)
+		image.ImageRectOffset = Vector2.new(485, 205)
+		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
 
 	if name == "folder" then
 		image.Image = NigImage
-		image.ImageRectOffset = Vector2.new(805,45)
-		image.ImageRectSize = Vector2.new(35,35)
+		image.ImageRectOffset = Vector2.new(805, 45)
+		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
 
 	if name == "earth" then
 		image.Image = NigImage
-		image.ImageRectOffset = Vector2.new(604,324)
-		image.ImageRectSize = Vector2.new(35,35)
+		image.ImageRectOffset = Vector2.new(604, 324)
+		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
 
 	if name == "locked" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(524, 644)
-		image.ImageRectSize = Vector2.new(35,35)
+		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
 
 	if name == "home" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(964, 205)
-		image.ImageRectSize = Vector2.new(35,35)
+		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
 
 	if name == "positon" or name == 'gps' then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(325, 565)
-		image.ImageRectSize = Vector2.new(35,35)
+		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
 
 	if name == "notify" or name == 'notification' then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(325, 565)
-		image.ImageRectSize = Vector2.new(35,35)
+		image.ImageRectSize = Vector2.new(35, 35)
 		return
 	end
 
@@ -205,8 +289,8 @@ local function SetImage(name:string,image:ImageLabel)
 		return
 	end
 
-	image.ImageRectOffset = Vector2.new(0,0)
-	image.ImageRectSize = Vector2.new(0,0)
+	image.ImageRectOffset = Vector2.new(0, 0)
+	image.ImageRectSize = Vector2.new(0, 0)
 
 	if name == "settings" then
 		image.Image = "rbxassetid://7734053495"
@@ -257,183 +341,253 @@ local function SetImage(name:string,image:ImageLabel)
 	end
 end
 
-function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
-	local BoxWindow = {
+function NoHyper.new(WindowName, WindowLogo, WindowDescription)
+	local HyperWindow = {
 		Tabs = {},
-		Size = UDim2.new(0, 600, 0, 400),
+		Size = UDim2.new(0.230000004, 380, 0.25, 280),
 		Toggle = Enum.KeyCode.LeftControl,
-		ConfigName = "default"
+		ConfigCallbacks = {}
 	}
 
-	WindowName = ToDefault(WindowName,'LinoriaBox UI')
-	WindowLogo = ToDefault(WindowLogo,'http://www.roblox.com/asset/?id=16530565354')
-	WindowDescription = ToDefault(WindowDescription,'Box-style UI Library')
+	WindowName = ToDefault(WindowName, 'Hello, NoHyper')
+	WindowLogo = ToDefault(WindowLogo, 'http://www.roblox.com/asset/?id=16530565354')
+	WindowDescription = ToDefault(WindowDescription, 'Welcome back!')
 
-	local LinoriaUI = Instance.new("ScreenGui")
+	-- Initialize Config for this window
+	NoHyper.Config:LoadConfig()
+	NoHyper.Config:StartAutoSave()
+
+	local NoHyperUI = Instance.new("ScreenGui")
 	local MainFrame = Instance.new("Frame")
 	local Frame = Instance.new("Frame")
 	local UICorner = Instance.new("UICorner")
-	local UIStroke = Instance.new("UIStroke")
-	
-	local TopBar = Instance.new("Frame")
-	local TopBarLine = Instance.new("Frame")
-	local LogoHub = Instance.new("ImageLabel")
-	local MainText = Instance.new("TextLabel")
-	local DescriptionText = Instance.new("TextLabel")
-	local CloseButton = Instance.new("ImageButton")
-	
+	local Contact = Instance.new("Frame")
+	local UIListLayout = Instance.new("UIListLayout")
+	local YoutubeButton = Instance.new("ImageButton")
+	local WebsiteButton = Instance.new("ImageButton")
+	local DiscordButton = Instance.new("ImageButton")
 	local TabButtonList = Instance.new("Frame")
 	local ScrollingFrame = Instance.new("ScrollingFrame")
 	local UIListLayout_2 = Instance.new("UIListLayout")
 	local TabSystem = Instance.new("Frame")
-	
+	local Top = Instance.new("Frame")
+	local LogoHub = Instance.new("ImageLabel")
+	local MainText = Instance.new("TextLabel")
+	local DescriptionText = Instance.new("TextLabel")
 	local DropShadow = Instance.new("ImageLabel")
+	local CloseButton = Instance.new("ImageButton")
+	local TickUI = Instance.new("Frame")
+	local View = Instance.new("Frame")
+	local UICorner_2 = Instance.new("UICorner")
+	local UICorner_3 = Instance.new("UICorner")
 
-	LinoriaUI:GetPropertyChangedSignal('Enabled'):Connect(function()
-		if not LinoriaUI.Enabled then
-			LinoriaUI.Enabled = true
+	NoHyperUI:GetPropertyChangedSignal('Enabled'):Connect(function()
+		if not NoHyperUI.Enabled then
+			NoHyperUI.Enabled = true
 		end
 	end)
 
-	BoxWindow.ScreenSource = LinoriaUI
+	HyperWindow.ScreenSource = NoHyperUI
 
-	LinoriaUI.Name = tostring("ui.protect.")..tostring(math.random(1,100))..tostring(Random.new():NextNumber(0.1,0.9))
-	LinoriaUI.Parent = Core
-	LinoriaUI.ResetOnSpawn = false
-	LinoriaUI.IgnoreGuiInset = true
-	LinoriaUI.ZIndexBehavior = Enum.ZIndexBehavior.Global
-	ProtectGui(LinoriaUI)
+	NoHyperUI.Name = tostring("ui.protect.") .. tostring(math.random(1, 100)) .. tostring(Random.new():NextNumber(0.1, 0.9)) .. tostring(Random.new():NextNumber(0.1, 0.9)) .. tostring(Random.new():NextNumber(0.1, 0.9))
+	NoHyperUI.Parent = Core
+	NoHyperUI.ResetOnSpawn = false
+	NoHyperUI.IgnoreGuiInset = true
+	NoHyperUI.ZIndexBehavior = Enum.ZIndexBehavior.Global
+	ProtectGui(NoHyperUI)
 
 	MainFrame.Name = "MainFrame"
-	MainFrame.Parent = LinoriaUI
+	MainFrame.Parent = NoHyperUI
 	MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-	MainFrame.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
+	MainFrame.BackgroundColor3 = NoHyper.Theme.BACKGROUND
 	MainFrame.BackgroundTransparency = 1.000
 	MainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	MainFrame.BorderSizePixel = 0
 	MainFrame.ClipsDescendants = true
 	MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-	MainFrame.Size = BoxWindow.Size
+	MainFrame.Size = HyperWindow.Size
 	MainFrame.Active = true
 
 	Frame.Parent = MainFrame
-	Frame.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
+	Frame.BackgroundColor3 = NoHyper.Theme.BACKGROUND
 	Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	Frame.BorderSizePixel = 0
 	Frame.Size = UDim2.new(1, 0, 1, 0)
-	Frame.Position = UDim2.fromScale(-1,0)
+	Frame.Position = UDim2.fromScale(-1, 0)
 	Frame.ClipsDescendants = true
 
 	UICorner.Parent = Frame
-	UICorner.CornerRadius = UDim.new(0, 6)
+	UICorner.CornerRadius = UDim.new(0, 12)
 
-	UIStroke.Parent = Frame
-	UIStroke.Color = LinoriaBox.Theme.STROKE
-	UIStroke.Thickness = 2
-	UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	Contact.Name = "Contact"
+	Contact.Parent = Frame
+	Contact.AnchorPoint = Vector2.new(0.5, 0)
+	Contact.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	Contact.BackgroundTransparency = 1.000
+	Contact.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	Contact.BorderSizePixel = 0
+	Contact.Position = UDim2.new(0.125, 0, 1.25, 0)
+	Contact.Size = UDim2.new(0.230000004, 0, 0.0484971367, 0)
 
-	-- Top Bar (Box Style)
-	TopBar.Name = "TopBar"
-	TopBar.Parent = Frame
-	TopBar.BackgroundColor3 = LinoriaBox.Theme.BOX_ACCENT
-	TopBar.BorderSizePixel = 0
-	TopBar.Size = UDim2.new(1, 0, 0, 35)
-	TopBar.Position = UDim2.new(0, 0, 0, 0)
+	UIListLayout.Parent = Contact
+	UIListLayout.FillDirection = Enum.FillDirection.Horizontal
+	UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	UIListLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+	UIListLayout.Padding = UDim.new(0, 10)
 
-	TopBarLine.Name = "TopBarLine"
-	TopBarLine.Parent = TopBar
-	TopBarLine.BackgroundColor3 = LinoriaBox.Theme.MAIN
-	TopBarLine.BorderSizePixel = 0
-	TopBarLine.Size = UDim2.new(1, 0, 0, 2)
-	TopBarLine.Position = UDim2.new(0, 0, 1, 0)
+	YoutubeButton.Name = "YoutubeButton"
+	YoutubeButton.Parent = Contact
+	YoutubeButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	YoutubeButton.BackgroundTransparency = 1.000
+	YoutubeButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	YoutubeButton.BorderSizePixel = 0
+	YoutubeButton.Size = UDim2.new(0.899999976, 0, 0.899999976, 0)
+	YoutubeButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
+	YoutubeButton.ZIndex = 5
+	YoutubeButton.Image = "rbxassetid://5027762797"
+	YoutubeButton.ScaleType = Enum.ScaleType.Crop
+	YoutubeButton.Visible = false
+
+	WebsiteButton.Name = "WebsiteButton"
+	WebsiteButton.Parent = Contact
+	WebsiteButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	WebsiteButton.BackgroundTransparency = 1.000
+	WebsiteButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	WebsiteButton.BorderSizePixel = 0
+	WebsiteButton.Size = UDim2.new(0.899999976, 0, 0.899999976, 0)
+	WebsiteButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
+	WebsiteButton.ZIndex = 5
+	WebsiteButton.Image = "rbxassetid://3926305904"
+	WebsiteButton.ImageColor3 = Color3.fromRGB(94, 186, 97)
+	WebsiteButton.ImageRectOffset = Vector2.new(604, 324)
+	WebsiteButton.ImageRectSize = Vector2.new(35, 35)
+	WebsiteButton.ScaleType = Enum.ScaleType.Fit
+	WebsiteButton.Visible = false
+
+	DiscordButton.Name = "DiscordButton"
+	DiscordButton.Parent = Contact
+	DiscordButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	DiscordButton.BackgroundTransparency = 1.000
+	DiscordButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	DiscordButton.BorderSizePixel = 0
+	DiscordButton.Size = UDim2.new(0.899999976, 0, 0.899999976, 0)
+	DiscordButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
+	DiscordButton.ZIndex = 5
+	DiscordButton.Image = "http://www.roblox.com/asset/?id=16759385019"
+	DiscordButton.ScaleType = Enum.ScaleType.Fit
+	DiscordButton.Visible = false
+
+	TabButtonList.Name = "TabButtonList"
+	TabButtonList.Parent = Frame
+	TabButtonList.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	TabButtonList.BackgroundTransparency = 1.000
+	TabButtonList.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	TabButtonList.BorderSizePixel = 0
+	TabButtonList.ClipsDescendants = true
+	TabButtonList.Position = UDim2.new(-0.3, 0, 0.132051408, 0)
+	TabButtonList.Size = UDim2.new(0.230000004, 0, 0.781199217, 0)
+	TabButtonList.ZIndex = 3
+
+	ScrollingFrame.Parent = TabButtonList
+	ScrollingFrame.Active = true
+	ScrollingFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+	ScrollingFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	ScrollingFrame.BackgroundTransparency = 1.000
+	ScrollingFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	ScrollingFrame.BorderSizePixel = 0
+	ScrollingFrame.ClipsDescendants = false
+	ScrollingFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+	ScrollingFrame.Size = UDim2.new(1, 0, 0.949999988, 0)
+	ScrollingFrame.ZIndex = 4
+	ScrollingFrame.BottomImage = ""
+	ScrollingFrame.ScrollBarThickness = 0
+	ScrollingFrame.TopImage = ""
+
+	UIListLayout_2.Parent = ScrollingFrame
+	UIListLayout_2.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
+	UIListLayout_2.Padding = UDim.new(0, 8)
+
+	scrolling_connect(ScrollingFrame)
+	TabSystem.Name = "TabSystem"
+	TabSystem.Parent = Frame
+	TabSystem.AnchorPoint = Vector2.new(0.5, 0.5)
+	TabSystem.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	TabSystem.BackgroundTransparency = 1.000
+	TabSystem.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	TabSystem.BorderSizePixel = 0
+	TabSystem.ClipsDescendants = true
+	TabSystem.Position = UDim2.new(1.5, 0, 0.571928024, 0)
+	TabSystem.Size = UDim2.new(0.706745386, 0, 0.816288531, 0)
+	TabSystem.ZIndex = 5
+
+	Top.Name = "Top"
+	Top.Parent = Frame
+	Top.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	Top.BackgroundTransparency = 1.000
+	Top.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	Top.BorderSizePixel = 0
+	Top.Position = UDim2.new(-3.28824861e-08, 0, 0, 0)
+	Top.Size = UDim2.new(1.00000012, 0, 0.139001563, 0)
 
 	LogoHub.Name = "LogoHub"
-	LogoHub.Parent = TopBar
-	LogoHub.AnchorPoint = Vector2.new(0, 0.5)
-	LogoHub.BackgroundTransparency = 1
-	LogoHub.Position = UDim2.new(0, 8, 0.5, 0)
-	LogoHub.Size = UDim2.new(0, 24, 0, 24)
+	LogoHub.Parent = Top
+	LogoHub.AnchorPoint = Vector2.new(0.5, 0.5)
+	LogoHub.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	LogoHub.BackgroundTransparency = 1.000
+	LogoHub.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	LogoHub.BorderSizePixel = 0
+	LogoHub.Position = UDim2.new(0.125, 0, 0.5, 0)
+	LogoHub.Size = UDim2.new(2.5, 0, 0.899999976, 0)
+	LogoHub.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	LogoHub.Image = tostring(WindowLogo)
 	LogoHub.ScaleType = Enum.ScaleType.Fit
 	LogoHub.ImageTransparency = 1
 
 	MainText.Name = "MainText"
-	MainText.Parent = TopBar
-	MainText.BackgroundTransparency = 1
-	MainText.Position = UDim2.new(0, 38, 0, 0)
-	MainText.Size = UDim2.new(0, 250, 0, 20)
+	MainText.Parent = Top
+	MainText.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	MainText.BackgroundTransparency = 1.000
+	MainText.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	MainText.BorderSizePixel = 0
+	MainText.Position = UDim2.new(0.270000011, 0, 0.125, 0)
+	MainText.Size = UDim2.new(0.706745207, 0, 0.509708107, 0)
 	MainText.Font = Enum.Font.GothamBold
 	MainText.Text = tostring(WindowName)
-	MainText.TextColor3 = Color3.fromRGB(255, 255, 255)
-	MainText.TextSize = 14
+	MainText.TextColor3 = NoHyper.Theme.TEXT
+	MainText.TextScaled = true
+	MainText.TextSize = 14.000
+	MainText.TextStrokeTransparency = 0.800
+	MainText.TextWrapped = true
 	MainText.TextXAlignment = Enum.TextXAlignment.Left
 	MainText.TextTransparency = 1
 
 	DescriptionText.Name = "DescriptionText"
-	DescriptionText.Parent = TopBar
-	DescriptionText.BackgroundTransparency = 1
-	DescriptionText.Position = UDim2.new(0, 38, 0, 18)
-	DescriptionText.Size = UDim2.new(0, 250, 0, 14)
+	DescriptionText.Parent = Top
+	DescriptionText.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	DescriptionText.BackgroundTransparency = 1.000
+	DescriptionText.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	DescriptionText.BorderSizePixel = 0
+	DescriptionText.Position = UDim2.new(0.27000013, 0, 0.749999702, 0)
+	DescriptionText.Size = UDim2.new(0.706745267, 0, 0.187055781, 0)
 	DescriptionText.Font = Enum.Font.Gotham
 	DescriptionText.Text = tostring(WindowDescription)
-	DescriptionText.TextColor3 = Color3.fromRGB(180, 180, 180)
-	DescriptionText.TextSize = 11
-	DescriptionText.TextXAlignment = Enum.TextXAlignment.Left
+	DescriptionText.TextColor3 = NoHyper.Theme.SUBTEXT
+	DescriptionText.TextScaled = true
+	DescriptionText.TextSize = 14.000
+	DescriptionText.TextStrokeTransparency = 0.800
 	DescriptionText.TextTransparency = 1
-
-	CloseButton.Name = "CloseButton"
-	CloseButton.Parent = TopBar
-	CloseButton.AnchorPoint = Vector2.new(1, 0.5)
-	CloseButton.BackgroundTransparency = 1
-	CloseButton.Position = UDim2.new(1, -8, 0.5, 0)
-	CloseButton.Size = UDim2.new(0, 20, 0, 20)
-	CloseButton.Image = "rbxassetid://10002398990"
-	CloseButton.ImageTransparency = 1
-
-	TabButtonList.Name = "TabButtonList"
-	TabButtonList.Parent = Frame
-	TabButtonList.BackgroundColor3 = LinoriaBox.Theme.SECTION
-	TabButtonList.BorderSizePixel = 0
-	TabButtonList.Position = UDim2.new(0, 8, 0, 45)
-	TabButtonList.Size = UDim2.new(0, 130, 1, -53)
-	TabButtonList.ClipsDescendants = true
-
-	local TabStroke = Instance.new("UIStroke")
-	TabStroke.Parent = TabButtonList
-	TabStroke.Color = LinoriaBox.Theme.STROKE
-	TabStroke.Thickness = 1
-
-	local TabCorner = Instance.new("UICorner")
-	TabCorner.Parent = TabButtonList
-	TabCorner.CornerRadius = UDim.new(0, 4)
-
-	ScrollingFrame.Parent = TabButtonList
-	ScrollingFrame.Active = true
-	ScrollingFrame.BackgroundTransparency = 1
-	ScrollingFrame.Position = UDim2.new(0, 4, 0, 4)
-	ScrollingFrame.Size = UDim2.new(1, -8, 1, -8)
-	ScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-	ScrollingFrame.ScrollBarThickness = 4
-	ScrollingFrame.ScrollBarImageColor3 = LinoriaBox.Theme.MAIN
-
-	UIListLayout_2.Parent = ScrollingFrame
-	UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
-	UIListLayout_2.Padding = UDim.new(0, 4)
-
-	scrolling_connect(ScrollingFrame)
-
-	TabSystem.Name = "TabSystem"
-	TabSystem.Parent = Frame
-	TabSystem.BackgroundTransparency = 1
-	TabSystem.Position = UDim2.new(0, 146, 0, 45)
-	TabSystem.Size = UDim2.new(1, -154, 1, -53)
-	TabSystem.ClipsDescendants = true
+	DescriptionText.TextWrapped = true
+	DescriptionText.TextXAlignment = Enum.TextXAlignment.Left
 
 	DropShadow.Name = "DropShadow"
 	DropShadow.Parent = Frame
 	DropShadow.AnchorPoint = Vector2.new(0.5, 0.5)
-	DropShadow.BackgroundTransparency = 1
+	DropShadow.BackgroundTransparency = 1.000
+	DropShadow.BorderSizePixel = 0
 	DropShadow.Position = UDim2.new(0.5, 0, 0.5, 0)
+	DropShadow.Rotation = 0.010
 	DropShadow.Size = UDim2.new(1, 47, 1, 47)
 	DropShadow.ZIndex = 0
 	DropShadow.Image = "rbxassetid://6015897843"
@@ -442,295 +596,525 @@ function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
 	DropShadow.ScaleType = Enum.ScaleType.Slice
 	DropShadow.SliceCenter = Rect.new(49, 49, 450, 450)
 
-	local cs = Tween:Create(Frame,TweenInfo.new(0.5),{
-		Position = UDim2.fromScale(0,0)
+	local cs = Tween:Create(Frame, TweenInfo.new(1), {
+		Position = UDim2.fromScale(0, 0)
 	})
 
 	cs:Play()
 	cs.Completed:Connect(function()
-		Tween:Create(DropShadow,TweenInfo.new(1),{
-			ImageTransparency = 0.4,
+		Tween:Create(DropShadow, TweenInfo.new(2), {
+			ImageTransparency = 0.3,
+		}):Play()
+
+		Tween:Create(DropShadow, TweenInfo.new(1), {
+			ImageTransparency = 0.5,
 		}):Play()
 	end)
 
-	delay(0.3,function()
-		Tween:Create(CloseButton,TweenInfo.new(0.3),{ImageTransparency = 0}):Play()
-		Tween:Create(DescriptionText,TweenInfo.new(0.3),{TextTransparency = 0.3}):Play()
-		Tween:Create(MainText,TweenInfo.new(0.3),{TextTransparency = 0}):Play()
-		Tween:Create(LogoHub,TweenInfo.new(0.3),{ImageTransparency = 0}):Play()
+	delay(0.5, function()
+		Tween:Create(CloseButton, TweenInfo.new(0.5), {
+			ImageTransparency = 0
+		}):Play()
+
+		Tween:Create(TickUI, TweenInfo.new(0.5), {
+			BackgroundTransparency = 0.5
+		}):Play()
+		Tween:Create(View, TweenInfo.new(0.5), {
+			BackgroundTransparency = 0.5
+		}):Play()
+		Tween:Create(DescriptionText, TweenInfo.new(0.5), {
+			TextTransparency = 0.500
+		}):Play()
+		Tween:Create(MainText, TweenInfo.new(0.5), {
+			TextTransparency = 0
+		}):Play()
+		Tween:Create(LogoHub, TweenInfo.new(.55), {
+			ImageTransparency = 0
+		}):Play()
+		Tween:Create(TabButtonList, TweenInfo.new(.55), {
+			Position = UDim2.new(0.00999999139, 0, 0.132051408, 0)
+		}):Play()
+
+		Tween:Create(TabSystem, TweenInfo.new(.55), {
+			Position = UDim2.new(0.623372614, 0, 0.571928024, 0)
+		}):Play()
+
+		Tween:Create(Contact, TweenInfo.new(.55), {
+			Position = UDim2.new(0.125, 0, 0.934000015, 0)
+		}):Play()
 	end)
 
-	-- Auto-save system
-	if ConfigSystem.AutoSaveEnabled then
-		task.spawn(function()
-			while wait(ConfigSystem.AutoSaveInterval) do
-				SaveConfig(BoxWindow.ConfigName)
-			end
-		end)
+	CloseButton.ImageTransparency = 1
+	CloseButton.Name = "CloseButton"
+	CloseButton.Parent = Frame
+	CloseButton.AnchorPoint = Vector2.new(1, 0)
+	CloseButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	CloseButton.BackgroundTransparency = 1.000
+	CloseButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	CloseButton.BorderSizePixel = 0
+	CloseButton.Position = UDim2.new(0.99000001, 0, 0.0109999999, 0)
+	CloseButton.Size = UDim2.new(0.0500000007, 0, 0.0500000007, 0)
+	CloseButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
+	CloseButton.ZIndex = 8
+	CloseButton.Image = "rbxassetid://10002398990"
+
+	TickUI.BackgroundTransparency = 1
+	TickUI.Name = "TickUI"
+	TickUI.Parent = Frame
+	TickUI.AnchorPoint = Vector2.new(0, 0.5)
+	TickUI.BackgroundColor3 = NoHyper.Theme.STROKE
+	TickUI.BackgroundTransparency = 1
+	TickUI.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	TickUI.BorderSizePixel = 0
+	TickUI.Position = UDim2.new(0.25, 0, 0.5, 0)
+	TickUI.Size = UDim2.new(0, 1, 1, 0)
+	TickUI.ZIndex = 3
+
+	View.BackgroundTransparency = 1
+	View.Name = "View"
+	View.Parent = TickUI
+	View.AnchorPoint = Vector2.new(0.5, 0.5)
+	View.BackgroundColor3 = NoHyper.Theme.STROKE
+	View.BackgroundTransparency = 1
+	View.BorderColor3 = Color3.fromRGB(0, 0, 0)
+	View.BorderSizePixel = 0
+	View.Position = UDim2.new(0.5, 0, 0.5, 0)
+	View.Size = UDim2.new(1, 1, 1, 0)
+	View.ZIndex = 2
+
+	UICorner_2.CornerRadius = UDim.new(0.5, 0)
+	UICorner_2.Parent = View
+
+	UICorner_3.CornerRadius = UDim.new(0.5, 0)
+	UICorner_3.Parent = TickUI
+
+	-- Config Management Functions
+	function HyperWindow:SaveConfig(configName)
+		configName = configName or NoHyper.Config.CurrentConfig
+		return NoHyper.Config:SaveConfig(configName)
 	end
 
-	function BoxWindow:NewTab(TabName:string,TabIcon:string)
-		local TabBox = {
+	function HyperWindow:LoadConfig(configName)
+		configName = configName or NoHyper.Config.CurrentConfig
+		if NoHyper.Config:LoadConfig(configName) then
+			-- Apply loaded config
+			for key, callback in pairs(self.ConfigCallbacks) do
+				local value = NoHyper.Config:GetValue(key)
+				if value ~= nil then
+					pcall(callback, value)
+				end
+			end
+			return true
+		end
+		return false
+	end
+
+	function HyperWindow:DeleteConfig(configName)
+		return NoHyper.Config:DeleteConfig(configName)
+	end
+
+	function HyperWindow:GetConfigs()
+		return NoHyper.Config:GetConfigs()
+	end
+
+	function HyperWindow:SetAutoSave(enabled, interval)
+		NoHyper.Config.AutoSaveEnabled = enabled
+		if interval then
+			NoHyper.Config.AutoSaveInterval = interval
+		end
+		if enabled then
+			NoHyper.Config:StartAutoSave()
+		end
+	end
+
+	function HyperWindow:NewTab(TabName:string, TabIcon:string)
+		local TabHyper = {
 			Section = {}
 		}
 
-		local TabButton = Instance.new("TextButton")
-		local TabIcon_img = Instance.new("ImageLabel")
-		local TabLabel = Instance.new("TextLabel")
+		local TabButton = Instance.new("Frame")
+		local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+		local UICorner = Instance.new("UICorner")
+		local BoxHighlight = Instance.new("Frame")
+		local BoxUICorner = Instance.new("UICorner")
+		local TextLabel = Instance.new("TextLabel")
+		local Icon = Instance.new("ImageLabel")
+		local Button = Instance.new("TextButton")
 
 		TabButton.Name = TabName or "TabButton"
 		TabButton.Parent = ScrollingFrame
-		TabButton.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
-		TabButton.BackgroundTransparency = 1
+		TabButton.BackgroundColor3 = NoHyper.Theme.SECTION
+		TabButton.BackgroundTransparency = 0.000
+		TabButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		TabButton.BorderSizePixel = 0
-		TabButton.Size = UDim2.new(1, 0, 0, 32)
-		TabButton.Font = Enum.Font.Gotham
-		TabButton.Text = ""
-		TabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		TabButton.Size = UDim2.new(0.980000019, 0, 0.5, 0)
 
-		local TabButtonCorner = Instance.new("UICorner")
-		TabButtonCorner.Parent = TabButton
-		TabButtonCorner.CornerRadius = UDim.new(0, 4)
+		UIAspectRatioConstraint.Parent = TabButton
+		UIAspectRatioConstraint.AspectRatio = 5.000
+		UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
-		TabIcon_img.Name = "Icon"
-		TabIcon_img.Parent = TabButton
-		TabIcon_img.BackgroundTransparency = 1
-		TabIcon_img.Position = UDim2.new(0, 8, 0.5, -8)
-		TabIcon_img.Size = UDim2.new(0, 16, 0, 16)
-		SetImage(TabIcon,TabIcon_img)
+		UICorner.CornerRadius = UDim.new(0, 8)
+		UICorner.Parent = TabButton
 
-		TabLabel.Name = "Label"
-		TabLabel.Parent = TabButton
-		TabLabel.BackgroundTransparency = 1
-		TabLabel.Position = UDim2.new(0, 30, 0, 0)
-		TabLabel.Size = UDim2.new(1, -35, 1, 0)
-		TabLabel.Font = Enum.Font.GothamMedium
-		TabLabel.Text = TabName or "Tab"
-		TabLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-		TabLabel.TextSize = 13
-		TabLabel.TextXAlignment = Enum.TextXAlignment.Left
+		BoxHighlight.Name = "BoxHighlight"
+		BoxHighlight.Parent = TabButton
+		BoxHighlight.AnchorPoint = Vector2.new(0, 0.5)
+		BoxHighlight.BackgroundColor3 = NoHyper.Theme.MAIN
+		BoxHighlight.BorderSizePixel = 0
+		BoxHighlight.Position = UDim2.new(0, 0, 0.5, 0)
+		BoxHighlight.Size = UDim2.new(0.015, 0, 0.7, 0)
+		BoxHighlight.BackgroundTransparency = 1
 
-		local TabFrame = Instance.new("ScrollingFrame")
-		local LeftFrame = Instance.new("Frame")
-		local RightFrame = Instance.new("Frame")
+		BoxUICorner.CornerRadius = UDim.new(1, 0)
+		BoxUICorner.Parent = BoxHighlight
+
+		TextLabel.Parent = TabButton
+		TextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+		TextLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		TextLabel.BackgroundTransparency = 1.000
+		TextLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		TextLabel.BorderSizePixel = 0
+		TextLabel.Position = UDim2.new(1.02499998, 0, 0.50999999, 0)
+		TextLabel.Size = UDim2.new(1.5, 0, 0.5, 0)
+		TextLabel.Font = Enum.Font.GothamBold
+		TextLabel.Text = TabName or "Null"
+		TextLabel.TextColor3 = NoHyper.Theme.SUBTEXT
+		TextLabel.TextScaled = true
+		TextLabel.TextSize = 14.000
+		TextLabel.TextStrokeTransparency = 0.950
+		TextLabel.TextWrapped = true
+		TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+		Icon.Name = "Icon"
+		Icon.Parent = TabButton
+		Icon.AnchorPoint = Vector2.new(0.5, 0.5)
+		Icon.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		Icon.BackgroundTransparency = 1.000
+		Icon.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		Icon.BorderSizePixel = 0
+		Icon.Position = UDim2.new(0.125, 0, 0.5, 0)
+		Icon.Size = UDim2.new(0.800000012, 0, 0.800000012, 0)
+		Icon.SizeConstraint = Enum.SizeConstraint.RelativeYY
+		Icon.ImageColor3 = NoHyper.Theme.SUBTEXT
+		SetImage(TabIcon, Icon)
+
+		Button.Name = "Button"
+		Button.Parent = TabButton
+		Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		Button.BackgroundTransparency = 1.000
+		Button.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		Button.BorderSizePixel = 0
+		Button.Size = UDim2.new(1, 0, 1, 0)
+		Button.ZIndex = 5
+		Button.Font = Enum.Font.SourceSans
+		Button.TextColor3 = Color3.fromRGB(0, 0, 0)
+		Button.TextSize = 14.000
+		Button.TextTransparency = 1.000
+
+		local TabFrame = Instance.new("Frame")
+		local LeftFrame = Instance.new("ScrollingFrame")
 		local UIListLayout = Instance.new("UIListLayout")
+		local RightFrame = Instance.new("ScrollingFrame")
 		local UIListLayout_2 = Instance.new("UIListLayout")
 
+		scrolling_connect(RightFrame)
+		scrolling_connect(LeftFrame)
 		TabFrame.Name = "TabFrame"
 		TabFrame.Parent = TabSystem
-		TabFrame.Active = true
-		TabFrame.BackgroundTransparency = 1
+		TabFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+		TabFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		TabFrame.BackgroundTransparency = 1.000
+		TabFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		TabFrame.BorderSizePixel = 0
-		TabFrame.Size = UDim2.new(1, 0, 1, 0)
-		TabFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-		TabFrame.ScrollBarThickness = 4
-		TabFrame.ScrollBarImageColor3 = LinoriaBox.Theme.MAIN
-		TabFrame.Visible = false
+		TabFrame.ClipsDescendants = true
+		TabFrame.Position = UDim2.new(0.5, 0, 0.497500002, 0)
+		TabFrame.Size = UDim2.new(0.949999988, 0, 0.980000019, 0)
+		TabFrame.ZIndex = 6
 
 		LeftFrame.Name = "LeftFrame"
 		LeftFrame.Parent = TabFrame
-		LeftFrame.BackgroundTransparency = 1
-		LeftFrame.Position = UDim2.new(0, 0, 0, 0)
-		LeftFrame.Size = UDim2.new(0.48, 0, 1, 0)
+		LeftFrame.Active = true
+		LeftFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+		LeftFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		LeftFrame.BackgroundTransparency = 1.000
+		LeftFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		LeftFrame.BorderSizePixel = 0
+		LeftFrame.ClipsDescendants = false
+		LeftFrame.Position = UDim2.new(0.25, 0, 0.5, 0)
+		LeftFrame.Size = UDim2.new(0.5, 0, 0.980000019, 0)
+		LeftFrame.ZIndex = 8
+		LeftFrame.BottomImage = ""
+		LeftFrame.ScrollBarThickness = 0
+		LeftFrame.TopImage = ""
 
 		UIListLayout.Parent = LeftFrame
+		UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 		UIListLayout.Padding = UDim.new(0, 8)
 
 		RightFrame.Name = "RightFrame"
 		RightFrame.Parent = TabFrame
-		RightFrame.BackgroundTransparency = 1
-		RightFrame.Position = UDim2.new(0.52, 0, 0, 0)
-		RightFrame.Size = UDim2.new(0.48, 0, 1, 0)
+		RightFrame.Active = true
+		RightFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+		RightFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+		RightFrame.BackgroundTransparency = 1.000
+		RightFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+		RightFrame.BorderSizePixel = 0
+		RightFrame.ClipsDescendants = false
+		RightFrame.Position = UDim2.new(0.75, 0, 0.5, 0)
+		RightFrame.Size = UDim2.new(0.5, 0, 0.980000019, 0)
+		RightFrame.ZIndex = 8
+		RightFrame.BottomImage = ""
+		RightFrame.ScrollBarThickness = 0
+		RightFrame.TopImage = ""
+		RightFrame.VerticalScrollBarPosition = Enum.VerticalScrollBarPosition.Left
 
 		UIListLayout_2.Parent = RightFrame
+		UIListLayout_2.HorizontalAlignment = Enum.HorizontalAlignment.Center
 		UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
 		UIListLayout_2.Padding = UDim.new(0, 8)
 
 		local call = function(val)
 			if val then
 				TabFrame.Visible = true
-				Tween:Create(TabButton,TweenInfo.new(0.15),{BackgroundTransparency = 0, BackgroundColor3 = LinoriaBox.Theme.TOUCH}):Play()
-				Tween:Create(TabLabel,TweenInfo.new(0.15),{TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
-				Tween:Create(TabIcon_img,TweenInfo.new(0.15),{ImageColor3 = LinoriaBox.Theme.MAIN}):Play()
+				Tween:Create(TabButton, TweenInfo.new(0.2), {BackgroundColor3 = NoHyper.Theme.SECTION}):Play()
+				Tween:Create(BoxHighlight, TweenInfo.new(0.2), {BackgroundTransparency = 0}):Play()
+				Tween:Create(TextLabel, TweenInfo.new(0.2), {
+					TextColor3 = NoHyper.Theme.TEXT,
+					Size = UDim2.fromScale(1.5, 0.5)
+				}):Play()
+				Tween:Create(Icon, TweenInfo.new(0.2), {
+					ImageColor3 = NoHyper.Theme.MAIN,
+					ImageTransparency = 0,
+					Size = UDim2.new(0.800000012, 0, 0.800000012, 0)
+				}):Play()
 			else
 				TabFrame.Visible = false
-				Tween:Create(TabButton,TweenInfo.new(0.15),{BackgroundTransparency = 1}):Play()
-				Tween:Create(TabLabel,TweenInfo.new(0.15),{TextColor3 = Color3.fromRGB(200, 200, 200)}):Play()
-				Tween:Create(TabIcon_img,TweenInfo.new(0.15),{ImageColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+				Tween:Create(TabButton, TweenInfo.new(0.2), {BackgroundColor3 = NoHyper.Theme.SECTION}):Play()
+				Tween:Create(BoxHighlight, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+				Tween:Create(TextLabel, TweenInfo.new(0.2), {
+					TextColor3 = NoHyper.Theme.SUBTEXT,
+					Size = UDim2.fromScale(1.5, 0.45)
+				}):Play()
+				Tween:Create(Icon, TweenInfo.new(0.2), {
+					ImageColor3 = NoHyper.Theme.SUBTEXT,
+					ImageTransparency = 0.4,
+					Size = UDim2.new(0.65, 0, 0.65, 0)
+				}):Play()
 			end
 		end
 
-		if not BoxWindow.Tabs[1] then
-			task.spawn(call,true)
+		if not HyperWindow.Tabs[1] then
+			task.spawn(call, true)
 		else
-			task.spawn(call,false)
+			task.spawn(call, false)
 		end
 
-		table.insert(BoxWindow.Tabs,{
+		table.insert(HyperWindow.Tabs, {
 			TabFrame,
 			call
 		})
 
-		TabButton.MouseButton1Click:Connect(function()
-			for i,v in ipairs(BoxWindow.Tabs) do
+		Button.MouseButton1Click:Connect(function()
+			for i, v in ipairs(HyperWindow.Tabs) do
 				if v[1] == TabFrame then
-					task.spawn(v[2],true)
+					task.spawn(v[2], true)
 				else
-					task.spawn(v[2],false)
+					task.spawn(v[2], false)
 				end
 			end
 		end)
 
-		function TabBox:NewSection(SectionName:string,SectionIcon:string,Position:string)
-			local Section_Box = {}
+		function TabHyper:NewSection(SectionName:string, SectionIcon:string, Position:string)
+			local Section_Hyper = {}
 
-			SectionName = ToDefault(SectionName,'Section')
-			SectionIcon = ToDefault(SectionIcon,'home')
+			SectionName = ToDefault(SectionName, 'Section')
+			SectionIcon = ToDefault(SectionIcon, 'home')
 			Position = (Position and (Position:lower():find('left') and LeftFrame) or RightFrame) or LeftFrame
 
 			local Section = Instance.new("Frame")
-			local SectionHeader = Instance.new("Frame")
-			local SectionTitle = Instance.new("TextLabel")
-			local SectionIcon_img = Instance.new("ImageLabel")
-			local SectionContent = Instance.new("Frame")
+			local UICorner = Instance.new("UICorner")
+			local SectionTitle = Instance.new("Frame")
+			local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+			local Icon = Instance.new("ImageLabel")
+			local TextLabel = Instance.new("TextLabel")
 			local UIListLayout = Instance.new("UIListLayout")
+			local UIStroke = Instance.new("UIStroke")
 
 			Section.Name = "Section"
 			Section.Parent = Position
-			Section.BackgroundColor3 = LinoriaBox.Theme.SECTION
+			Section.BackgroundColor3 = NoHyper.Theme.SECTION
+			Section.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			Section.BorderSizePixel = 0
-			Section.Size = UDim2.new(1, 0, 0, 40)
+			Section.Size = UDim2.new(NoHyper.SectionWidth, 0, 0, 38)
+			Section.ZIndex = 5
 
-			local SectionCorner = Instance.new("UICorner")
-			SectionCorner.Parent = Section
-			SectionCorner.CornerRadius = UDim.new(0, 4)
-
-			local SectionStroke = Instance.new("UIStroke")
-			SectionStroke.Parent = Section
-			SectionStroke.Color = LinoriaBox.Theme.STROKE
-			SectionStroke.Thickness = 1
-
-			SectionHeader.Name = "SectionHeader"
-			SectionHeader.Parent = Section
-			SectionHeader.BackgroundColor3 = LinoriaBox.Theme.BOX_ACCENT
-			SectionHeader.BorderSizePixel = 0
-			SectionHeader.Size = UDim2.new(1, 0, 0, 28)
-
-			local HeaderCorner = Instance.new("UICorner")
-			HeaderCorner.Parent = SectionHeader
-			HeaderCorner.CornerRadius = UDim.new(0, 4)
-
-			local HeaderLine = Instance.new("Frame")
-			HeaderLine.Parent = SectionHeader
-			HeaderLine.BackgroundColor3 = LinoriaBox.Theme.MAIN
-			HeaderLine.BorderSizePixel = 0
-			HeaderLine.Position = UDim2.new(0, 0, 1, -1)
-			HeaderLine.Size = UDim2.new(1, 0, 0, 1)
-
-			SectionIcon_img.Name = "Icon"
-			SectionIcon_img.Parent = SectionHeader
-			SectionIcon_img.BackgroundTransparency = 1
-			SectionIcon_img.Position = UDim2.new(0, 8, 0.5, -8)
-			SectionIcon_img.Size = UDim2.new(0, 16, 0, 16)
-			SectionIcon_img.ImageColor3 = LinoriaBox.Theme.MAIN
-			SetImage(SectionIcon,SectionIcon_img)
+			UICorner.CornerRadius = UDim.new(0, 8)
+			UICorner.Parent = Section
 
 			SectionTitle.Name = "SectionTitle"
-			SectionTitle.Parent = SectionHeader
-			SectionTitle.BackgroundTransparency = 1
-			SectionTitle.Position = UDim2.new(0, 30, 0, 0)
-			SectionTitle.Size = UDim2.new(1, -35, 1, 0)
-			SectionTitle.Font = Enum.Font.GothamBold
-			SectionTitle.Text = SectionName
-			SectionTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-			SectionTitle.TextSize = 13
-			SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
+			SectionTitle.Parent = Section
+			SectionTitle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			SectionTitle.BackgroundTransparency = 1.000
+			SectionTitle.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			SectionTitle.BorderSizePixel = 0
+			SectionTitle.ClipsDescendants = true
+			SectionTitle.Size = UDim2.new(1, 0, 1, 0)
+			SectionTitle.ZIndex = 7
 
-			SectionContent.Name = "SectionContent"
-			SectionContent.Parent = Section
-			SectionContent.BackgroundTransparency = 1
-			SectionContent.Position = UDim2.new(0, 0, 0, 28)
-			SectionContent.Size = UDim2.new(1, 0, 1, -28)
+			UIAspectRatioConstraint.Parent = SectionTitle
+			UIAspectRatioConstraint.AspectRatio = 8.500
+			UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
-			UIListLayout.Parent = SectionContent
+			Icon.Name = "Icon"
+			Icon.Parent = SectionTitle
+			Icon.AnchorPoint = Vector2.new(0.5, 0.5)
+			Icon.BackgroundColor3 = NoHyper.Theme.MAIN
+			Icon.BackgroundTransparency = 1.000
+			Icon.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			Icon.BorderSizePixel = 0
+			Icon.Position = UDim2.new(0.075000003, 0, 0.5, 0)
+			Icon.Size = UDim2.new(0.649999976, 0, 0.649999976, 0)
+			Icon.SizeConstraint = Enum.SizeConstraint.RelativeYY
+			Icon.ZIndex = 8
+			Icon.ImageColor3 = NoHyper.Theme.MAIN
+			SetImage(SectionIcon, Icon)
+
+			TextLabel.Parent = SectionTitle
+			TextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+			TextLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+			TextLabel.BackgroundTransparency = 1.000
+			TextLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
+			TextLabel.BorderSizePixel = 0
+			TextLabel.Position = UDim2.new(0.935000002, 0, 0.5, 0)
+			TextLabel.Size = UDim2.new(1.5664264, 0, 0.600000024, 0)
+			TextLabel.ZIndex = 8
+			TextLabel.Font = Enum.Font.GothamBold
+			TextLabel.Text = SectionName or "General"
+			TextLabel.TextColor3 = NoHyper.Theme.TEXT
+			TextLabel.TextScaled = true
+			TextLabel.TextSize = 14.000
+			TextLabel.TextStrokeTransparency = 0.950
+			TextLabel.TextWrapped = true
+			TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+			UIListLayout.Parent = Section
 			UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 			UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 			UIListLayout.Padding = UDim.new(0, 6)
 
-			function Section_Box.update()
-				local old = 28
+			UIStroke.Color = NoHyper.Theme.STROKE
+			UIStroke.Thickness = 1
+			UIStroke.Parent = Section
 
-				for i,v in ipairs(SectionContent:GetChildren()) do
+			function Section_Hyper.update()
+				local old = 1
+
+				for i, v in ipairs(Section:GetChildren()) do
 					if v:IsA('Frame') then
-						old += (v.AbsoluteSize.Y or 0) + UIListLayout.Padding.Offset
+						old += (v.AbsoluteSize.Y or 27) + UIListLayout.Padding.Offset
 					end
 				end
 
-				Section.Size = UDim2.new(1, 0, 0, old + 8)
+				Tween:Create(Section, TweenInfo.new(0.15), {Size = UDim2.new(NoHyper.SectionWidth, 0, 0, old + 1)}):Play()
 			end
 
-			table.insert(LinoriaBox.AutoUpdate,Section_Box.update)
+			table.insert(NoHyper.AutoUpdate, Section_Hyper.update)
 
-			function Section_Box.text(...)
-				SectionTitle.Text = tostring(...)
+			function Section_Hyper.text(...)
+				TextLabel.Text = tostring(...)
 			end
 
-			function Section_Box:AddButton(ButtonName,callback)
-				local configKey = "Button_" .. ButtonName
+			function Section_Hyper:AddButton(ButtonName, callback)
+				local Button = Instance.new("Frame")
+				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+				local Button_2 = Instance.new("TextButton")
+				local Frame = Instance.new("Frame")
+				local UICorner = Instance.new("UICorner")
+				local TextLabel = Instance.new("TextLabel")
 
-				local ButtonFrame = Instance.new("Frame")
-				local Button = Instance.new("TextButton")
-				local ButtonLabel = Instance.new("TextLabel")
-
-				ButtonFrame.Name = "Button"
-				ButtonFrame.Parent = SectionContent
-				ButtonFrame.BackgroundTransparency = 1
-				ButtonFrame.Size = UDim2.new(0.95, 0, 0, 28)
-
-				Button.Parent = ButtonFrame
-				Button.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
+				Button.Name = "Button"
+				Button.Parent = Section
+				Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Button.BackgroundTransparency = 1.000
+				Button.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Button.BorderSizePixel = 0
 				Button.Size = UDim2.new(1, 0, 1, 0)
-				Button.Font = Enum.Font.Gotham
-				Button.Text = ""
+				Button.ZIndex = 7
 
-				local ButtonCorner = Instance.new("UICorner")
-				ButtonCorner.Parent = Button
-				ButtonCorner.CornerRadius = UDim.new(0, 4)
+				UIAspectRatioConstraint.Parent = Button
+				UIAspectRatioConstraint.AspectRatio = 9.000
+				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
-				local ButtonStroke = Instance.new("UIStroke")
-				ButtonStroke.Parent = Button
-				ButtonStroke.Color = LinoriaBox.Theme.STROKE
-				ButtonStroke.Thickness = 1
+				Button_2.Name = "Button"
+				Button_2.Parent = Button
+				Button_2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Button_2.BackgroundTransparency = 1.000
+				Button_2.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Button_2.BorderSizePixel = 0
+				Button_2.Size = UDim2.new(1, 0, 1, 0)
+				Button_2.ZIndex = 12
+				Button_2.Font = Enum.Font.SourceSans
+				Button_2.Text = ""
+				Button_2.TextColor3 = Color3.fromRGB(0, 0, 0)
+				Button_2.TextSize = 14.000
+				Button_2.TextTransparency = 1.000
 
-				ButtonLabel.Parent = Button
-				ButtonLabel.BackgroundTransparency = 1
-				ButtonLabel.Size = UDim2.new(1, 0, 1, 0)
-				ButtonLabel.Font = Enum.Font.GothamMedium
-				ButtonLabel.Text = ButtonName
-				ButtonLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-				ButtonLabel.TextSize = 12
+				Frame.Parent = Button
+				Frame.AnchorPoint = Vector2.new(0.5, 0.5)
+				Frame.BackgroundColor3 = NoHyper.Theme.BACKGROUND
+				Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Frame.BorderSizePixel = 0
+				Frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+				Frame.Size = UDim2.new(0.899999976, 0, 1, 0)
+				Frame.ZIndex = 10
 
-				Button.MouseEnter:Connect(function()
-					Tween:Create(Button,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.TOUCH}):Play()
-					Tween:Create(ButtonLabel,TweenInfo.new(0.1),{TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+				Button_2.MouseEnter:Connect(function()
+					Tween:Create(Frame, TweenInfo.new(0.15), {BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
 				end)
 
-				Button.MouseLeave:Connect(function()
-					Tween:Create(Button,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.BACKGROUND}):Play()
-					Tween:Create(ButtonLabel,TweenInfo.new(0.1),{TextColor3 = Color3.fromRGB(200, 200, 200)}):Play()
+				Button_2.MouseButton1Down:Connect(function()
+					Tween:Create(Frame, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.SYSTEM}):Play()
 				end)
 
-				Button.MouseButton1Click:Connect(callback or function() end)
+				Button_2.MouseButton1Up:Connect(function()
+					Tween:Create(Frame, TweenInfo.new(0.075), {BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
+				end)
 
-				Section_Box.update()
+				Button_2.MouseLeave:Connect(function()
+					Tween:Create(Frame, TweenInfo.new(0.15), {BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
+				end)
+
+				UICorner.CornerRadius = UDim.new(0, 6)
+				UICorner.Parent = Frame
+
+				TextLabel.Parent = Frame
+				TextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+				TextLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				TextLabel.BackgroundTransparency = 1.000
+				TextLabel.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				TextLabel.BorderSizePixel = 0
+				TextLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+				TextLabel.Size = UDim2.new(0.899999976, 0, 0.5, 0)
+				TextLabel.ZIndex = 10
+				TextLabel.Font = Enum.Font.GothamBold
+				TextLabel.Text = ButtonName
+				TextLabel.TextColor3 = NoHyper.Theme.TEXT
+				TextLabel.TextScaled = true
+				TextLabel.TextSize = 14.000
+				TextLabel.TextWrapped = true
+
+				Button_2.MouseButton1Click:Connect(callback or function()
+
+				end)
+
+				Section_Hyper.update()
 
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							ButtonLabel.Text = tostring(...)
+							TextLabel.Text = tostring(...)
 						end,
 					},
 					{
@@ -740,96 +1124,148 @@ function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
 				})
 			end
 
-			function Section_Box:AddToggle(ToggleName:string,Default:boolean,callback:FunctionalTest)
+			function Section_Hyper:AddToggle(ToggleName:string, Default:boolean, callback:FunctionalTest)
 				Default = Default or false
-				callback = ToDefault(callback,function() end)
+				callback = ToDefault(callback, function()
 
-				local configKey = "Toggle_" .. ToggleName
+				end)
 
-				-- Load from config
-				if ConfigSystem.CurrentConfig[configKey] ~= nil then
-					Default = ConfigSystem.CurrentConfig[configKey]
+				local configKey = TabName .. "_" .. SectionName .. "_" .. ToggleName
+				local savedValue = NoHyper.Config:GetValue(configKey, Default)
+				if savedValue ~= nil then
+					Default = savedValue
 				end
 
-				local ToggleFrame = Instance.new("Frame")
-				local ToggleLabel = Instance.new("TextLabel")
-				local ToggleBox = Instance.new("Frame")
-				local ToggleButton = Instance.new("TextButton")
-				local ToggleCheck = Instance.new("ImageLabel")
+				local Toggle = Instance.new("Frame")
+				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+				local Text = Instance.new("TextLabel")
+				local Ui = Instance.new("Frame")
+				local UICorner = Instance.new("UICorner")
+				local True = Instance.new("ImageLabel")
+				local Button = Instance.new("TextButton")
 
-				ToggleFrame.Name = "Toggle"
-				ToggleFrame.Parent = SectionContent
-				ToggleFrame.BackgroundTransparency = 1
-				ToggleFrame.Size = UDim2.new(0.95, 0, 0, 24)
+				Toggle.Name = "Toggle"
+				Toggle.Parent = Section
+				Toggle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Toggle.BackgroundTransparency = 1.000
+				Toggle.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Toggle.BorderSizePixel = 0
+				Toggle.ClipsDescendants = true
+				Toggle.Size = UDim2.new(1, 0, 1, 0)
+				Toggle.ZIndex = 7
 
-				ToggleLabel.Parent = ToggleFrame
-				ToggleLabel.BackgroundTransparency = 1
-				ToggleLabel.Position = UDim2.new(0, 0, 0, 0)
-				ToggleLabel.Size = UDim2.new(1, -30, 1, 0)
-				ToggleLabel.Font = Enum.Font.Gotham
-				ToggleLabel.Text = ToggleName or "Toggle"
-				ToggleLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-				ToggleLabel.TextSize = 12
-				ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+				UIAspectRatioConstraint.Parent = Toggle
+				UIAspectRatioConstraint.AspectRatio = 9.000
+				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
-				ToggleBox.Name = "Box"
-				ToggleBox.Parent = ToggleFrame
-				ToggleBox.AnchorPoint = Vector2.new(1, 0.5)
-				ToggleBox.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
-				ToggleBox.BorderSizePixel = 0
-				ToggleBox.Position = UDim2.new(1, 0, 0.5, 0)
-				ToggleBox.Size = UDim2.new(0, 18, 0, 18)
+				Text.Name = "Text"
+				Text.Parent = Toggle
+				Text.AnchorPoint = Vector2.new(0, 0.5)
+				Text.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Text.BackgroundTransparency = 1.000
+				Text.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Text.BorderSizePixel = 0
+				Text.Position = UDim2.new(0.0516665913, 0, 0.499999881, 0)
+				Text.Size = UDim2.new(0.998333275, 0, 0.444999993, 0)
+				Text.ZIndex = 7
+				Text.Font = Enum.Font.GothamMedium
+				Text.Text = ToggleName or "TOGGLE"
+				Text.TextColor3 = NoHyper.Theme.TEXT
+				Text.TextScaled = true
+				Text.TextSize = 14.000
+				Text.TextStrokeTransparency = 0.800
+				Text.TextTransparency = 0.100
+				Text.TextWrapped = true
+				Text.TextXAlignment = Enum.TextXAlignment.Left
 
-				local BoxCorner = Instance.new("UICorner")
-				BoxCorner.Parent = ToggleBox
-				BoxCorner.CornerRadius = UDim.new(0, 3)
+				Ui.Name = "Ui"
+				Ui.Parent = Toggle
+				Ui.AnchorPoint = Vector2.new(1, 0.5)
+				Ui.BackgroundColor3 = NoHyper.Theme.BACKGROUND
+				Ui.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Ui.BorderSizePixel = 0
+				Ui.Position = UDim2.new(0.950000107, 0, 0.500000417, 0)
+				Ui.Size = UDim2.new(0.649999976, 0, 0.649999976, 0)
+				Ui.SizeConstraint = Enum.SizeConstraint.RelativeYY
+				Ui.ZIndex = 7
 
-				local BoxStroke = Instance.new("UIStroke")
-				BoxStroke.Parent = ToggleBox
-				BoxStroke.Color = LinoriaBox.Theme.STROKE
-				BoxStroke.Thickness = 1
+				UICorner.CornerRadius = UDim.new(0, 6)
+				UICorner.Parent = Ui
 
-				ToggleCheck.Name = "Check"
-				ToggleCheck.Parent = ToggleBox
-				ToggleCheck.BackgroundTransparency = 1
-				ToggleCheck.Size = UDim2.new(1, 0, 1, 0)
-				ToggleCheck.Image = "rbxassetid://3944680095"
-				ToggleCheck.Visible = false
+				True.Name = "True"
+				True.Parent = Ui
+				True.AnchorPoint = Vector2.new(0.5, 0.5)
+				True.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				True.BackgroundTransparency = 1.000
+				True.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				True.BorderSizePixel = 0
+				True.Position = UDim2.new(0.5, 0, 0.5, 0)
+				True.Size = UDim2.new(0.75, 0, 0.75, 0)
+				True.Visible = false
+				True.ZIndex = 8
+				True.Image = "rbxassetid://3944680095"
 
-				ToggleButton.Parent = ToggleFrame
-				ToggleButton.BackgroundTransparency = 1
-				ToggleButton.Size = UDim2.new(1, 0, 1, 0)
-				ToggleButton.Text = ""
-				ToggleButton.ZIndex = 10
+				Button.Name = "Button"
+				Button.Parent = Toggle
+				Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Button.BackgroundTransparency = 1.000
+				Button.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Button.BorderSizePixel = 0
+				Button.Size = UDim2.new(1, 0, 1, 0)
+				Button.ZIndex = 9
+				Button.Font = Enum.Font.SourceSans
+				Button.Text = ""
+				Button.TextColor3 = Color3.fromRGB(0, 0, 0)
+				Button.TextSize = 14.000
+				Button.TextTransparency = 1.000
 
-				local function Effect(val)
-					if val then
-						ToggleCheck.Visible = true
-						Tween:Create(ToggleBox,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.MAIN}):Play()
-						Tween:Create(BoxStroke,TweenInfo.new(0.1),{Color = LinoriaBox.Theme.MAIN}):Play()
-					else
-						ToggleCheck.Visible = false
-						Tween:Create(ToggleBox,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.BACKGROUND}):Play()
-						Tween:Create(BoxStroke,TweenInfo.new(0.1),{Color = LinoriaBox.Theme.STROKE}):Play()
+				Button.MouseEnter:Connect(function()
+					if Default then
+						return
 					end
-					ConfigSystem.CurrentConfig[configKey] = val
+
+					Tween:Create(Ui, TweenInfo.new(0.15), {BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
+				end)
+
+				Button.MouseLeave:Connect(function()
+					if Default then
+						return
+					end
+
+					Tween:Create(Ui, TweenInfo.new(0.15), {BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
+				end)
+
+				local function Effect(vcal)
+					if vcal then
+						Tween:Create(Ui, TweenInfo.new(0.15), {BackgroundColor3 = NoHyper.Theme.SYSTEM}):Play()
+						True.Visible = true
+					else
+						True.Visible = false
+						Tween:Create(Ui, TweenInfo.new(0.15), {BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
+					end
 				end
 
 				Effect(Default)
 
-				ToggleButton.MouseButton1Click:Connect(function()
+				Button.MouseButton1Click:Connect(function()
 					Default = not Default
 					Effect(Default)
+					NoHyper.Config:SetValue(configKey, Default)
 					callback(Default)
 				end)
 
-				Section_Box.update()
+				HyperWindow.ConfigCallbacks[configKey] = function(value)
+					Default = value
+					Effect(value)
+				end
+
+				Section_Hyper.update()
 
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							ToggleLabel.Text = tostring(...)
+							TextLabel.Text = tostring(...)
 						end,
 					},
 					{
@@ -841,16 +1277,25 @@ function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
 						callback = function(v)
 							Default = v
 							Effect(v)
+							NoHyper.Config:SetValue(configKey, v)
 							callback(v)
 						end,
 					}
 				})
 			end
 
-			function Section_Box:AddKeybind(KeybindName:string,Default:Enum.KeyCode,callback)
-				callback = ToDefault(callback,function() end)
+			function Section_Hyper:AddKeybind(KeybindName:string, Default:Enum.KeyCode, callback)
+				callback = ToDefault(callback, function() end)
 
-				local configKey = "Keybind_" .. KeybindName
+				local configKey = TabName .. "_" .. SectionName .. "_" .. KeybindName
+				local savedValue = NoHyper.Config:GetValue(configKey)
+				if savedValue and typeof(savedValue) == 'string' then
+					pcall(function()
+						if Enum.KeyCode[savedValue] then
+							Default = Enum.KeyCode[savedValue]
+						end
+					end)
+				end
 
 				if typeof(Default) == 'string' then
 					pcall(function()
@@ -860,109 +1305,169 @@ function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
 					end)
 				end
 
-				-- Load from config
-				if ConfigSystem.CurrentConfig[configKey] ~= nil then
-					local savedKey = ConfigSystem.CurrentConfig[configKey]
-					if typeof(savedKey) == 'string' and Enum.KeyCode[savedKey] then
-						Default = Enum.KeyCode[savedKey]
-					end
-				end
-
 				local function toname(v:Enum.KeyCode)
 					if v then
 						return v.Name
 					end
+
 					return 'None'
 				end
+				local Keybind = Instance.new("Frame")
+				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+				local Text = Instance.new("TextLabel")
+				local Bind = Instance.new("Frame")
+				local UICorner = Instance.new("UICorner")
+				local BindKey = Instance.new("TextLabel")
+				local Button = Instance.new("TextButton")
 
-				local KeybindFrame = Instance.new("Frame")
-				local KeybindLabel = Instance.new("TextLabel")
-				local KeybindBox = Instance.new("TextButton")
-				local KeybindText = Instance.new("TextLabel")
+				Keybind.Name = "Keybind"
+				Keybind.Parent = Section
+				Keybind.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Keybind.BackgroundTransparency = 1.000
+				Keybind.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Keybind.BorderSizePixel = 0
+				Keybind.ClipsDescendants = true
+				Keybind.Size = UDim2.new(1, 0, 1, 0)
+				Keybind.ZIndex = 7
 
-				KeybindFrame.Name = "Keybind"
-				KeybindFrame.Parent = SectionContent
-				KeybindFrame.BackgroundTransparency = 1
-				KeybindFrame.Size = UDim2.new(0.95, 0, 0, 24)
+				UIAspectRatioConstraint.Parent = Keybind
+				UIAspectRatioConstraint.AspectRatio = 9.000
+				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
-				KeybindLabel.Parent = KeybindFrame
-				KeybindLabel.BackgroundTransparency = 1
-				KeybindLabel.Size = UDim2.new(1, -60, 1, 0)
-				KeybindLabel.Font = Enum.Font.Gotham
-				KeybindLabel.Text = KeybindName or "Keybind"
-				KeybindLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-				KeybindLabel.TextSize = 12
-				KeybindLabel.TextXAlignment = Enum.TextXAlignment.Left
+				Text.Name = "Text"
+				Text.Parent = Keybind
+				Text.AnchorPoint = Vector2.new(0, 0.5)
+				Text.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Text.BackgroundTransparency = 1.000
+				Text.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Text.BorderSizePixel = 0
+				Text.Position = UDim2.new(0.0516665913, 0, 0.499999881, 0)
+				Text.Size = UDim2.new(0.998333275, 0, 0.444999993, 0)
+				Text.ZIndex = 7
+				Text.Font = Enum.Font.GothamMedium
+				Text.Text = KeybindName or "KEYBIND"
+				Text.TextColor3 = NoHyper.Theme.TEXT
+				Text.TextScaled = true
+				Text.TextSize = 14.000
+				Text.TextStrokeTransparency = 0.800
+				Text.TextTransparency = 0.100
+				Text.TextWrapped = true
+				Text.TextXAlignment = Enum.TextXAlignment.Left
 
-				KeybindBox.Name = "Box"
-				KeybindBox.Parent = KeybindFrame
-				KeybindBox.AnchorPoint = Vector2.new(1, 0.5)
-				KeybindBox.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
-				KeybindBox.BorderSizePixel = 0
-				KeybindBox.Position = UDim2.new(1, 0, 0.5, 0)
-				KeybindBox.Size = UDim2.new(0, 50, 0, 20)
-				KeybindBox.Font = Enum.Font.Gotham
-				KeybindBox.Text = ""
+				Bind.Name = "Bind"
+				Bind.Parent = Keybind
+				Bind.AnchorPoint = Vector2.new(1, 0.5)
+				Bind.BackgroundColor3 = NoHyper.Theme.BACKGROUND
+				Bind.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Bind.BorderSizePixel = 0
+				Bind.Position = UDim2.new(0.950000226, 0, 0.500000417, 0)
+				Bind.Size = UDim2.new(0.177682102, 0, 0.649999976, 0)
+				Bind.ZIndex = 7
 
-				local BoxCorner = Instance.new("UICorner")
-				BoxCorner.Parent = KeybindBox
-				BoxCorner.CornerRadius = UDim.new(0, 3)
+				UICorner.CornerRadius = UDim.new(0, 6)
+				UICorner.Parent = Bind
 
-				local BoxStroke = Instance.new("UIStroke")
-				BoxStroke.Parent = KeybindBox
-				BoxStroke.Color = LinoriaBox.Theme.STROKE
-				BoxStroke.Thickness = 1
+				BindKey.Name = "BindKey"
+				BindKey.Parent = Bind
+				BindKey.AnchorPoint = Vector2.new(0, 0.5)
+				BindKey.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				BindKey.BackgroundTransparency = 1.000
+				BindKey.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				BindKey.BorderSizePixel = 0
+				BindKey.Position = UDim2.new(0, 0, 0.5, 0)
+				BindKey.Size = UDim2.new(1, 0, 0.649999976, 0)
+				BindKey.ZIndex = 7
+				BindKey.Font = Enum.Font.GothamBold
+				BindKey.Text = toname(Default)
+				BindKey.TextColor3 = NoHyper.Theme.TEXT
+				BindKey.TextScaled = true
+				BindKey.TextSize = 14.000
+				BindKey.TextWrapped = true
 
-				KeybindText.Parent = KeybindBox
-				KeybindText.BackgroundTransparency = 1
-				KeybindText.Size = UDim2.new(1, 0, 1, 0)
-				KeybindText.Font = Enum.Font.GothamMedium
-				KeybindText.Text = toname(Default)
-				KeybindText.TextColor3 = Color3.fromRGB(200, 200, 200)
-				KeybindText.TextSize = 11
+				Button.Name = "Button"
+				Button.Parent = Keybind
+				Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Button.BackgroundTransparency = 1.000
+				Button.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Button.BorderSizePixel = 0
+				Button.Size = UDim2.new(1, 0, 1, 0)
+				Button.ZIndex = 9
+				Button.Font = Enum.Font.SourceSans
+				Button.Text = ""
+				Button.TextColor3 = Color3.fromRGB(0, 0, 0)
+				Button.TextSize = 14.000
+				Button.TextTransparency = 1.000
 
 				local BindConnect
 
-				KeybindBox.MouseEnter:Connect(function()
-					if BindConnect then return end
-					Tween:Create(KeybindBox,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.TOUCH}):Play()
+				Button.MouseEnter:Connect(function()
+					if BindConnect then
+						return
+					end
+					Tween:Create(Bind, TweenInfo.new(0.15), {BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
 				end)
 
-				KeybindBox.MouseLeave:Connect(function()
-					if BindConnect then return end
-					Tween:Create(KeybindBox,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.BACKGROUND}):Play()
+				Button.MouseLeave:Connect(function()
+					if BindConnect then
+						return
+					end
+					Tween:Create(Bind, TweenInfo.new(0.15), {BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 				end)
 
-				KeybindBox.MouseButton1Click:Connect(function()
-					if BindConnect then return end
+				local function UpdateText()
+					local t = BindKey.Text
+					local siz = TextService:GetTextSize(t, BindKey.TextSize, BindKey.Font, Vector2.new(math.huge, math.huge))
+					Tween:Create(Bind, TweenInfo.new(0.15), {Size = UDim2.new(0, siz.X + 15, 0.65, 0)}):Play()
+				end
 
-					KeybindText.Text = '...'
-					Tween:Create(KeybindBox,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.SYSTEM}):Play()
+				UpdateText()
+
+				Button.MouseButton1Click:Connect(function()
+					if BindConnect then
+						return
+					end
+
+					BindKey.Text = '...'
+					UpdateText()
+					Tween:Create(Bind, TweenInfo.new(0.15), {BackgroundColor3 = NoHyper.Theme.SYSTEM}):Play()
 					BindConnect = 'wait'
 					BindConnect = UIS.InputBegan:Wait()
 
 					if BindConnect.KeyCode ~= Enum.KeyCode.Unknown then
-						KeybindText.Text = toname(BindConnect.KeyCode)
+						BindKey.Text = toname(BindConnect.KeyCode)
 						Default = BindConnect.KeyCode
-						ConfigSystem.CurrentConfig[configKey] = BindConnect.KeyCode.Name
+						NoHyper.Config:SetValue(configKey, BindConnect.KeyCode.Name)
 						pcall(function()
-							task.spawn(callback,BindConnect.KeyCode)
+							task.spawn(callback, BindConnect.KeyCode)
 						end)
 					else
-						KeybindText.Text = toname(Default)
+						BindKey.Text = toname(Default)
+						UpdateText()
 					end
 
-					Tween:Create(KeybindBox,TweenInfo.new(0.1),{BackgroundColor3 = LinoriaBox.Theme.BACKGROUND}):Play()
+					Tween:Create(Bind, TweenInfo.new(0.15), {BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
+
+					UpdateText()
 					BindConnect = nil
 				end)
 
-				Section_Box.update()
+				HyperWindow.ConfigCallbacks[configKey] = function(value)
+					if typeof(value) == 'string' then
+						pcall(function()
+							if Enum.KeyCode[value] then
+								Default = Enum.KeyCode[value]
+								BindKey.Text = toname(Default)
+								UpdateText()
+							end
+						end)
+					end
+				end
 
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							KeybindLabel.Text = tostring(...)
+							TextLabel.Text = tostring(...)
 						end,
 					},
 					{
@@ -973,121 +1478,172 @@ function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
 						name = 'Value',
 						callback = function(v)
 							Default = v
-							KeybindText.Text = toname(v)
+							BindKey.Text = toname(v)
+							UpdateText()
+							if typeof(v) == 'string' then
+								NoHyper.Config:SetValue(configKey, v)
+							else
+								NoHyper.Config:SetValue(configKey, v.Name)
+							end
 							callback(v)
 						end,
 					},
 					{
 						name = 'Get',
-						callback = function()
+						callback = function(v)
 							return Default
 						end,
 					},
 				})
 			end
 
-			function Section_Box:AddSlider(SliderName,Value:{Min:number,Max:number,Default:number,ValueT:string},callback)
+			function Section_Hyper:AddSlider(SliderName, Value:{Min:number, Max:number, Default:number, ValueT:string}, callback)
 				Value = Value or {}
 				Value.Min = Value.Min or 1
 				Value.Max = Value.Max or 100
 				Value.Default = Value.Default or Value.Min
 				Value.ValueT = Value.ValueT or ''
 
-				callback = ToDefault(callback,function() end)
+				callback = ToDefault(callback, function()
 
-				local configKey = "Slider_" .. SliderName
+				end)
 
-				-- Load from config
-				if ConfigSystem.CurrentConfig[configKey] ~= nil then
-					Value.Default = ConfigSystem.CurrentConfig[configKey]
+				local configKey = TabName .. "_" .. SectionName .. "_" .. SliderName
+				local savedValue = NoHyper.Config:GetValue(configKey, Value.Default)
+				if savedValue then
+					Value.Default = savedValue
 				end
 
-				local SliderFrame = Instance.new("Frame")
-				local SliderLabel = Instance.new("TextLabel")
-				local SliderValueLabel = Instance.new("TextLabel")
-				local SliderBar = Instance.new("Frame")
-				local SliderFill = Instance.new("Frame")
-				local SliderButton = Instance.new("TextButton")
+				local Slider = Instance.new("Frame")
+				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+				local Text = Instance.new("TextLabel")
+				local Ui = Instance.new("Frame")
+				local UICorner = Instance.new("UICorner")
+				local SLIDE = Instance.new("Frame")
+				local UICorner_2 = Instance.new("UICorner")
+				local Frame = Instance.new("Frame")
+				local UICorner_3 = Instance.new("UICorner")
+				local UIStroke = Instance.new("UIStroke")
+				local ValueText = Instance.new("TextLabel")
 
-				SliderFrame.Name = "Slider"
-				SliderFrame.Parent = SectionContent
-				SliderFrame.BackgroundTransparency = 1
-				SliderFrame.Size = UDim2.new(0.95, 0, 0, 38)
+				Slider.Name = "Slider"
+				Slider.Parent = Section
+				Slider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Slider.BackgroundTransparency = 1.000
+				Slider.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Slider.BorderSizePixel = 0
+				Slider.ClipsDescendants = true
+				Slider.Size = UDim2.new(1, 0, 1, 0)
+				Slider.ZIndex = 7
 
-				SliderLabel.Parent = SliderFrame
-				SliderLabel.BackgroundTransparency = 1
-				SliderLabel.Position = UDim2.new(0, 0, 0, 0)
-				SliderLabel.Size = UDim2.new(0.7, 0, 0, 16)
-				SliderLabel.Font = Enum.Font.Gotham
-				SliderLabel.Text = SliderName or "Slider"
-				SliderLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-				SliderLabel.TextSize = 12
-				SliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+				UIAspectRatioConstraint.Parent = Slider
+				UIAspectRatioConstraint.AspectRatio = 9.000
+				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
-				SliderValueLabel.Parent = SliderFrame
-				SliderValueLabel.BackgroundTransparency = 1
-				SliderValueLabel.Position = UDim2.new(0.7, 0, 0, 0)
-				SliderValueLabel.Size = UDim2.new(0.3, 0, 0, 16)
-				SliderValueLabel.Font = Enum.Font.GothamMedium
-				SliderValueLabel.Text = tostring(Value.Default)..Value.ValueT
-				SliderValueLabel.TextColor3 = LinoriaBox.Theme.MAIN
-				SliderValueLabel.TextSize = 11
-				SliderValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+				Text.Name = "Text"
+				Text.Parent = Slider
+				Text.AnchorPoint = Vector2.new(0, 0.5)
+				Text.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Text.BackgroundTransparency = 1.000
+				Text.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Text.BorderSizePixel = 0
+				Text.Position = UDim2.new(0.0516665913, 0, 0.499999881, 0)
+				Text.Size = UDim2.new(0.998333275, 0, 0.444999993, 0)
+				Text.ZIndex = 7
+				Text.Font = Enum.Font.GothamMedium
+				Text.Text = SliderName or "AIM BOT RANGE"
+				Text.TextColor3 = NoHyper.Theme.TEXT
+				Text.TextScaled = true
+				Text.TextSize = 14.000
+				Text.TextStrokeTransparency = 0.800
+				Text.TextTransparency = 0.100
+				Text.TextWrapped = true
+				Text.TextXAlignment = Enum.TextXAlignment.Left
 
-				SliderBar.Name = "Bar"
-				SliderBar.Parent = SliderFrame
-				SliderBar.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
-				SliderBar.BorderSizePixel = 0
-				SliderBar.Position = UDim2.new(0, 0, 0, 20)
-				SliderBar.Size = UDim2.new(1, 0, 0, 14)
+				Ui.Name = "Ui"
+				Ui.Parent = Slider
+				Ui.AnchorPoint = Vector2.new(1, 0.5)
+				Ui.BackgroundColor3 = NoHyper.Theme.BACKGROUND
+				Ui.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Ui.BorderSizePixel = 0
+				Ui.Position = UDim2.new(0.949999869, 0, 0.500000417, 0)
+				Ui.Size = UDim2.new(0.44600001, 0, 0.324999988, 0)
+				Ui.ZIndex = 10
+				Ui.Active = true
 
-				local BarCorner = Instance.new("UICorner")
-				BarCorner.Parent = SliderBar
-				BarCorner.CornerRadius = UDim.new(0, 3)
+				UICorner.CornerRadius = UDim.new(0, 6)
+				UICorner.Parent = Ui
 
-				local BarStroke = Instance.new("UIStroke")
-				BarStroke.Parent = SliderBar
-				BarStroke.Color = LinoriaBox.Theme.STROKE
-				BarStroke.Thickness = 1
+				SLIDE.Name = "SLIDE"
+				SLIDE.Parent = Ui
+				SLIDE.BackgroundColor3 = NoHyper.Theme.MAIN
+				SLIDE.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				SLIDE.BorderSizePixel = 0
+				SLIDE.Size = UDim2.new((Value.Default / Value.Max), 0, 1, 0)
+				SLIDE.ZIndex = 11
 
-				SliderFill.Name = "Fill"
-				SliderFill.Parent = SliderBar
-				SliderFill.BackgroundColor3 = LinoriaBox.Theme.MAIN
-				SliderFill.BorderSizePixel = 0
-				SliderFill.Size = UDim2.fromScale((Value.Default - Value.Min) / (Value.Max - Value.Min), 1)
+				UICorner_2.CornerRadius = UDim.new(0, 6)
+				UICorner_2.Parent = SLIDE
 
-				local FillCorner = Instance.new("UICorner")
-				FillCorner.Parent = SliderFill
-				FillCorner.CornerRadius = UDim.new(0, 3)
+				Frame.Parent = SLIDE
+				Frame.AnchorPoint = Vector2.new(1, 0)
+				Frame.BackgroundColor3 = NoHyper.Theme.SYSTEM
+				Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Frame.BorderSizePixel = 0
+				Frame.Position = UDim2.new(1.05, 0, 0, 0)
+				Frame.Size = UDim2.new(1, 0, 1, 0)
+				Frame.SizeConstraint = Enum.SizeConstraint.RelativeYY
+				Frame.ZIndex = 12
 
-				SliderButton.Parent = SliderFrame
-				SliderButton.BackgroundTransparency = 1
-				SliderButton.Position = UDim2.new(0, 0, 0, 20)
-				SliderButton.Size = UDim2.new(1, 0, 0, 14)
-				SliderButton.Text = ""
-				SliderButton.ZIndex = 10
+				UICorner_3.CornerRadius = UDim.new(1, 0)
+				UICorner_3.Parent = Frame
+
+				UIStroke.Thickness = 2.000
+				UIStroke.Color = NoHyper.Theme.MAIN
+				UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+				UIStroke.Parent = Frame
+
+				ValueText.Name = "ValueText"
+				ValueText.Parent = Ui
+				ValueText.AnchorPoint = Vector2.new(0, 1)
+				ValueText.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				ValueText.BackgroundTransparency = 1.000
+				ValueText.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				ValueText.BorderSizePixel = 0
+				ValueText.Position = UDim2.new(0, 0, -0.150000006, 0)
+				ValueText.Size = UDim2.new(1, 0, 1, 0)
+				ValueText.ZIndex = 7
+				ValueText.Font = Enum.Font.GothamBold
+				ValueText.Text = tostring(Value.Default) .. ' / ' .. tostring(Value.Max) .. tostring(Value.ValueT)
+				ValueText.TextColor3 = NoHyper.Theme.SUBTEXT
+				ValueText.TextScaled = true
+				ValueText.TextSize = 14.000
+				ValueText.TextStrokeTransparency = 0.800
+				ValueText.TextTransparency = 0.300
+				ValueText.TextWrapped = true
 
 				local Touch = false
 
 				local function update(Input)
-					local SizeScale = math.clamp((((Input.Position.X) - SliderBar.AbsolutePosition.X) / SliderBar.AbsoluteSize.X), 0, 1)
+					local SizeScale = math.clamp((((Input.Position.X) - Ui.AbsolutePosition.X) / Ui.AbsoluteSize.X), 0, 1)
 					local Valuea = math.floor(((Value.Max - Value.Min) * SizeScale) + Value.Min)
 					local Size = UDim2.fromScale(SizeScale, 1)
-					SliderValueLabel.Text = tostring(Valuea)..Value.ValueT
-					Tween:Create(SliderFill,TweenInfo.new(0.05),{Size = Size}):Play()
+					ValueText.Text = tostring(Valuea) .. ' / ' .. tostring(Value.Max) .. tostring(Value.ValueT)
+					Tween:Create(SLIDE, TweenInfo.new(0.1), {Size = Size}):Play()
 					Value.Default = Valuea
-					ConfigSystem.CurrentConfig[configKey] = Valuea
+					NoHyper.Config:SetValue(configKey, Valuea)
 					callback(Valuea)
 				end
 
-				SliderButton.InputBegan:Connect(function(Input)
+				Ui.InputBegan:Connect(function(Input)
 					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 						Touch = true
 						update(Input)
+
 					end
 				end)
 
-				SliderButton.InputEnded:Connect(function(Input)
+				Ui.InputEnded:Connect(function(Input)
 					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 						Touch = false
 					end
@@ -1095,19 +1651,24 @@ function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
 
 				UIS.InputChanged:Connect(function(Input)
 					if Touch then
-						if (Input.UserInputType==Enum.UserInputType.MouseMovement or Input.UserInputType==Enum.UserInputType.Touch) then
+						if (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
 							update(Input)
 						end
 					end
 				end)
 
-				Section_Box.update()
+				HyperWindow.ConfigCallbacks[configKey] = function(value)
+					Value.Default = value
+					local Size = UDim2.fromScale((value / Value.Max), 1)
+					ValueText.Text = tostring(value) .. ' / ' .. tostring(Value.Max) .. tostring(Value.ValueT)
+					Tween:Create(SLIDE, TweenInfo.new(0.1), {Size = Size}):Play()
+				end
 
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							SliderLabel.Text = tostring(...)
+							TextLabel.Text = tostring(...)
 						end,
 					},
 					{
@@ -1118,235 +1679,321 @@ function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
 						name = 'Value',
 						callback = function(v)
 							Value.Default = v
-							local Size = UDim2.fromScale((v - Value.Min) / (Value.Max - Value.Min), 1)
-							SliderValueLabel.Text = tostring(v)..Value.ValueT
-							Tween:Create(SliderFill,TweenInfo.new(0.1),{Size = Size}):Play()
+							local Size = UDim2.fromScale((v / Value.Max), 1)
+							ValueText.Text = tostring(v) .. ' / ' .. tostring(Value.Max) .. tostring(Value.ValueT)
+							Tween:Create(SLIDE, TweenInfo.new(0.1), {Size = Size}):Play()
+							NoHyper.Config:SetValue(configKey, v)
 							callback(v)
 						end,
 					},
 					{
 						name = 'Get',
-						callback = function()
+						callback = function(v)
 							return Value.Default
 						end,
 					},
 				})
 			end
 
-			function Section_Box:AddDropdown(DropdownName:string,DropdownInfo:{any},DropdownDefault:any,callback)
+			function Section_Hyper:AddDropdown(DropdownName:string, DropdownInfo:{any}, DropdownDefault:any, callback)
 				DropdownInfo = DropdownInfo or {}
 				DropdownDefault = DropdownDefault or DropdownInfo[1]
 
-				local configKey = "Dropdown_" .. DropdownName
-
-				-- Load from config
-				if ConfigSystem.CurrentConfig[configKey] ~= nil then
-					DropdownDefault = ConfigSystem.CurrentConfig[configKey]
+				local configKey = TabName .. "_" .. SectionName .. "_" .. DropdownName
+				local savedValue = NoHyper.Config:GetValue(configKey, DropdownDefault)
+				if savedValue then
+					DropdownDefault = savedValue
 				end
 
-				local DropdownFrame = Instance.new("Frame")
-				local DropdownLabel = Instance.new("TextLabel")
-				local DropdownBox = Instance.new("TextButton")
-				local DropdownValue = Instance.new("TextLabel")
-				local DropdownIcon = Instance.new("ImageLabel")
-				local DropdownList = Instance.new("Frame")
-				local DropdownScroll = Instance.new("ScrollingFrame")
+				local Dropdown = Instance.new("Frame")
+				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+				local Text = Instance.new("TextLabel")
+				local Ui = Instance.new("Frame")
+				local UICorner = Instance.new("UICorner")
+				local ValueText = Instance.new("TextLabel")
+				local ValueIcon = Instance.new("Frame")
+				local UICorner_2 = Instance.new("UICorner")
+				local Iconcc = Instance.new("ImageLabel")
+				local Button = Instance.new("TextButton")
+				local Drop = Instance.new("Frame")
+				local UICorner_3 = Instance.new("UICorner")
+				local UIStroke = Instance.new("UIStroke")
 				local UIListLayout = Instance.new("UIListLayout")
-
 				local DOPWN = 'rbxassetid://7733717447'
 				local UP = 'rbxassetid://7072706796'
 
-				DropdownFrame.Name = "Dropdown"
-				DropdownFrame.Parent = SectionContent
-				DropdownFrame.BackgroundTransparency = 1
-				DropdownFrame.Size = UDim2.new(0.95, 0, 0, 24)
-				DropdownFrame.ClipsDescendants = false
+				Dropdown.Name = "Dropdown"
+				Dropdown.Parent = Section
+				Dropdown.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Dropdown.BackgroundTransparency = 1.000
+				Dropdown.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Dropdown.BorderSizePixel = 0
+				Dropdown.Size = UDim2.new(1, 0, 1, 0)
+				Dropdown.ZIndex = 7
 
-				DropdownLabel.Parent = DropdownFrame
-				DropdownLabel.BackgroundTransparency = 1
-				DropdownLabel.Size = UDim2.new(1, 0, 0, 12)
-				DropdownLabel.Font = Enum.Font.Gotham
-				DropdownLabel.Text = DropdownName or "Dropdown"
-				DropdownLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-				DropdownLabel.TextSize = 12
-				DropdownLabel.TextXAlignment = Enum.TextXAlignment.Left
+				UIAspectRatioConstraint.Parent = Dropdown
+				UIAspectRatioConstraint.AspectRatio = 9.000
+				UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
-				DropdownBox.Name = "Box"
-				DropdownBox.Parent = DropdownFrame
-				DropdownBox.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
-				DropdownBox.BorderSizePixel = 0
-				DropdownBox.Position = UDim2.new(0, 0, 0, 14)
-				DropdownBox.Size = UDim2.new(1, 0, 0, 22)
-				DropdownBox.Text = ""
-				DropdownBox.ZIndex = 10
+				Text.Name = "Text"
+				Text.Parent = Dropdown
+				Text.AnchorPoint = Vector2.new(0, 0.5)
+				Text.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Text.BackgroundTransparency = 1.000
+				Text.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Text.BorderSizePixel = 0
+				Text.Position = UDim2.new(0.0516665727, 0, 0.499999762, 0)
+				Text.Size = UDim2.new(0.948333681, 0, 0.445000023, 0)
+				Text.ZIndex = 7
+				Text.Font = Enum.Font.GothamMedium
+				Text.Text = tostring(DropdownName or ' - ')
+				Text.TextColor3 = NoHyper.Theme.TEXT
+				Text.TextScaled = true
+				Text.TextSize = 14.000
+				Text.TextStrokeTransparency = 0.800
+				Text.TextTransparency = 0.100
+				Text.TextWrapped = true
+				Text.TextXAlignment = Enum.TextXAlignment.Left
 
-				local BoxCorner = Instance.new("UICorner")
-				BoxCorner.Parent = DropdownBox
-				BoxCorner.CornerRadius = UDim.new(0, 3)
+				Ui.Name = "Ui"
+				Ui.Parent = Dropdown
+				Ui.AnchorPoint = Vector2.new(1, 0.5)
+				Ui.BackgroundColor3 = NoHyper.Theme.BACKGROUND
+				Ui.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Ui.BorderSizePixel = 0
+				Ui.ClipsDescendants = true
+				Ui.Position = UDim2.new(0.950000226, 0, 0.450411677, 0)
+				Ui.Size = UDim2.new(0.446000099, 0, 0.75, 0)
+				Ui.ZIndex = 7
 
-				local BoxStroke = Instance.new("UIStroke")
-				BoxStroke.Parent = DropdownBox
-				BoxStroke.Color = LinoriaBox.Theme.STROKE
-				BoxStroke.Thickness = 1
+				UICorner.CornerRadius = UDim.new(0, 6)
+				UICorner.Parent = Ui
 
-				DropdownValue.Parent = DropdownBox
-				DropdownValue.BackgroundTransparency = 1
-				DropdownValue.Position = UDim2.new(0, 6, 0, 0)
-				DropdownValue.Size = UDim2.new(1, -26, 1, 0)
-				DropdownValue.Font = Enum.Font.Gotham
-				DropdownValue.Text = tostring(DropdownDefault or 'None')
-				DropdownValue.TextColor3 = Color3.fromRGB(200, 200, 200)
-				DropdownValue.TextSize = 11
-				DropdownValue.TextXAlignment = Enum.TextXAlignment.Left
+				ValueText.Name = "ValueText"
+				ValueText.Parent = Ui
+				ValueText.AnchorPoint = Vector2.new(0.5, 0.5)
+				ValueText.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				ValueText.BackgroundTransparency = 1.000
+				ValueText.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				ValueText.BorderSizePixel = 0
+				ValueText.Position = UDim2.new(0.840817988, 0, 0.499999613, 0)
+				ValueText.Size = UDim2.new(1.58200002, 0, 0.449999988, 0)
+				ValueText.ZIndex = 8
+				ValueText.Font = Enum.Font.GothamBold
+				ValueText.Text = tostring(DropdownDefault or 'None')
+				ValueText.TextColor3 = NoHyper.Theme.TEXT
+				ValueText.TextScaled = true
+				ValueText.TextSize = 14.000
+				ValueText.TextTransparency = 0.300
+				ValueText.TextWrapped = true
+				ValueText.TextXAlignment = Enum.TextXAlignment.Left
 
-				DropdownIcon.Parent = DropdownBox
-				DropdownIcon.AnchorPoint = Vector2.new(1, 0.5)
-				DropdownIcon.BackgroundTransparency = 1
-				DropdownIcon.Position = UDim2.new(1, -6, 0.5, 0)
-				DropdownIcon.Size = UDim2.new(0, 14, 0, 14)
-				DropdownIcon.Image = DOPWN
+				ValueIcon.Name = "ValueIcon"
+				ValueIcon.Parent = Ui
+				ValueIcon.AnchorPoint = Vector2.new(1, 0.5)
+				ValueIcon.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				ValueIcon.BackgroundTransparency = 1.000
+				ValueIcon.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				ValueIcon.BorderSizePixel = 0
+				ValueIcon.Position = UDim2.new(1, 0, 0.5, 0)
+				ValueIcon.Size = UDim2.new(0.850000024, 0, 0.850000024, 0)
+				ValueIcon.SizeConstraint = Enum.SizeConstraint.RelativeYY
+				ValueIcon.ZIndex = 8
 
-				DropdownList.Name = "List"
-				DropdownList.Parent = DropdownFrame
-				DropdownList.BackgroundColor3 = LinoriaBox.Theme.SECTION
-				DropdownList.BorderSizePixel = 0
-				DropdownList.Position = UDim2.new(0, 0, 0, 38)
-				DropdownList.Size = UDim2.new(1, 0, 0, 0)
-				DropdownList.Visible = false
-				DropdownList.ZIndex = 20
-				DropdownList.ClipsDescendants = true
+				UICorner_2.CornerRadius = UDim.new(0, 6)
+				UICorner_2.Parent = ValueIcon
 
-				local ListCorner = Instance.new("UICorner")
-				ListCorner.Parent = DropdownList
-				ListCorner.CornerRadius = UDim.new(0, 3)
+				Iconcc.Name = "Icon.cc"
+				Iconcc.Parent = ValueIcon
+				Iconcc.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Iconcc.BackgroundTransparency = 1.000
+				Iconcc.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Iconcc.BorderSizePixel = 0
+				Iconcc.Size = UDim2.new(1, 0, 1, 0)
+				Iconcc.ZIndex = 7
+				Iconcc.Image = DOPWN
 
-				local ListStroke = Instance.new("UIStroke")
-				ListStroke.Parent = DropdownList
-				ListStroke.Color = LinoriaBox.Theme.STROKE
-				ListStroke.Thickness = 1
+				Button.Name = "Button"
+				Button.Parent = Dropdown
+				Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				Button.BackgroundTransparency = 1.000
+				Button.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Button.BorderSizePixel = 0
+				Button.Size = UDim2.new(1, 0, 1, 0)
+				Button.ZIndex = 12
+				Button.Font = Enum.Font.SourceSans
+				Button.Text = ""
+				Button.TextColor3 = Color3.fromRGB(0, 0, 0)
+				Button.TextSize = 14.000
+				Button.TextTransparency = 1.000
 
-				DropdownScroll.Parent = DropdownList
-				DropdownScroll.Active = true
-				DropdownScroll.BackgroundTransparency = 1
-				DropdownScroll.Position = UDim2.new(0, 4, 0, 4)
-				DropdownScroll.Size = UDim2.new(1, -8, 1, -8)
-				DropdownScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-				DropdownScroll.ScrollBarThickness = 4
-				DropdownScroll.ScrollBarImageColor3 = LinoriaBox.Theme.MAIN
+				Drop.Name = "Drop"
+				Drop.Parent = Dropdown
+				Drop.AnchorPoint = Vector2.new(1, 0)
+				Drop.BackgroundColor3 = NoHyper.Theme.SECTION
+				Drop.BorderColor3 = Color3.fromRGB(0, 0, 0)
+				Drop.BorderSizePixel = 0
+				Drop.ClipsDescendants = true
+				Drop.Position = UDim2.new(0.950000048, 0, 0.999999702, 0)
+				Drop.Size = UDim2.new(0.446000069, 0, 0, 10)
+				Drop.Visible = false
+				Drop.ZIndex = 16
+				Drop.Active = true
 
-				UIListLayout.Parent = DropdownScroll
+				UICorner_3.CornerRadius = UDim.new(0, 6)
+				UICorner_3.Parent = Drop
+
+				UIStroke.Color = NoHyper.Theme.STROKE
+				UIStroke.Parent = Drop
+
+				UIListLayout.Parent = Drop
+				UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 				UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-				UIListLayout.Padding = UDim.new(0, 2)
+				UIListLayout.Padding = UDim.new(0, 5)
 
-				scrolling_connect(DropdownScroll)
+				local function valshopw()
+					local old = 1
 
-				local function getItemHeight()
-					local height = 8
-					for i,v in ipairs(DropdownScroll:GetChildren()) do
+					for i, v in ipairs(Drop:GetChildren()) do
 						if v:IsA('TextButton') then
-							height = height + v.AbsoluteSize.Y + UIListLayout.Padding.Offset
+							old += (v.AbsoluteSize.Y or 27) + UIListLayout.Padding.Offset
 						end
 					end
-					return math.min(height, 120)
+
+					return old + 1
 				end
 
-				local function Toggle(open)
-					if open then
-						DropdownIcon.Image = UP
-						DropdownList.Visible = true
-						Tween:Create(DropdownList,TweenInfo.new(0.15),{
-							Size = UDim2.new(1, 0, 0, getItemHeight())
-						}):Play()
-						Tween:Create(DropdownBox,TweenInfo.new(0.15),{BackgroundColor3 = LinoriaBox.Theme.TOUCH}):Play()
+				Drop:GetPropertyChangedSignal('Size'):Connect(function()
+					if Drop.Size.Y.Offset <= 15 then
+						Drop.Visible = false
 					else
-						DropdownIcon.Image = DOPWN
-						Tween:Create(DropdownList,TweenInfo.new(0.15),{
-							Size = UDim2.new(1, 0, 0, 0)
-						}):Play()
-						Tween:Create(DropdownBox,TweenInfo.new(0.15),{BackgroundColor3 = LinoriaBox.Theme.BACKGROUND}):Play()
-						delay(0.15, function()
-							DropdownList.Visible = false
-						end)
+						Drop.Visible = true
 					end
+				end)
+
+				local function Toggle(vla)
+					if vla then
+						Iconcc.Image = UP
+						Tween:Create(Drop, TweenInfo.new(0.2), {
+							Size = UDim2.new(0.446000069, 0, 0, valshopw() + 6),
+						}):Play()
+						Tween:Create(Ui, TweenInfo.new(0.2), {BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
+					else
+						Iconcc.Image = DOPWN
+						Tween:Create(Drop, TweenInfo.new(0.2), {
+							Size = UDim2.new(0.446000069, 0, 0, 15),
+						}):Play()
+
+						Tween:Create(Ui, TweenInfo.new(0.2), {BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
+					end
+				end
+
+				local function getbutton()
+
+					local Button = Instance.new("TextButton")
+					local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+					local Frame = Instance.new("Frame")
+					local UICorner = Instance.new("UICorner")
+					local Frame_2 = Instance.new("Frame")
+
+					Button.Name = "Button"
+					Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+					Button.BackgroundTransparency = 1.000
+					Button.BorderColor3 = Color3.fromRGB(0, 0, 0)
+					Button.BorderSizePixel = 0
+					Button.ClipsDescendants = true
+					Button.Size = UDim2.new(0.850000024, 0, 0.5, 0)
+					Button.ZIndex = 25
+					Button.Font = Enum.Font.GothamBold
+					Button.TextColor3 = NoHyper.Theme.TEXT
+					Button.TextScaled = true
+					Button.TextSize = 14.000
+					Button.TextTransparency = 0.100
+					Button.TextWrapped = true
+					Button.TextXAlignment = Enum.TextXAlignment.Left
+
+					UIAspectRatioConstraint.Parent = Button
+					UIAspectRatioConstraint.AspectRatio = 6.500
+					UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
+
+					Frame.Parent = Button
+					Frame.AnchorPoint = Vector2.new(0.5, 0.5)
+					Frame.BackgroundColor3 = NoHyper.Theme.MAIN
+					Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
+					Frame.BorderSizePixel = 0
+					Frame.Position = UDim2.new(1, 0, 0.5, 0)
+					Frame.Size = UDim2.new(0.100000001, 0, 0.800000012, 0)
+					Frame.ZIndex = 20
+
+					UICorner.CornerRadius = UDim.new(1, 0)
+					UICorner.Parent = Frame
+
+					return Button, Frame
 				end
 
 				local function Render()
-					for i,v in ipairs(DropdownScroll:GetChildren()) do
+					for i, v in ipairs(Drop:GetChildren()) do
 						if v:IsA('TextButton') then
 							v:Destroy()
 						end
 					end
 
-					for i,v in pairs(DropdownInfo) do
-						local OptionButton = Instance.new("TextButton")
-						local OptionCheck = Instance.new("Frame")
+					local lastui
+					for i, v in pairs(DropdownInfo) do
+						local ubtton, Toggle = getbutton()
+						if v == DropdownDefault then
+							Tween:Create(Toggle, TweenInfo.new(0.15), {BackgroundTransparency = 0, Size = UDim2.new(0.100000001, 0, 0.800000012, 0)}):Play()
+							lastui = Toggle
+						else
+							Tween:Create(Toggle, TweenInfo.new(0.15), {BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0.800000012, 0)}):Play()
 
-						OptionButton.Name = "Option"
-						OptionButton.Parent = DropdownScroll
-						OptionButton.BackgroundColor3 = LinoriaBox.Theme.BACKGROUND
-						OptionButton.BackgroundTransparency = 1
-						OptionButton.BorderSizePixel = 0
-						OptionButton.Size = UDim2.new(1, 0, 0, 20)
-						OptionButton.Font = Enum.Font.Gotham
-						OptionButton.Text = "  " .. tostring(v)
-						OptionButton.TextColor3 = Color3.fromRGB(200, 200, 200)
-						OptionButton.TextSize = 11
-						OptionButton.TextXAlignment = Enum.TextXAlignment.Left
-						OptionButton.ZIndex = 25
+						end
+						ubtton.Parent = Drop
+						ubtton.Text = tostring(v)
+						ubtton.MouseButton1Click:Connect(function()
+							if lastui then
+								Tween:Create(lastui, TweenInfo.new(0.15), {BackgroundTransparency = 1, Size = UDim2.new(0, 0, 0.800000012, 0)}):Play()
 
-						OptionCheck.Name = "Check"
-						OptionCheck.Parent = OptionButton
-						OptionCheck.AnchorPoint = Vector2.new(1, 0.5)
-						OptionCheck.BackgroundColor3 = LinoriaBox.Theme.MAIN
-						OptionCheck.BorderSizePixel = 0
-						OptionCheck.Position = UDim2.new(1, 0, 0.5, 0)
-						OptionCheck.Size = UDim2.new(0, v == DropdownDefault and 3 or 0, 0, 16)
-
-						local CheckCorner = Instance.new("UICorner")
-						CheckCorner.Parent = OptionCheck
-						CheckCorner.CornerRadius = UDim.new(0, 2)
-
-						OptionButton.MouseButton1Click:Connect(function()
-							for _,btn in pairs(DropdownScroll:GetChildren()) do
-								if btn:IsA('TextButton') and btn:FindFirstChild('Check') then
-									Tween:Create(btn.Check,TweenInfo.new(0.1),{Size = UDim2.new(0, 0, 0, 16)}):Play()
-								end
 							end
 
-							Tween:Create(OptionCheck,TweenInfo.new(0.1),{Size = UDim2.new(0, 3, 0, 16)}):Play()
+							Tween:Create(Toggle, TweenInfo.new(0.15), {BackgroundTransparency = 0, Size = UDim2.new(0.100000001, 0, 0.800000012, 0)}):Play()
+
+							lastui = Toggle
 							DropdownDefault = v
-							DropdownValue.Text = tostring(v)
-							ConfigSystem.CurrentConfig[configKey] = v
+							ValueText.Text = tostring(DropdownDefault or 'None')
+							NoHyper.Config:SetValue(configKey, v)
 							callback(v)
-							Toggle(false)
 						end)
 
-						OptionButton.MouseEnter:Connect(function()
-							Tween:Create(OptionButton,TweenInfo.new(0.1),{BackgroundTransparency = 0.8, TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+						ubtton.MouseEnter:Connect(function()
+							Tween:Create(ubtton, TweenInfo.new(0.15), {TextColor3 = NoHyper.Theme.MAIN}):Play()
 						end)
 
-						OptionButton.MouseLeave:Connect(function()
-							Tween:Create(OptionButton,TweenInfo.new(0.1),{BackgroundTransparency = 1, TextColor3 = Color3.fromRGB(200, 200, 200)}):Play()
+						ubtton.MouseLeave:Connect(function()
+							Tween:Create(ubtton, TweenInfo.new(0.15), {TextColor3 = NoHyper.Theme.TEXT}):Play()
 						end)
 					end
 				end
 
-				local isOpen = false
+				local valnow = false
 
 				Render()
 
-				DropdownBox.MouseButton1Click:Connect(function()
-					isOpen = not isOpen
-					Toggle(isOpen)
+				Button.MouseButton1Click:Connect(function()
+					valnow = not valnow
+					Toggle(valnow)
 				end)
 
-				Section_Box.update()
+				HyperWindow.ConfigCallbacks[configKey] = function(value)
+					DropdownDefault = value
+					ValueText.Text = tostring(DropdownDefault or 'None')
+				end
 
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							DropdownLabel.Text = tostring(...)
+							TextLabel.Text = tostring(...)
 						end,
 					},
 					{
@@ -1357,13 +2004,14 @@ function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
 						name = 'Value',
 						callback = function(v)
 							DropdownDefault = v
-							DropdownValue.Text = tostring(v)
+							ValueText.Text = tostring(DropdownDefault or 'None')
+							NoHyper.Config:SetValue(configKey, v)
 							callback(v)
 						end,
 					},
 					{
 						name = 'Get',
-						callback = function()
+						callback = function(v)
 							return DropdownDefault
 						end,
 					},
@@ -1377,60 +2025,246 @@ function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
 				})
 			end
 
-			Section_Box.update()
+			Section.ChildAdded:Connect(Section_Hyper.update)
 
-			return Section_Box
+			Section_Hyper.update()
+
+			return Section_Hyper
 		end
 
-		return TabBox
+		return TabHyper
 	end
 
-	function BoxWindow:NewSize(v)
-		BoxWindow.Size = v
+	function HyperWindow:NewSize(v)
+		HyperWindow.Size = v
 		MainFrame.Size = v
 	end
 
-	function BoxWindow:SetConfigName(name)
-		BoxWindow.ConfigName = name
-	end
-
-	function BoxWindow:SaveConfig(name)
-		return SaveConfig(name or BoxWindow.ConfigName)
-	end
-
-	function BoxWindow:LoadConfig(name)
-		local data = LoadConfig(name or BoxWindow.ConfigName)
-		if data then
-			-- Refresh all elements with loaded data
-			print("Config loaded successfully")
+	function HyperWindow:AddYoutube(Link:string)
+		if Link:find('https://') then
+			YoutubeButton.Visible = true
+			YoutubeButton.MouseButton1Click:Connect(function()
+				(setclipboard or toclipboard or function(...)
+					print('Copy:', ...)
+				end)(Link)
+			end)
 		end
-		return data
 	end
 
-	-- UI Toggle System
+	function HyperWindow:AddWebsite(Link:string)
+		if Link:find('https://') then
+			WebsiteButton.Visible = true
+			WebsiteButton.MouseButton1Click:Connect(function()
+				(setclipboard or toclipboard or function(...)
+					print('Copy:', ...)
+				end)(Link)
+			end)
+		end
+	end
+
+	function HyperWindow:AddDiscord(Link:string)
+		if Link:find('https://') or Link:find('discord.gg/') then
+			DiscordButton.Visible = true
+			DiscordButton.MouseButton1Click:Connect(function()
+				(setclipboard or toclipboard or function(...)
+					print('Copy:', ...)
+				end)(Link)
+			end)
+		end
+	end
+
+	for i, v in ipairs({DiscordButton, WebsiteButton, YoutubeButton}) do
+		v.MouseEnter:Connect(function()
+			Tween:Create(v, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
+				Size = UDim2.fromScale(1.1, 1.1)
+			}):Play()
+		end)
+
+		v.MouseLeave:Connect(function()
+			Tween:Create(v, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
+				Size = UDim2.fromScale(0.9, 0.9)
+			}):Play()
+		end)
+	end
+
+	local lastposition = MainFrame.Position
+	local function UIToggle(val)
+		local tim = 0.75
+		local item = 0.6
+
+		if val then
+			Tween:Create(MainFrame, TweenInfo.new(tim), {
+				Size = HyperWindow.Size,
+				Position = UDim2.fromScale(0.5, 0.5)
+			}):Play()
+
+			Tween:Create(CloseButton, TweenInfo.new(tim), {
+				ImageTransparency = 0.1
+			}):Play()
+
+			Tween:Create(Top, TweenInfo.new(tim), {
+				Size = UDim2.new(1.00000012, 0, 0.139001563, 0)
+			}):Play()
+
+			Tween:Create(Contact, TweenInfo.new(item), {
+				Position = UDim2.new(0.125, 0, 0.934000015, 0)
+			}):Play()
+
+			Tween:Create(TabSystem, TweenInfo.new(item), {
+				Position = UDim2.new(0.623372614, 0, 0.571928024, 0)
+			}):Play()
+
+			Tween:Create(TabButtonList, TweenInfo.new(item), {
+				Position = UDim2.new(0.00999999139, 0, 0.132051408, 0)
+			}):Play()
+
+			Tween:Create(TickUI, TweenInfo.new(item), {
+				Position = UDim2.new(0.25, 0, 0.5, 0)
+			}):Play()
+
+			Tween:Create(DescriptionText, TweenInfo.new(item * 1.6), {
+				TextTransparency = 0.5,
+				Size = UDim2.fromScale(0.707, 0.187),
+				Position = UDim2.new(0.27000013, 0, 0.749999702, 0)
+			}):Play()
+
+			Tween:Create(MainText, TweenInfo.new(item * 1.5), {
+				TextTransparency = 0,
+				Size = UDim2.fromScale(0.707, 0.51),
+				Position = UDim2.new(0.270000011, 0, 0.125, 0)
+			}):Play()
+		else
+			Tween:Create(CloseButton, TweenInfo.new(tim), {
+				ImageTransparency = 1
+			}):Play()
+
+			Tween:Create(MainFrame, TweenInfo.new(tim), {
+				Size = UDim2.new(0.1, 100, 0.1, 50),
+				Position = lastposition,
+			}):Play()
+
+			Tween:Create(Top, TweenInfo.new(tim * 1.5), {
+				Size = UDim2.fromScale(3.9, 1)
+			}):Play()
+
+			Tween:Create(Contact, TweenInfo.new(item), {
+				Position = UDim2.new(0.125, 0, 1, 0)
+			}):Play()
+
+			Tween:Create(TabSystem, TweenInfo.new(item), {
+				Position = UDim2.new(1.5, 0, 0.571928024, 0)
+			}):Play()
+
+			Tween:Create(TabButtonList, TweenInfo.new(item), {
+				Position = UDim2.new(0.00999999139, 0, 1, 0)
+			}):Play()
+
+			Tween:Create(TickUI, TweenInfo.new(item), {
+				Position = UDim2.new(.25, 0, 1.5, 0)
+			}):Play()
+
+			Tween:Create(DescriptionText, TweenInfo.new(item / 1.5), {
+				TextTransparency = 1,
+				Size = UDim2.fromScale(0.1, 0.1),
+				Position = UDim2.new(0.170000011, 0, -0.5, 0)
+			}):Play()
+
+			Tween:Create(MainText, TweenInfo.new(item / 1.5), {
+				TextTransparency = 1,
+				Size = UDim2.fromScale(0.1, 0.1),
+				Position = UDim2.new(0.170000011, 0, -0.5, 0)
+			}):Play()
+
+		end
+	end
+
 	local Status = true
+	local oldposcheck = MainFrame.Position
 	local buton = cretate_button(Frame)
+
 	buton.Visible = false
 
-	UIS.InputBegan:Connect(function(input)
-		if input.KeyCode == BoxWindow.Toggle then
+	UIS.InputBegan:Connect(function(cc)
+		if cc.KeyCode == HyperWindow.Toggle then
 			Status = not Status
-			MainFrame.Visible = Status
-			if not Status then
-				SaveConfig(BoxWindow.ConfigName)
+
+			if Status then
+				buton.Visible = false
+			else
+				buton.Visible = true
 			end
+
+			UIToggle(Status)
 		end
 	end)
 
 	CloseButton.MouseButton1Click:Connect(function()
 		Status = not Status
-		MainFrame.Visible = Status
-		if not Status then
-			SaveConfig(BoxWindow.ConfigName)
+
+		if Status then
+			buton.Visible = false
+		else
+			buton.Visible = true
+		end
+
+		UIToggle(Status)
+	end)
+
+	buton.MouseButton1Down:Connect(function(inp)
+		oldposcheck = MainFrame.Position
+	end)
+
+	buton.MouseButton1Up:Connect(function(inp)
+		if oldposcheck == MainFrame.Position and not Status then
+			Status = not Status
+
+			if Status then
+				buton.Visible = false
+			else
+				buton.Visible = true
+			end
+
+			UIToggle(Status)
 		end
 	end)
 
-	-- Dragging System
+	spawn(function()
+		local dragToggle = nil
+		local dragSpeed = 0.2
+		local dragStart = nil
+		local startPos = nil
+
+		local function updateInput(input)
+			local delta = input.Position - dragStart
+			local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+				startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+			game:GetService('TweenService'):Create(MainFrame, TweenInfo.new(dragSpeed), {Position = position}):Play()
+		end
+
+		buton.InputBegan:Connect(function(input)
+			if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and buton.Visible then
+				dragToggle = true
+				dragStart = input.Position
+				startPos = MainFrame.Position
+				lastposition = MainFrame.Position
+
+				input.Changed:Connect(function()
+					if input.UserInputState == Enum.UserInputState.End then
+						dragToggle = false
+					end
+				end)
+			end
+		end)
+
+		UIS.InputChanged:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch and buton.Visible then
+				if dragToggle then
+					updateInput(input)
+				end
+			end
+		end)
+	end)
+
 	local dragToggle = nil
 	local dragSpeed = 0.13
 	local dragStart = nil
@@ -1440,11 +2274,11 @@ function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
 		local delta = input.Position - dragStart
 		local position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
 			startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-		Tween:Create(MainFrame, TweenInfo.new(dragSpeed), {Position = position}):Play()
+		game:GetService('TweenService'):Create(MainFrame, TweenInfo.new(dragSpeed), {Position = position}):Play()
 	end
 
-	TopBar.InputBegan:Connect(function(input)
-		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then 
+	Top.InputBegan:Connect(function(input)
+		if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
 			dragToggle = true
 			dragStart = input.Position
 			startPos = MainFrame.Position
@@ -1464,17 +2298,16 @@ function LinoriaBox.new(WindowName,WindowLogo,WindowDescription)
 		end
 	end)
 
-	-- Load config on startup
-	LoadConfig(BoxWindow.ConfigName)
-
-	return BoxWindow
+	return HyperWindow
 end
 
-function LinoriaBox:LoopUpdate()
+function NoHyper:LoopUpdate()
 	task.spawn(function()
-		while true do task.wait()
+		while true do
+			task.wait()
 			pcall(function()
-				for i,v in ipairs(LinoriaBox.AutoUpdate) do task.wait()
+				for i, v in ipairs(NoHyper.AutoUpdate) do
+					task.wait()
 					pcall(v)
 				end
 			end)
@@ -1482,4 +2315,4 @@ function LinoriaBox:LoopUpdate()
 	end)
 end
 
-return LinoriaBox
+return NoHyper
