@@ -2138,11 +2138,17 @@ function Library.Storage:Write(text)
 end;
 
 function Library:CreateWindow(setup)
-    if self.CurrentGui and self.CurrentGui.Parent then
+    if self.CurrentWindow and self.CurrentWindow.Destroy then
+        pcall(function() self.CurrentWindow:Destroy() end)
+    elseif self.CurrentGui and self.CurrentGui.Parent then
         pcall(function() self.CurrentGui:Destroy() end)
-        self.CurrentGui = nil
-        self.CurrentWindow = nil
     end
+    if self.ActiveBlur and self.ActiveBlur.Destroy then
+        pcall(function() self.ActiveBlur.Destroy() end)
+    end
+    self.CurrentGui = nil
+    self.CurrentWindow = nil
+    self.ActiveBlur = nil
     local cg = Library.CoreGui
     local pg = Library.LocalPlayer and Library.LocalPlayer:FindFirstChild("PlayerGui")
     local old1 = cg and cg:FindFirstChild(Library.GuiName)
@@ -2212,7 +2218,8 @@ function Library:CreateWindow(setup)
 		end;
 	end)
 
-	local BlurEle = Library.UIBlur.new(MainFrame,true);
+    local BlurEle = Library.UIBlur.new(MainFrame,true);
+    Library.ActiveBlur = BlurEle;
 
 	DropShadow.Name = "DropShadow"
 	DropShadow.Parent = MainFrame
@@ -5527,11 +5534,12 @@ function Library:CreateWindow(setup)
 		setup.Size = udim
 	end;
 
-	function WindowLibrary:Destroy()
-		ScreenGui:Destroy();
-		BlurEle.Destroy();
-		return true;
-	end;
+    function WindowLibrary:Destroy()
+        ScreenGui:Destroy();
+        BlurEle.Destroy();
+        Library.ActiveBlur = nil;
+        return true;
+    end;
 
 	CloseButton.MouseButton1Click:Connect(function()
 		WindowLibrary:Dialog({
@@ -5971,11 +5979,17 @@ function Library:GetGui()
 end;
 
 function Library:DestroyWindow()
-    if self.CurrentGui and self.CurrentGui.Parent then
+    if self.CurrentWindow and self.CurrentWindow.Destroy then
+        pcall(function() self.CurrentWindow:Destroy() end)
+    elseif self.CurrentGui and self.CurrentGui.Parent then
         pcall(function() self.CurrentGui:Destroy() end)
+    end
+    if self.ActiveBlur and self.ActiveBlur.Destroy then
+        pcall(function() self.ActiveBlur.Destroy() end)
     end
     self.CurrentGui = nil
     self.CurrentWindow = nil
+    self.ActiveBlur = nil
 end;
 
 return Library;
