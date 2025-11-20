@@ -1,49 +1,26 @@
--- [Modified from Original by Hyperion : CSGO Cheat]
--- Modern Grey/Black Theme with Auto-Save Configuration
+-- [Modified Hyperlib with Modern Grey/Black Theme - Rayfield Inspired]
+-- Single instance protection + auto-save/load functionality
 
 if not game:IsLoaded() then
 	game.Loaded:Wait()
 end
 
-local LocalPlayer = game:GetService('Players').LocalPlayer;
+-- Single instance protection
+local ProtectedName = "HyperLibModernUI_SingleInstance"
+if getgenv()[ProtectedName] then
+	getgenv()[ProtectedName]:Destroy()
+	getgenv()[ProtectedName] = nil
+	task.wait(0.5)
+end
+
+local LocalPlayer = game:GetService('Players').LocalPlayer
 local Tween = game:GetService('TweenService')
 local Run = game:GetService('RunService')
-local Core = (gethui and gethui()) or game:FindFirstChild'CoreGui' or LocalPlayer.PlayerGui;
+local Core = (gethui and gethui()) or game:FindFirstChild'CoreGui' or LocalPlayer.PlayerGui
 local UIS = game:GetService('UserInputService')
 local TextService = game:GetService('TextService')
-local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
-
--- Prevent multiple instances
-local UI_ID = "ModernHyperLib_V2_Instance"
-if Core:FindFirstChild(UI_ID) then
-	Core:FindFirstChild(UI_ID):Destroy()
-end
-
--- Configuration System
-local ConfigData = {}
-local function SaveConfig()
-	if writefile then
-		local success, encoded = pcall(function()
-			return game:GetService("HttpService"):JSONEncode(ConfigData)
-		end)
-		if success then
-			writefile("hyperlib_config.json", encoded)
-		end
-	end
-end
-
-local function LoadConfig()
-	if readfile and isfile and isfile("hyperlib_config.json") then
-		local success, decoded = pcall(function()
-			return game:GetService("HttpService"):JSONDecode(readfile("hyperlib_config.json"))
-		end)
-		if success then
-			ConfigData = decoded
-		end
-	end
-end
-
-LoadConfig()
+local HttpService = game:GetService('HttpService')
+local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end)
 
 local function cretate_button(asd)
 	local button=Instance.new('TextButton')
@@ -60,39 +37,72 @@ local function ToDefault(val,def)
 	return val or def
 end
 
+-- Modern Grey/Black Theme (Rayfield-inspired)
 local NoHyper = {
 	Theme = {
-		BACKGROUND = Color3.fromRGB(20, 20, 22),
-		SECTION = Color3.fromRGB(28, 28, 32),
-		MAIN = Color3.fromRGB(85, 85, 95),
-		STROKE = Color3.fromRGB(45, 45, 50),
-		TOUCH = Color3.fromRGB(65, 65, 75),
-		SYSTEM = Color3.fromRGB(105, 105, 115),
-		ACCENT = Color3.fromRGB(140, 140, 150)
+		BACKGROUND = Color3.fromRGB(20, 20, 25),      -- Deep black background
+		SECTION = Color3.fromRGB(28, 28, 33),         -- Slightly lighter section
+		MAIN = Color3.fromRGB(100, 100, 110),         -- Soft grey accent
+		STROKE = Color3.fromRGB(45, 45, 50),          -- Subtle border
+		TOUCH = Color3.fromRGB(70, 70, 80),           -- Hover state
+		SYSTEM = Color3.fromRGB(120, 120, 130),       -- Active state
+		SHADOW = Color3.fromRGB(10, 10, 15)           -- Shadow color
 	},
 	AutoUpdate = {},
-	SectionWidth = 0.95
+	SectionWidth = 0.95,
+	ConfigData = {}
 }
+
+-- Configuration save/load system
+local ConfigFolder = "HyperLibConfigs"
+local ConfigFile = ConfigFolder .. "/" .. game.PlaceId .. "_config.json"
+
+function NoHyper:SaveConfig()
+	local success, result = pcall(function()
+		if not isfolder(ConfigFolder) then
+			makefolder(ConfigFolder)
+		end
+		local jsonData = HttpService:JSONEncode(self.ConfigData)
+		writefile(ConfigFile, jsonData)
+	end)
+	return success
+end
+
+function NoHyper:LoadConfig()
+	local success, result = pcall(function()
+		if isfile(ConfigFile) then
+			local jsonData = readfile(ConfigFile)
+			self.ConfigData = HttpService:JSONDecode(jsonData)
+			return true
+		end
+		return false
+	end)
+	return success and result
+end
 
 function NoHyper.set_theme(name:string)
 	if name:lower() == 'modern' or name:lower() == 'rayfield' then
-		NoHyper.Theme.BACKGROUND = Color3.fromRGB(20, 20, 22)
-		NoHyper.Theme.SECTION = Color3.fromRGB(28, 28, 32)
-		NoHyper.Theme.MAIN = Color3.fromRGB(85, 85, 95)
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(20, 20, 25)
+		NoHyper.Theme.SECTION = Color3.fromRGB(28, 28, 33)
+		NoHyper.Theme.MAIN = Color3.fromRGB(100, 100, 110)
 		NoHyper.Theme.STROKE = Color3.fromRGB(45, 45, 50)
-		NoHyper.Theme.TOUCH = Color3.fromRGB(65, 65, 75)
-		NoHyper.Theme.SYSTEM = Color3.fromRGB(105, 105, 115)
-		NoHyper.Theme.ACCENT = Color3.fromRGB(140, 140, 150)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(70, 70, 80)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(120, 120, 130)
+	elseif name:lower() == 'dark' then
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(15, 15, 18)
+		NoHyper.Theme.SECTION = Color3.fromRGB(22, 22, 26)
+		NoHyper.Theme.MAIN = Color3.fromRGB(90, 90, 100)
+		NoHyper.Theme.STROKE = Color3.fromRGB(40, 40, 45)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(60, 60, 70)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(110, 110, 120)
 	end
 end
 
 local function Signal(list:{{name:string,callback:FunctionalTest}})
 	local k = {}
-
 	for i,v in ipairs(list) do
 		k[v.name] = v.callback
 	end
-
 	return k
 end
 
@@ -101,7 +111,6 @@ local function scrolling_connect(scrollframe:ScrollingFrame)
 		local addres = 45
 		local UIListLayout:UIListLayout = scrollframe:WaitForChild('UIListLayout',9999999)
 		scrollframe.CanvasSize=UDim2.new(0,0,0,UIListLayout.AbsoluteContentSize.Y+addres)
-
 		UIListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
 			scrollframe.CanvasSize=UDim2.new(0,0,0,UIListLayout.AbsoluteContentSize.Y+addres)
 		end)
@@ -111,7 +120,6 @@ end
 local function SetImage(name:string,image:ImageLabel)
 	name = name or "ADS"
 	name = name:lower()
-
 	local NigImage = "rbxassetid://3926305904"
 
 	if name == "ads" then
@@ -120,63 +128,54 @@ local function SetImage(name:string,image:ImageLabel)
 		image.ImageRectSize = Vector2.new(35,35)
 		return
 	end
-
 	if name == "list" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(485,205)
 		image.ImageRectSize = Vector2.new(35,35)
 		return
 	end
-
 	if name == "folder" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(805,45)
 		image.ImageRectSize = Vector2.new(35,35)
 		return
 	end
-
 	if name == "earth" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(604,324)
 		image.ImageRectSize = Vector2.new(35,35)
 		return
 	end
-
 	if name == "locked" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(524, 644)
 		image.ImageRectSize = Vector2.new(35,35)
 		return
 	end
-
 	if name == "home" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(964, 205)
 		image.ImageRectSize = Vector2.new(35,35)
 		return
 	end
-
 	if name == "positon" or name == 'gps' then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(325, 565)
 		image.ImageRectSize = Vector2.new(35,35)
 		return
 	end
-
 	if name == "notify" or name == 'notification' then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(325, 565)
 		image.ImageRectSize = Vector2.new(35,35)
 		return
 	end
-
 	if name == "close" or name == 'no' then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(284, 4)
 		image.ImageRectSize = Vector2.new(24, 24)
 		return
 	end
-
 	if name == "color" then
 		image.Image = NigImage
 		image.ImageRectOffset = Vector2.new(44, 964)
@@ -187,55 +186,19 @@ local function SetImage(name:string,image:ImageLabel)
 	image.ImageRectOffset = Vector2.new(0,0)
 	image.ImageRectSize = Vector2.new(0,0)
 
-	if name == "settings" then
-		image.Image = "rbxassetid://7734053495"
-	end
-
-	if name == "smartphone" then
-		image.Image = "rbxassetid://7734058979"
-	end
-
-	if name == "crown" then
-		image.Image = "rbxassetid://7733765398"
-	end
-
-	if name == "save" then
-		image.Image = "rbxassetid://7734052335"
-	end
-
-	if name == "hash" then
-		image.Image = "rbxassetid://7733955740"
-	end
-
-	if name == "server" then
-		image.Image = "rbxassetid://7734053426"
-	end
-
-	if name == "option" then
-		image.Image = "rbxassetid://7734021300"
-	end
-
-	if name == "link" then
-		image.Image = "rbxassetid://7733978098"
-	end
-
-	if name == "copy" then
-		image.Image = "rbxassetid://7733764083"
-	end
-
-	if name == "cpu" then
-		image.Image = "rbxassetid://7733765045"
-	end
-
-	if name == "moon" then
-		image.Image = "rbxassetid://7743870134"
-	end
-
-	if name == "wallet" then
-		image.Image = "rbxassetid://7743877573"
-	end
+	if name == "settings" then image.Image = "rbxassetid://7734053495" end
+	if name == "smartphone" then image.Image = "rbxassetid://7734058979" end
+	if name == "crown" then image.Image = "rbxassetid://7733765398" end
+	if name == "save" then image.Image = "rbxassetid://7734052335" end
+	if name == "hash" then image.Image = "rbxassetid://7733955740" end
+	if name == "server" then image.Image = "rbxassetid://7734053426" end
+	if name == "option" then image.Image = "rbxassetid://7734021300" end
+	if name == "link" then image.Image = "rbxassetid://7733978098" end
+	if name == "copy" then image.Image = "rbxassetid://7733764083" end
+	if name == "cpu" then image.Image = "rbxassetid://7733765045" end
+	if name == "moon" then image.Image = "rbxassetid://7743870134" end
+	if name == "wallet" then image.Image = "rbxassetid://7743877573" end
 end
-
 
 function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	local HyperWindow = {
@@ -247,6 +210,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	WindowName = ToDefault(WindowName,'Hello, NoHyper')
 	WindowLogo = ToDefault(WindowLogo,'http://www.roblox.com/asset/?id=16530565354')
 	WindowDescription = ToDefault(WindowDescription,'Welcome back!')
+
+	-- Auto-load config on initialization
+	NoHyper:LoadConfig()
 
 	local NoHyperUI = Instance.new("ScreenGui")
 	local MainFrame = Instance.new("Frame")
@@ -278,10 +244,12 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		end
 	end)
 
-
 	HyperWindow.ScreenSource = NoHyperUI
+	
+	-- Single instance protection reference
+	getgenv()[ProtectedName] = NoHyperUI
 
-	NoHyperUI.Name = UI_ID
+	NoHyperUI.Name = tostring("ui.protect.")..tostring(math.random(1,100))..tostring(Random.new():NextNumber(0.1,0.9))..tostring(Random.new():NextNumber(0.1,0.9))..tostring(Random.new():NextNumber(0.1,0.9))
 	NoHyperUI.Parent = Core
 	NoHyperUI.ResetOnSpawn = false
 	NoHyperUI.IgnoreGuiInset = true
@@ -351,7 +319,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	WebsiteButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	WebsiteButton.ZIndex = 5
 	WebsiteButton.Image = "rbxassetid://3926305904"
-	WebsiteButton.ImageColor3 = NoHyper.Theme.ACCENT
+	WebsiteButton.ImageColor3 = NoHyper.Theme.MAIN
 	WebsiteButton.ImageRectOffset = Vector2.new(604, 324)
 	WebsiteButton.ImageRectSize = Vector2.new(35, 35)
 	WebsiteButton.ScaleType = Enum.ScaleType.Fit
@@ -445,12 +413,12 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	MainText.BorderSizePixel = 0
 	MainText.Position = UDim2.new(0.270000011, 0, 0.125, 0)
 	MainText.Size = UDim2.new(0.706745207, 0, 0.509708107, 0)
-	MainText.Font = Enum.Font.GothamMedium
+	MainText.Font = Enum.Font.GothamBold
 	MainText.Text = tostring(WindowName)
 	MainText.TextColor3 = Color3.fromRGB(255, 255, 255)
 	MainText.TextScaled = true
 	MainText.TextSize = 14.000
-	MainText.TextStrokeTransparency = 0.800
+	MainText.TextStrokeTransparency = 0.900
 	MainText.TextWrapped = true
 	MainText.TextXAlignment = Enum.TextXAlignment.Left
 	MainText.TextTransparency = 1
@@ -463,12 +431,12 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	DescriptionText.BorderSizePixel = 0
 	DescriptionText.Position = UDim2.new(0.27000013, 0, 0.749999702, 0)
 	DescriptionText.Size = UDim2.new(0.706745267, 0, 0.187055781, 0)
-	DescriptionText.Font = Enum.Font.GothamMedium
+	DescriptionText.Font = Enum.Font.Gotham
 	DescriptionText.Text = tostring(WindowDescription)
-	DescriptionText.TextColor3 = Color3.fromRGB(180, 180, 185)
+	DescriptionText.TextColor3 = NoHyper.Theme.MAIN
 	DescriptionText.TextScaled = true
 	DescriptionText.TextSize = 14.000
-	DescriptionText.TextStrokeTransparency = 0.800
+	DescriptionText.TextStrokeTransparency = 0.900
 	DescriptionText.TextTransparency = 1
 	DescriptionText.TextWrapped = true
 	DescriptionText.TextXAlignment = Enum.TextXAlignment.Left
@@ -483,7 +451,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	DropShadow.Size = UDim2.new(1, 47, 1, 47)
 	DropShadow.ZIndex = 0
 	DropShadow.Image = "rbxassetid://6015897843"
-	DropShadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+	DropShadow.ImageColor3 = NoHyper.Theme.SHADOW
 	DropShadow.ImageTransparency = 1
 	DropShadow.ScaleType = Enum.ScaleType.Slice
 	DropShadow.SliceCenter = Rect.new(49, 49, 450, 450)
@@ -495,25 +463,22 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	cs:Play()
 	cs.Completed:Connect(function()
 		Tween:Create(DropShadow,TweenInfo.new(2),{
-			ImageTransparency = 0.15,
+			ImageTransparency = 0.2,
 		}):Play()
-
 		Tween:Create(DropShadow,TweenInfo.new(1),{
-			ImageTransparency = 0.25,
+			ImageTransparency = 0.4,
 		}):Play()	
 	end)
 
-	-- Items
 	delay(0.5,function()
 		Tween:Create(CloseButton,TweenInfo.new(0.5),{
 			ImageTransparency = 0
 		}):Play()
-
 		Tween:Create(TickUI,TweenInfo.new(0.5),{
-			BackgroundTransparency = 0.5
+			BackgroundTransparency = 0.3
 		}):Play()
 		Tween:Create(View,TweenInfo.new(0.5),{
-			BackgroundTransparency = 0.5
+			BackgroundTransparency = 0.3
 		}):Play()
 		Tween:Create(DescriptionText,TweenInfo.new(0.5),{
 			TextTransparency = 0.400
@@ -527,11 +492,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		Tween:Create(TabButtonList,TweenInfo.new(.55),{
 			Position = UDim2.new(0.00999999139, 0, 0.132051408, 0)
 		}):Play()
-
 		Tween:Create(TabSystem,TweenInfo.new(.55),{
 			Position = UDim2.new(0.623372614, 0, 0.571928024, 0)
 		}):Play()
-
 		Tween:Create(Contact,TweenInfo.new(.55),{
 			Position = UDim2.new(0.125, 0, 0.934000015, 0)
 		}):Play()
@@ -595,8 +558,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 
 		TabButton.Name = TabName or "TabButton"
 		TabButton.Parent = ScrollingFrame
-		TabButton.BackgroundColor3 = NoHyper.Theme.MAIN
-		TabButton.BackgroundTransparency = 0.850
+		TabButton.BackgroundColor3 = NoHyper.Theme.SECTION
+		TabButton.BackgroundTransparency = 0.95
 		TabButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		TabButton.BorderSizePixel = 0
 		TabButton.Size = UDim2.new(0.980000019, 0, 0.5, 0)
@@ -618,7 +581,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		TextLabel.Size = UDim2.new(1.5, 0, 0.5, 0)
 		TextLabel.Font = Enum.Font.GothamBold
 		TextLabel.Text = TabName or "Null"
-		TextLabel.TextColor3 = Color3.fromRGB(200, 200, 205)
+		TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 		TextLabel.TextScaled = true
 		TextLabel.TextSize = 14.000
 		TextLabel.TextStrokeTransparency = 0.950
@@ -635,7 +598,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		Icon.Position = UDim2.new(0.125, 0, 0.5, 0)
 		Icon.Size = UDim2.new(0.800000012, 0, 0.800000012, 0)
 		Icon.SizeConstraint = Enum.SizeConstraint.RelativeYY
-		Icon.ImageColor3 = NoHyper.Theme.ACCENT
+		Icon.ImageColor3 = NoHyper.Theme.MAIN
 		SetImage(TabIcon,Icon)
 
 		Button.Name = "Button"
@@ -650,8 +613,6 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		Button.TextColor3 = Color3.fromRGB(0, 0, 0)
 		Button.TextSize = 14.000
 		Button.TextTransparency = 1.000
-
-		--[=========================================]
 
 		local TabFrame = Instance.new("Frame")
 		local LeftFrame = Instance.new("ScrollingFrame")
@@ -718,29 +679,22 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		local call = function(val)
 			if val then
 				TabFrame.Visible = true
-				Tween:Create(TabButton,TweenInfo.new(0.15),{BackgroundTransparency = 0.3}):Play()
-				Tween:Create(TextLabel,TweenInfo.new(0.25),{
-					TextTransparency = 0,
-					Size = UDim2.fromScale(1.5,0.5),
-					TextColor3 = Color3.fromRGB(255, 255, 255)
-				}):Play()
-				Tween:Create(Icon,TweenInfo.new(0.25),{
+				Tween:Create(TabButton,TweenInfo.new(0.1),{BackgroundTransparency = 0}):Play()
+				Tween:Create(TextLabel,TweenInfo.new(0.3),{TextTransparency = 0,Size = UDim2.fromScale(1.5,0.5)}):Play()
+				Tween:Create(Icon,TweenInfo.new(0.3),{
 					ImageTransparency = 0,
-					Size = UDim2.new(0.800000012, 0, 0.800000012, 0),
-					ImageColor3 = Color3.fromRGB(255, 255, 255)
+					Size = UDim2.new(0.800000012, 0, 0.800000012, 0)
 				}):Play()
 			else
 				TabFrame.Visible = false
-				Tween:Create(TabButton,TweenInfo.new(0.15),{BackgroundTransparency = 0.85}):Play()
-				Tween:Create(TextLabel,TweenInfo.new(0.25),{
+				Tween:Create(TabButton,TweenInfo.new(0.1),{BackgroundTransparency = 0.95}):Play()
+				Tween:Create(TextLabel,TweenInfo.new(0.3),{
 					TextTransparency = 0.4,
-					Size = UDim2.fromScale(1.5,0.45),
-					TextColor3 = Color3.fromRGB(200, 200, 205)
+					Size = UDim2.fromScale(1.5,0.45)
 				}):Play()
-				Tween:Create(Icon,TweenInfo.new(0.25),{
+				Tween:Create(Icon,TweenInfo.new(0.3),{
 					ImageTransparency = 0.4,
-					Size = UDim2.new(0.65, 0, 0.65, 0),
-					ImageColor3 = NoHyper.Theme.ACCENT
+					Size = UDim2.new(0.65, 0, 0.65, 0)
 				}):Play()
 			end
 		end
@@ -795,7 +749,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			Section.ZIndex = 5
 
 			UICorner.Parent = Section
-			UICorner.CornerRadius = UDim.new(0, 6)
+			UICorner.CornerRadius = UDim.new(0,6)
 
 			SectionTitle.Name = "SectionTitle"
 			SectionTitle.Parent = Section
@@ -814,7 +768,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			Icon.Name = "Icon"
 			Icon.Parent = SectionTitle
 			Icon.AnchorPoint = Vector2.new(0.5, 0.5)
-			Icon.BackgroundColor3 = NoHyper.Theme.ACCENT
+			Icon.BackgroundColor3 = NoHyper.Theme.MAIN
 			Icon.BackgroundTransparency = 1.000
 			Icon.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			Icon.BorderSizePixel = 0
@@ -822,7 +776,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			Icon.Size = UDim2.new(0.649999976, 0, 0.649999976, 0)
 			Icon.SizeConstraint = Enum.SizeConstraint.RelativeYY
 			Icon.ZIndex = 8
-			Icon.ImageColor3 = NoHyper.Theme.ACCENT
+			Icon.ImageColor3 = NoHyper.Theme.MAIN
 			SetImage(SectionIcon,Icon)
 
 			TextLabel.Parent = SectionTitle
@@ -834,9 +788,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			TextLabel.Position = UDim2.new(0.935000002, 0, 0.5, 0)
 			TextLabel.Size = UDim2.new(1.5664264, 0, 0.600000024, 0)
 			TextLabel.ZIndex = 8
-			TextLabel.Font = Enum.Font.GothamMedium
+			TextLabel.Font = Enum.Font.GothamBold
 			TextLabel.Text = SectionName or "General"
-			TextLabel.TextColor3 = Color3.fromRGB(220, 220, 225)
+			TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 			TextLabel.TextScaled = true
 			TextLabel.TextSize = 14.000
 			TextLabel.TextStrokeTransparency = 0.950
@@ -846,7 +800,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			Frame.Parent = SectionTitle
 			Frame.AnchorPoint = Vector2.new(0.5, 1)
 			Frame.BackgroundColor3 = NoHyper.Theme.STROKE
-			Frame.BackgroundTransparency = 0.650
+			Frame.BackgroundTransparency = 0.5
 			Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			Frame.BorderSizePixel = 0
 			Frame.Position = UDim2.new(0.5, 0, 1, 0)
@@ -856,7 +810,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			Frame_2.Parent = Frame
 			Frame_2.AnchorPoint = Vector2.new(0.5, 0.5)
 			Frame_2.BackgroundColor3 = NoHyper.Theme.STROKE
-			Frame_2.BackgroundTransparency = 0.650
+			Frame_2.BackgroundTransparency = 0.5
 			Frame_2.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			Frame_2.BorderSizePixel = 0
 			Frame_2.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -864,8 +818,10 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			Frame_2.ZIndex = 9
 
 			UICorner_2.Parent = Frame_2
+			UICorner_2.CornerRadius = UDim.new(0,3)
 
 			UICorner_3.Parent = Frame
+			UICorner_3.CornerRadius = UDim.new(0,3)
 
 			UIListLayout.Parent = Section
 			UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -873,18 +829,17 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			UIListLayout.Padding = UDim.new(0, 3)
 
 			UIStroke.Color = NoHyper.Theme.STROKE
-			UIStroke.Transparency = 0.4
 			UIStroke.Parent = Section
+			UIStroke.Thickness = 1
+			UIStroke.Transparency = 0.7
 
 			function Section_Hyper.update()
 				local old = 1
-
 				for i,v in ipairs(Section:GetChildren()) do
 					if v:IsA('Frame') then
 						old += (v.AbsoluteSize.Y or 27) + UIListLayout.Padding.Offset
 					end
 				end
-
 				Tween:Create(Section,TweenInfo.new(0.1),{Size = UDim2.new(NoHyper.SectionWidth,0,0,old + 1)}):Play()
 			end
 
@@ -895,8 +850,6 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			end
 
 			function Section_Hyper:AddButton(ButtonName,callback)
-				local configKey = TabName.."_"..SectionName.."_Button_"..ButtonName
-				
 				local Button = Instance.new("Frame")
 				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 				local Button_2 = Instance.new("TextButton")
@@ -933,7 +886,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 
 				Frame.Parent = Button
 				Frame.AnchorPoint = Vector2.new(0.5, 0.5)
-				Frame.BackgroundColor3 = NoHyper.Theme.SECTION
+				Frame.BackgroundColor3 = NoHyper.Theme.BACKGROUND
 				Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Frame.BorderSizePixel = 0
 				Frame.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -949,11 +902,11 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				end)
 
 				Button_2.MouseButton1Up:Connect(function()
-					Tween:Create(Frame,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.SECTION}):Play()
+					Tween:Create(Frame,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 				end)
 
 				Button_2.MouseLeave:Connect(function()
-					Tween:Create(Frame,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.SECTION}):Play()
+					Tween:Create(Frame,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 				end)
 
 				UICorner.CornerRadius = UDim.new(0, 5)
@@ -970,13 +923,12 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				TextLabel.ZIndex = 10
 				TextLabel.Font = Enum.Font.GothamMedium
 				TextLabel.Text = ButtonName
-				TextLabel.TextColor3 = Color3.fromRGB(210, 210, 215)
+				TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 				TextLabel.TextScaled = true
 				TextLabel.TextSize = 14.000
 				TextLabel.TextWrapped = true
 
 				Button_2.MouseButton1Click:Connect(callback or function()
-
 				end)
 
 				Section_Hyper.update()
@@ -996,16 +948,15 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			end
 
 			function Section_Hyper:AddToggle(ToggleName:string,Default:boolean,callback:FunctionalTest)
-				local configKey = TabName.."_"..SectionName.."_Toggle_"..ToggleName
-				
-				if ConfigData[configKey] ~= nil then
-					Default = ConfigData[configKey]
-				end
-				
 				Default = Default or false
 				callback = ToDefault(callback,function()
-
 				end)
+
+				-- Auto-load saved value
+				local configKey = "Toggle_" .. ToggleName
+				if NoHyper.ConfigData[configKey] ~= nil then
+					Default = NoHyper.ConfigData[configKey]
+				end
 
 				local Toggle = Instance.new("Frame")
 				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
@@ -1041,7 +992,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Text.ZIndex = 7
 				Text.Font = Enum.Font.GothamMedium
 				Text.Text = ToggleName or "TOGGLE"
-				Text.TextColor3 = Color3.fromRGB(210, 210, 215)
+				Text.TextColor3 = Color3.fromRGB(255, 255, 255)
 				Text.TextScaled = true
 				Text.TextSize = 14.000
 				Text.TextStrokeTransparency = 0.800
@@ -1052,7 +1003,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Ui.Name = "Ui"
 				Ui.Parent = Toggle
 				Ui.AnchorPoint = Vector2.new(1, 0.5)
-				Ui.BackgroundColor3 = NoHyper.Theme.SECTION
+				Ui.BackgroundColor3 = NoHyper.Theme.BACKGROUND
 				Ui.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Ui.BorderSizePixel = 0
 				Ui.Position = UDim2.new(0.950000107, 0, 0.500000417, 0)
@@ -1091,38 +1042,33 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Button.TextTransparency = 1.000
 
 				Button.MouseEnter:Connect(function()
-					if Default then
-						return
-					end
-
+					if Default then return end
 					Tween:Create(Ui,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
 				end)
 
 				Button.MouseLeave:Connect(function()
-					if Default then
-						return
-					end
-
-					Tween:Create(Ui,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.SECTION}):Play()
+					if Default then return end
+					Tween:Create(Ui,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 				end)
 
 				local function Effect(vcal)
 					if vcal then
-						Tween:Create(Ui,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.ACCENT}):Play()
+						Tween:Create(Ui,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.SYSTEM}):Play()
 						True.Visible = true
 					else
 						True.Visible = false
-						Tween:Create(Ui,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.SECTION}):Play()
+						Tween:Create(Ui,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 					end
 				end
 
 				Effect(Default)
+				pcall(callback, Default)
 
 				Button.MouseButton1Click:Connect(function()
 					Default = not Default
 					Effect(Default)
-					ConfigData[configKey] = Default
-					SaveConfig()
+					NoHyper.ConfigData[configKey] = Default
+					NoHyper:SaveConfig()
 					callback(Default)
 				end)
 
@@ -1132,7 +1078,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 					{
 						name = 'Text',
 						callback = function(...)
-							TextLabel.Text = tostring(...)
+							Text.Text = tostring(...)
 						end,
 					},
 					{
@@ -1144,8 +1090,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						callback = function(v)
 							Default = v
 							Effect(v)
-							ConfigData[configKey] = v
-							SaveConfig()
+							NoHyper.ConfigData[configKey] = v
+							NoHyper:SaveConfig()
 							callback(v)
 						end,
 					}
@@ -1153,15 +1099,15 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			end
 
 			function Section_Hyper:AddKeybind(KeybindName:string,Default:Enum.KeyCode,callback)
-				local configKey = TabName.."_"..SectionName.."_Keybind_"..KeybindName
-				
-				if ConfigData[configKey] ~= nil then
+				callback = ToDefault(callback,function() end)
+
+				-- Auto-load saved value
+				local configKey = "Keybind_" .. KeybindName
+				if NoHyper.ConfigData[configKey] then
 					pcall(function()
-						Default = Enum.KeyCode[ConfigData[configKey]]
+						Default = Enum.KeyCode[NoHyper.ConfigData[configKey]]
 					end)
 				end
-				
-				callback = ToDefault(callback,function() end)
 
 				if typeof(Default) == 'string' then
 					pcall(function()
@@ -1175,9 +1121,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 					if v then
 						return v.Name
 					end
-
 					return 'None'
 				end
+				
 				local Keybind = Instance.new("Frame")
 				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 				local Text = Instance.new("TextLabel")
@@ -1212,7 +1158,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Text.ZIndex = 7
 				Text.Font = Enum.Font.GothamMedium
 				Text.Text = KeybindName or "KEYBIND"
-				Text.TextColor3 = Color3.fromRGB(210, 210, 215)
+				Text.TextColor3 = Color3.fromRGB(255, 255, 255)
 				Text.TextScaled = true
 				Text.TextSize = 14.000
 				Text.TextStrokeTransparency = 0.800
@@ -1223,7 +1169,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Bind.Name = "Bind"
 				Bind.Parent = Keybind
 				Bind.AnchorPoint = Vector2.new(1, 0.5)
-				Bind.BackgroundColor3 = NoHyper.Theme.SECTION
+				Bind.BackgroundColor3 = NoHyper.Theme.BACKGROUND
 				Bind.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Bind.BorderSizePixel = 0
 				Bind.Position = UDim2.new(0.950000226, 0, 0.500000417, 0)
@@ -1245,7 +1191,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				BindKey.ZIndex = 7
 				BindKey.Font = Enum.Font.GothamMedium
 				BindKey.Text = toname(Default)
-				BindKey.TextColor3 = Color3.fromRGB(210, 210, 215)
+				BindKey.TextColor3 = Color3.fromRGB(255, 255, 255)
 				BindKey.TextScaled = true
 				BindKey.TextSize = 14.000
 				BindKey.TextWrapped = true
@@ -1267,17 +1213,13 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				local BindConnect
 
 				Button.MouseEnter:Connect(function()
-					if BindConnect then
-						return
-					end
+					if BindConnect then return end
 					Tween:Create(Bind,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
 				end)
 
 				Button.MouseLeave:Connect(function()
-					if BindConnect then
-						return
-					end
-					Tween:Create(Bind,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.SECTION}):Play()
+					if BindConnect then return end
+					Tween:Create(Bind,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 				end)
 
 				local function UpdateText()
@@ -1289,21 +1231,19 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				UpdateText()
 
 				Button.MouseButton1Click:Connect(function()
-					if BindConnect then
-						return
-					end
+					if BindConnect then return end
 
 					BindKey.Text = '...'
 					UpdateText()
-					Tween:Create(Bind,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.ACCENT}):Play()
+					Tween:Create(Bind,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.SYSTEM}):Play()
 					BindConnect = 'wait'
 					BindConnect = UIS.InputBegan:Wait()
 
 					if BindConnect.KeyCode ~= Enum.KeyCode.Unknown then
 						BindKey.Text = toname(BindConnect.KeyCode)
 						Default = BindConnect.KeyCode
-						ConfigData[configKey] = Default.Name
-						SaveConfig()
+						NoHyper.ConfigData[configKey] = Default.Name
+						NoHyper:SaveConfig()
 						pcall(function()
 							task.spawn(callback,BindConnect.KeyCode)
 						end)
@@ -1312,18 +1252,19 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						UpdateText()
 					end
 
-					Tween:Create(Bind,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.SECTION}):Play()
-
+					Tween:Create(Bind,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 
 					UpdateText()
 					BindConnect = nil
 				end)
 
+				Section_Hyper.update()
+
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							TextLabel.Text = tostring(...)
+							Text.Text = tostring(...)
 						end,
 					},
 					{
@@ -1335,8 +1276,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						callback = function(v)
 							Default = v
 							BindKey.Text = toname(v)
-							ConfigData[configKey] = v.Name
-							SaveConfig()
+							NoHyper.ConfigData[configKey] = v.Name
+							NoHyper:SaveConfig()
 							UpdateText()
 							callback(v)
 						end,
@@ -1351,21 +1292,20 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			end
 
 			function Section_Hyper:AddSlider(SliderName,Value:{Min:number,Max:number,Default:number,ValueT:string},callback)
-				local configKey = TabName.."_"..SectionName.."_Slider_"..SliderName
-				
 				Value = Value or {}
-				Value.Min = Value.Min or 0
+				Value.Min = Value.Min or 1
 				Value.Max = Value.Max or 100
 				Value.Default = Value.Default or Value.Min
 				Value.ValueT = Value.ValueT or ''
-				
-				if ConfigData[configKey] ~= nil then
-					Value.Default = ConfigData[configKey]
-				end
 
 				callback = ToDefault(callback,function()
-
 				end)
+
+				-- Auto-load saved value
+				local configKey = "Slider_" .. SliderName
+				if NoHyper.ConfigData[configKey] then
+					Value.Default = NoHyper.ConfigData[configKey]
+				end
 
 				local Slider = Instance.new("Frame")
 				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
@@ -1405,7 +1345,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Text.ZIndex = 7
 				Text.Font = Enum.Font.GothamMedium
 				Text.Text = SliderName or "SLIDER"
-				Text.TextColor3 = Color3.fromRGB(210, 210, 215)
+				Text.TextColor3 = Color3.fromRGB(255, 255, 255)
 				Text.TextScaled = true
 				Text.TextSize = 14.000
 				Text.TextStrokeTransparency = 0.800
@@ -1416,7 +1356,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Ui.Name = "Ui"
 				Ui.Parent = Slider
 				Ui.AnchorPoint = Vector2.new(1, 0.5)
-				Ui.BackgroundColor3 = NoHyper.Theme.SECTION
+				Ui.BackgroundColor3 = NoHyper.Theme.BACKGROUND
 				Ui.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Ui.BorderSizePixel = 0
 				Ui.Position = UDim2.new(0.949999869, 0, 0.500000417, 0)
@@ -1429,7 +1369,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 
 				SLIDE.Name = "SLIDE"
 				SLIDE.Parent = Ui
-				SLIDE.BackgroundColor3 = NoHyper.Theme.ACCENT
+				SLIDE.BackgroundColor3 = NoHyper.Theme.MAIN
 				SLIDE.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				SLIDE.BorderSizePixel = 0
 				SLIDE.Size = UDim2.new(0.462937713, 0, 1, 0)
@@ -1440,7 +1380,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 
 				Frame.Parent = SLIDE
 				Frame.AnchorPoint = Vector2.new(1, 0)
-				Frame.BackgroundColor3 = NoHyper.Theme.ACCENT
+				Frame.BackgroundColor3 = NoHyper.Theme.SYSTEM
 				Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Frame.BorderSizePixel = 0
 				Frame.Position = UDim2.new(1.075, 0, 0, 0)
@@ -1448,14 +1388,14 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Frame.SizeConstraint = Enum.SizeConstraint.RelativeYY
 				Frame.ZIndex = 12
 
-				UICorner_3.CornerRadius = UDim.new(0, 5)
+				UICorner_3.CornerRadius = UDim.new(0.5, 0)
 				UICorner_3.Parent = Frame
 
-				UIStroke.Thickness = 2.000
-				UIStroke.Color = NoHyper.Theme.STROKE
-				UIStroke.Transparency = 0.5
+				UIStroke.Thickness = 1.5
+				UIStroke.Color = NoHyper.Theme.MAIN
 				UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 				UIStroke.Parent = Frame
+				UIStroke.Transparency = 0.3
 
 				ValueText.Name = "ValueText"
 				ValueText.Parent = Ui
@@ -1469,11 +1409,11 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				ValueText.ZIndex = 7
 				ValueText.Font = Enum.Font.GothamMedium
 				ValueText.Text = tostring(Value.Default)..tostring(Value.ValueT)
-				ValueText.TextColor3 = Color3.fromRGB(180, 180, 185)
+				ValueText.TextColor3 = Color3.fromRGB(255, 255, 255)
 				ValueText.TextScaled = true
 				ValueText.TextSize = 14.000
 				ValueText.TextStrokeTransparency = 0.800
-				ValueText.TextTransparency = 0.400
+				ValueText.TextTransparency = 0.500
 				ValueText.TextWrapped = true
 
 				local Touch = false
@@ -1485,8 +1425,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 					ValueText.Text = tostring(Valuea)..tostring(Value.ValueT)
 					Tween:Create(SLIDE,TweenInfo.new(0.1),{Size = Size}):Play()
 					Value.Default = Valuea
-					ConfigData[configKey] = Valuea
-					SaveConfig()
+					NoHyper.ConfigData[configKey] = Valuea
+					NoHyper:SaveConfig()
 					callback(Valuea)
 				end
 
@@ -1494,7 +1434,6 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 					if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
 						Touch = true
 						update(Input)
-
 					end
 				end)
 
@@ -1511,15 +1450,19 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						end
 					end
 				end)
-				
-				local SizeScale = ((Value.Default - Value.Min) / (Value.Max - Value.Min))
-				SLIDE.Size = UDim2.fromScale(SizeScale, 1)
+
+				-- Set initial slider position
+				local initialScale = (Value.Default - Value.Min) / (Value.Max - Value.Min)
+				SLIDE.Size = UDim2.fromScale(initialScale, 1)
+				pcall(callback, Value.Default)
+
+				Section_Hyper.update()
 
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							TextLabel.Text = tostring(...)
+							Text.Text = tostring(...)
 						end,
 					},
 					{
@@ -1530,11 +1473,11 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						name = 'Value',
 						callback = function(v)
 							Value.Default = v
-							local Size = UDim2.fromScale((v / Value.Max), 1)
+							local Size = UDim2.fromScale((v - Value.Min) / (Value.Max - Value.Min), 1)
 							ValueText.Text = tostring(v)..tostring(Value.ValueT)
 							Tween:Create(SLIDE,TweenInfo.new(0.1),{Size = Size}):Play()
-							ConfigData[configKey] = v
-							SaveConfig()
+							NoHyper.ConfigData[configKey] = v
+							NoHyper:SaveConfig()
 							callback(v)
 						end,
 					},
@@ -1548,13 +1491,13 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			end
 
 			function Section_Hyper:AddDropdown(DropdownName:string,DropdownInfo:{any},DropdownDefault:any,callback)
-				local configKey = TabName.."_"..SectionName.."_Dropdown_"..DropdownName
-				
 				DropdownInfo = DropdownInfo or {}
 				DropdownDefault = DropdownDefault or DropdownInfo[1]
-				
-				if ConfigData[configKey] ~= nil then
-					DropdownDefault = ConfigData[configKey]
+
+				-- Auto-load saved value
+				local configKey = "Dropdown_" .. DropdownName
+				if NoHyper.ConfigData[configKey] then
+					DropdownDefault = NoHyper.ConfigData[configKey]
 				end
 
 				local Dropdown = Instance.new("Frame")
@@ -1599,7 +1542,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Text.ZIndex = 7
 				Text.Font = Enum.Font.GothamMedium
 				Text.Text = tostring(DropdownName or ' - ')
-				Text.TextColor3 = Color3.fromRGB(210, 210, 215)
+				Text.TextColor3 = Color3.fromRGB(255, 255, 255)
 				Text.TextScaled = true
 				Text.TextSize = 14.000
 				Text.TextStrokeTransparency = 0.800
@@ -1610,7 +1553,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Ui.Name = "Ui"
 				Ui.Parent = Dropdown
 				Ui.AnchorPoint = Vector2.new(1, 0.5)
-				Ui.BackgroundColor3 = NoHyper.Theme.SECTION
+				Ui.BackgroundColor3 = NoHyper.Theme.BACKGROUND
 				Ui.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Ui.BorderSizePixel = 0
 				Ui.ClipsDescendants = true
@@ -1633,10 +1576,10 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				ValueText.ZIndex = 8
 				ValueText.Font = Enum.Font.Gotham
 				ValueText.Text = tostring(DropdownDefault or 'None')
-				ValueText.TextColor3 = Color3.fromRGB(180, 180, 185)
+				ValueText.TextColor3 = Color3.fromRGB(255, 255, 255)
 				ValueText.TextScaled = true
 				ValueText.TextSize = 14.000
-				ValueText.TextTransparency = 0.400
+				ValueText.TextTransparency = 0.500
 				ValueText.TextWrapped = true
 				ValueText.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -1664,7 +1607,6 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Iconcc.Size = UDim2.new(1, 0, 1, 0)
 				Iconcc.ZIndex = 7
 				Iconcc.Image = DOPWN
-				Iconcc.ImageColor3 = NoHyper.Theme.ACCENT
 
 				Button.Name = "Button"
 				Button.Parent = Dropdown
@@ -1683,7 +1625,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Drop.Name = "Drop"
 				Drop.Parent = Dropdown
 				Drop.AnchorPoint = Vector2.new(1, 0)
-				Drop.BackgroundColor3 = NoHyper.Theme.SECTION
+				Drop.BackgroundColor3 = NoHyper.Theme.BACKGROUND
 				Drop.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Drop.BorderSizePixel = 0
 				Drop.ClipsDescendants = true
@@ -1697,8 +1639,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				UICorner_3.Parent = Drop
 
 				UIStroke.Color = NoHyper.Theme.STROKE
-				UIStroke.Transparency = 0.4
 				UIStroke.Parent = Drop
+				UIStroke.Thickness = 1
+				UIStroke.Transparency = 0.7
 
 				UIListLayout.Parent = Drop
 				UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -1707,13 +1650,11 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 
 				local function valshopw()
 					local old = 1
-
 					for i,v in ipairs(Drop:GetChildren()) do
 						if v:IsA('TextButton') then
 							old += (v.AbsoluteSize.Y or 27) + UIListLayout.Padding.Offset
 						end
 					end
-
 					return old + 1
 				end
 
@@ -1737,18 +1678,15 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						Tween:Create(Drop,TweenInfo.new(0.15),{
 							Size = UDim2.new(0.446000069, 0, 0, 15),
 						}):Play()
-
-						Tween:Create(Ui,TweenInfo.new(0.4),{BackgroundColor3 = NoHyper.Theme.SECTION}):Play()
+						Tween:Create(Ui,TweenInfo.new(0.4),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 					end
 				end
 
 				local function getbutton()
-
 					local Button = Instance.new("TextButton")
 					local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 					local Frame = Instance.new("Frame")
 					local UICorner = Instance.new("UICorner")
-					local Frame_2 = Instance.new("Frame")
 
 					Button.Name = "Button"
 					Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1759,7 +1697,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 					Button.Size = UDim2.new(0.850000024, 0, 0.5, 0)
 					Button.ZIndex = 25
 					Button.Font = Enum.Font.GothamMedium
-					Button.TextColor3 = Color3.fromRGB(210, 210, 215)
+					Button.TextColor3 = Color3.fromRGB(255, 255, 255)
 					Button.TextScaled = true
 					Button.TextSize = 14.000
 					Button.TextTransparency = 0.100
@@ -1772,7 +1710,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 
 					Frame.Parent = Button
 					Frame.AnchorPoint = Vector2.new(0.5, 0.5)
-					Frame.BackgroundColor3 = NoHyper.Theme.ACCENT
+					Frame.BackgroundColor3 = NoHyper.Theme.SYSTEM
 					Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					Frame.BorderSizePixel = 0
 					Frame.Position = UDim2.new(1, 0, 0.5, 0)
@@ -1800,32 +1738,28 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 							lastui = Toggle
 						else
 							Tween:Create(Toggle,TweenInfo.new(0.1),{BackgroundTransparency = 1,Size = UDim2.new(0, 0, 0.800000012, 0)}):Play()
-
 						end
 						ubtton.Parent = Drop
 						ubtton.Text = tostring(v)
 						ubtton.MouseButton1Click:Connect(function()
 							if lastui then
 								Tween:Create(lastui,TweenInfo.new(0.1),{BackgroundTransparency = 1,Size = UDim2.new(0, 0, 0.800000012, 0)}):Play()
-
 							end
-
 							Tween:Create(Toggle,TweenInfo.new(0.1),{BackgroundTransparency = 0,Size = UDim2.new(0.100000001, 0, 0.800000012, 0)}):Play()
-
 							lastui = Toggle
 							DropdownDefault = v
 							ValueText.Text = tostring(DropdownDefault or 'None')
-							ConfigData[configKey] = v
-							SaveConfig()
+							NoHyper.ConfigData[configKey] = v
+							NoHyper:SaveConfig()
 							callback(v)
 						end)
 
 						ubtton.MouseEnter:Connect(function()
-							Tween:Create(ubtton,TweenInfo.new(0.1),{TextColor3 = NoHyper.Theme.ACCENT}):Play()
+							Tween:Create(ubtton,TweenInfo.new(0.1),{TextColor3 = NoHyper.Theme.MAIN}):Play()
 						end)
 
 						ubtton.MouseLeave:Connect(function()
-							Tween:Create(ubtton,TweenInfo.new(0.1),{TextColor3 = Color3.fromRGB(210, 210, 215)}):Play()
+							Tween:Create(ubtton,TweenInfo.new(0.1),{TextColor3 = Color3.fromRGB(255, 255, 255)}):Play()
 						end)
 					end
 				end
@@ -1833,17 +1767,20 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				local valnow = false
 
 				Render()
+				pcall(callback, DropdownDefault)
 
 				Button.MouseButton1Click:Connect(function()
 					valnow = not valnow
 					Toggle(valnow)
 				end)
 
+				Section_Hyper.update()
+
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							TextLabel.Text = tostring(...)
+							Text.Text = tostring(...)
 						end,
 					},
 					{
@@ -1855,8 +1792,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						callback = function(v)
 							DropdownDefault = v
 							ValueText.Text = tostring(DropdownDefault or 'None')
-							ConfigData[configKey] = v
-							SaveConfig()
+							NoHyper.ConfigData[configKey] = v
+							NoHyper:SaveConfig()
 							callback(v)
 						end,
 					},
@@ -1877,7 +1814,6 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			end
 
 			Section.ChildAdded:Connect(Section_Hyper.update)
-
 			Section_Hyper.update()
 
 			return Section_Hyper
@@ -2025,7 +1961,6 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Size = UDim2.fromScale(0.1,0.1),
 				Position = UDim2.new(0.170000011, 0, -0.5, 0)
 			}):Play()
-
 		end
 	end
 
@@ -2163,4 +2098,5 @@ function NoHyper:LoopUpdate()
 		end
 	end)
 end
-return NoHyper;
+
+return NoHyper
