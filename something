@@ -2122,24 +2122,38 @@ function Library.Config:Save()
     local payload = {
         Controls = self.Data,
         PerformanceMode = Library.PerformanceMode,
+        ActiveTabTitle = Library.CurrentWindow and Library.CurrentWindow.ActiveTabTitle or nil,
     }
     local ok, json = pcall(function() return hs:JSONEncode(payload) end)
     if ok then Library.Storage:Write(json) end
 end;
 
 Library.Storage = { File = 'ui_'..tostring(game.PlaceId)..'.json' };
+function Library.Storage:GetEnv()
+    local ok, g = pcall(function() return getgenv and getgenv() or nil end)
+    return (ok and g) or _G
+end;
 function Library.Storage:IsFile()
-    return typeof(_G.isfile) == 'function' and _G.isfile(self.File)
+    local env = self:GetEnv()
+    local isf = (env and env.isfile) or isfile
+    if typeof(isf) == 'function' then
+        return isf(self.File)
+    end
+    return false
 end;
 function Library.Storage:Read()
-    if typeof(_G.readfile) == 'function' and _G.isfile and _G.isfile(self.File) then
-        return _G.readfile(self.File)
+    local env = self:GetEnv()
+    local rf = (env and env.readfile) or readfile
+    if typeof(rf) == 'function' and self:IsFile() then
+        return rf(self.File)
     end
     return nil
 end;
 function Library.Storage:Write(text)
-    if typeof(_G.writefile) == 'function' then
-        _G.writefile(self.File,text)
+    local env = self:GetEnv()
+    local wf = (env and env.writefile) or writefile
+    if typeof(wf) == 'function' then
+        wf(self.File,text)
         return true
     end
     return false
@@ -3604,6 +3618,7 @@ WindowLibrary.WindowTitle = setup.Title;
                     v.TabToggle(false);
                 end;
             end;
+            Library.Config:Save()
         end)
 
         do
