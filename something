@@ -1,5 +1,5 @@
--- [Modified Hyperlib - Rayfield Theme]
--- [Preserves all original functionality with modern grey/black design]
+-- [Modified by: Visual Redesign + Auto-Save Feature]
+-- [Grey/Black Modern Theme with Auto Config Loading]
 
 if not game:IsLoaded() then
 	game.Loaded:Wait()
@@ -14,44 +14,47 @@ local TextService = game:GetService('TextService')
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 local HttpService = game:GetService('HttpService')
 
--- Configuration System
+-- Auto-Save Configuration System
 local ConfigSystem = {
-	FolderName = "HyperlibConfigs",
-	ConfigCache = {}
+	FolderName = "HyperLibConfigs",
+	FileName = "LastConfig.json",
+	Data = {}
 }
 
-local function SaveConfig(configName, data)
-	if not isfolder then return false end
+local function GetConfigPath()
+	return ConfigSystem.FolderName .. "/" .. ConfigSystem.FileName
+end
+
+local function SaveConfig()
+	if not isfolder then return end
 	
 	if not isfolder(ConfigSystem.FolderName) then
 		makefolder(ConfigSystem.FolderName)
 	end
 	
 	local success, err = pcall(function()
-		local encoded = HttpService:JSONEncode(data)
-		writefile(ConfigSystem.FolderName .. "/" .. configName .. ".json", encoded)
+		writefile(GetConfigPath(), HttpService:JSONEncode(ConfigSystem.Data))
 	end)
 	
-	return success
+	if not success then
+		warn("Failed to save config:", err)
+	end
 end
 
-local function LoadConfig(configName)
-	if not isfile then return nil end
+local function LoadConfig()
+	if not isfile or not readfile then return end
 	
-	local filePath = ConfigSystem.FolderName .. "/" .. configName .. ".json"
-	
-	if isfile(filePath) then
+	if isfile(GetConfigPath()) then
 		local success, result = pcall(function()
-			local content = readfile(filePath)
-			return HttpService:JSONDecode(content)
+			return HttpService:JSONDecode(readfile(GetConfigPath()))
 		end)
 		
-		if success then
-			return result
+		if success and result then
+			ConfigSystem.Data = result
+			return true
 		end
 	end
-	
-	return nil
+	return false
 end
 
 local function cretate_button(asd)
@@ -71,43 +74,63 @@ end
 
 local NoHyper = {
 	Theme = {
-		-- Modern Rayfield-inspired grey/black palette
-		BACKGROUND = Color3.fromRGB(25, 25, 30),      -- Dark background
-		SECTION = Color3.fromRGB(30, 30, 35),         -- Section background
-		MAIN = Color3.fromRGB(120, 120, 140),         -- Accent color (soft purple-grey)
-		STROKE = Color3.fromRGB(45, 45, 55),          -- Border/stroke
-		TOUCH = Color3.fromRGB(50, 50, 60),           -- Hover state
-		SYSTEM = Color3.fromRGB(140, 140, 160),       -- Active state
-		TEXT = Color3.fromRGB(220, 220, 230),         -- Text color
-		SHADOW = Color3.fromRGB(0, 0, 0)              -- Shadow
+		BACKGROUND = Color3.fromRGB(20, 20, 20),        -- Dark grey/black
+		SECTION = Color3.fromRGB(28, 28, 28),           -- Slightly lighter
+		MAIN = Color3.fromRGB(90, 90, 90),              -- Modern grey accent
+		STROKE = Color3.fromRGB(40, 40, 40),            -- Subtle border
+		TOUCH = Color3.fromRGB(50, 50, 50),             -- Hover state
+		SYSTEM = Color3.fromRGB(110, 110, 110),         -- Active state
+		TEXT_PRIMARY = Color3.fromRGB(240, 240, 240),   -- Primary text
+		TEXT_SECONDARY = Color3.fromRGB(160, 160, 160)  -- Secondary text
 	},
 	AutoUpdate = {},
 	SectionWidth = 0.95,
-	ConfigName = "default_config"
+	ConfigCallbacks = {}
 }
 
 function NoHyper.set_theme(name:string)
-	if name:lower() == 'rayfield' or name:lower() == 'modern' then
-		NoHyper.Theme.BACKGROUND = Color3.fromRGB(25, 25, 30)
-		NoHyper.Theme.SECTION = Color3.fromRGB(30, 30, 35)
-		NoHyper.Theme.MAIN = Color3.fromRGB(120, 120, 140)
-		NoHyper.Theme.STROKE = Color3.fromRGB(45, 45, 55)
-		NoHyper.Theme.TOUCH = Color3.fromRGB(50, 50, 60)
-		NoHyper.Theme.SYSTEM = Color3.fromRGB(140, 140, 160)
-	elseif name:lower() == 'dark' then
-		NoHyper.Theme.BACKGROUND = Color3.fromRGB(20, 20, 25)
-		NoHyper.Theme.SECTION = Color3.fromRGB(25, 25, 30)
-		NoHyper.Theme.MAIN = Color3.fromRGB(100, 100, 120)
-		NoHyper.Theme.STROKE = Color3.fromRGB(40, 40, 50)
-		NoHyper.Theme.TOUCH = Color3.fromRGB(45, 45, 55)
-		NoHyper.Theme.SYSTEM = Color3.fromRGB(120, 120, 140)
-	elseif name:lower() == 'midnight' then
-		NoHyper.Theme.BACKGROUND = Color3.fromRGB(15, 15, 20)
-		NoHyper.Theme.SECTION = Color3.fromRGB(20, 20, 25)
-		NoHyper.Theme.MAIN = Color3.fromRGB(90, 90, 110)
-		NoHyper.Theme.STROKE = Color3.fromRGB(35, 35, 45)
-		NoHyper.Theme.TOUCH = Color3.fromRGB(40, 40, 50)
-		NoHyper.Theme.SYSTEM = Color3.fromRGB(110, 110, 130)
+	if name:lower() == 'modern' or name:lower() == 'rayfield' then
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(20, 20, 20)
+		NoHyper.Theme.SECTION = Color3.fromRGB(28, 28, 28)
+		NoHyper.Theme.MAIN = Color3.fromRGB(90, 90, 90)
+		NoHyper.Theme.STROKE = Color3.fromRGB(40, 40, 40)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(50, 50, 50)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(110, 110, 110)
+	elseif name:lower() == 'nohyper' then
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(34, 37, 42)
+		NoHyper.Theme.SECTION = Color3.fromRGB(39, 42, 48)
+		NoHyper.Theme.MAIN = Color3.fromRGB(189, 48, 37)
+		NoHyper.Theme.STROKE = Color3.fromRGB(27, 30, 34)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(103, 26, 20)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(225, 57, 44)
+	elseif name:lower() == 'bedol' then
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(34, 37, 42)
+		NoHyper.Theme.SECTION = Color3.fromRGB(39, 42, 48)
+		NoHyper.Theme.MAIN = Color3.fromRGB(189, 0, 0)
+		NoHyper.Theme.STROKE = Color3.fromRGB(27, 30, 34)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(103, 0, 0)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(225, 0, 0)
+	elseif name:lower() == 'neverlose' then
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(3, 15, 32)
+		NoHyper.Theme.SECTION = Color3.fromRGB(4, 19, 43)
+		NoHyper.Theme.MAIN = Color3.fromRGB(69, 185, 217)
+		NoHyper.Theme.STROKE = Color3.fromRGB(12, 55, 111)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(69, 181, 248)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(74, 202, 234)
+	elseif name:lower() == 'green' then
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(3, 24, 19)
+		NoHyper.Theme.SECTION = Color3.fromRGB(4, 29, 23)
+		NoHyper.Theme.MAIN = Color3.fromRGB(75, 246, 138)
+		NoHyper.Theme.STROKE = Color3.fromRGB(15, 35, 31)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(57, 186, 104)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(75, 246, 138)
+	elseif name:lower() == 'tokyo' then
+		NoHyper.Theme.BACKGROUND = Color3.fromRGB(26, 27, 38)
+		NoHyper.Theme.SECTION = Color3.fromRGB(22, 22, 32)
+		NoHyper.Theme.MAIN = Color3.fromRGB(181, 186, 209)
+		NoHyper.Theme.STROKE = Color3.fromRGB(68, 72, 89)
+		NoHyper.Theme.TOUCH = Color3.fromRGB(36, 36, 51)
+		NoHyper.Theme.SYSTEM = Color3.fromRGB(189, 194, 218)
 	end
 end
 
@@ -261,17 +284,20 @@ local function SetImage(name:string,image:ImageLabel)
 	end
 end
 
+
 function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	local HyperWindow = {
 		Tabs = {},
 		Size = UDim2.new(0.230000004, 350, 0.25, 250),
-		Toggle = Enum.KeyCode.LeftControl,
-		ConfigData = {}
+		Toggle = Enum.KeyCode.LeftControl
 	}
 
 	WindowName = ToDefault(WindowName,'Hello, NoHyper')
 	WindowLogo = ToDefault(WindowLogo,'http://www.roblox.com/asset/?id=16530565354')
 	WindowDescription = ToDefault(WindowDescription,'Welcome back!')
+
+	-- Load saved configuration
+	LoadConfig()
 
 	local NoHyperUI = Instance.new("ScreenGui")
 	local MainFrame = Instance.new("Frame")
@@ -303,6 +329,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		end
 	end)
 
+
 	HyperWindow.ScreenSource = NoHyperUI
 
 	NoHyperUI.Name = tostring("ui.protect.")..tostring(math.random(1,100))..tostring(Random.new():NextNumber(0.1,0.9))..tostring(Random.new():NextNumber(0.1,0.9))..tostring(Random.new():NextNumber(0.1,0.9))
@@ -333,7 +360,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	Frame.ClipsDescendants = true
 
 	UICorner.Parent = Frame
-	UICorner.CornerRadius = UDim.new(0,8)
+	UICorner.CornerRadius = UDim.new(0,8) -- Slightly more rounded for modern look
 
 	Contact.Name = "Contact"
 	Contact.Parent = Frame
@@ -471,7 +498,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	MainText.Size = UDim2.new(0.706745207, 0, 0.509708107, 0)
 	MainText.Font = Enum.Font.GothamBold
 	MainText.Text = tostring(WindowName)
-	MainText.TextColor3 = NoHyper.Theme.TEXT
+	MainText.TextColor3 = NoHyper.Theme.TEXT_PRIMARY
 	MainText.TextScaled = true
 	MainText.TextSize = 14.000
 	MainText.TextStrokeTransparency = 0.900
@@ -489,7 +516,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	DescriptionText.Size = UDim2.new(0.706745267, 0, 0.187055781, 0)
 	DescriptionText.Font = Enum.Font.Gotham
 	DescriptionText.Text = tostring(WindowDescription)
-	DescriptionText.TextColor3 = NoHyper.Theme.TEXT
+	DescriptionText.TextColor3 = NoHyper.Theme.TEXT_SECONDARY
 	DescriptionText.TextScaled = true
 	DescriptionText.TextSize = 14.000
 	DescriptionText.TextStrokeTransparency = 0.900
@@ -507,7 +534,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	DropShadow.Size = UDim2.new(1, 47, 1, 47)
 	DropShadow.ZIndex = 0
 	DropShadow.Image = "rbxassetid://6015897843"
-	DropShadow.ImageColor3 = NoHyper.Theme.SHADOW
+	DropShadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
 	DropShadow.ImageTransparency = 1
 	DropShadow.ScaleType = Enum.ScaleType.Slice
 	DropShadow.SliceCenter = Rect.new(49, 49, 450, 450)
@@ -527,16 +554,17 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		}):Play()	
 	end)
 
+	-- Items
 	delay(0.5,function()
 		Tween:Create(CloseButton,TweenInfo.new(0.5),{
 			ImageTransparency = 0
 		}):Play()
 
 		Tween:Create(TickUI,TweenInfo.new(0.5),{
-			BackgroundTransparency = 0.3
+			BackgroundTransparency = 0.5
 		}):Play()
 		Tween:Create(View,TweenInfo.new(0.5),{
-			BackgroundTransparency = 0.3
+			BackgroundTransparency = 0.5
 		}):Play()
 		Tween:Create(DescriptionText,TweenInfo.new(0.5),{
 			TextTransparency = 0.400
@@ -573,7 +601,6 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 	CloseButton.SizeConstraint = Enum.SizeConstraint.RelativeYY
 	CloseButton.ZIndex = 8
 	CloseButton.Image = "rbxassetid://10002398990"
-	CloseButton.ImageColor3 = NoHyper.Theme.TEXT
 
 	TickUI.BackgroundTransparency = 1
 	TickUI.Name = "TickUI"
@@ -613,15 +640,14 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		local TabButton = Instance.new("Frame")
 		local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 		local UICorner = Instance.new("UICorner")
+		local UIGradient = Instance.new("UIGradient")
 		local TextLabel = Instance.new("TextLabel")
 		local Icon = Instance.new("ImageLabel")
 		local Button = Instance.new("TextButton")
-		local SelectionIndicator = Instance.new("Frame")
-		local UICorner_Indicator = Instance.new("UICorner")
 
 		TabButton.Name = TabName or "TabButton"
 		TabButton.Parent = ScrollingFrame
-		TabButton.BackgroundColor3 = NoHyper.Theme.SECTION
+		TabButton.BackgroundColor3 = NoHyper.Theme.MAIN
 		TabButton.BackgroundTransparency = 1.000
 		TabButton.BorderColor3 = Color3.fromRGB(0, 0, 0)
 		TabButton.BorderSizePixel = 0
@@ -634,17 +660,10 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		UICorner.CornerRadius = UDim.new(0, 6)
 		UICorner.Parent = TabButton
 
-		SelectionIndicator.Name = "SelectionIndicator"
-		SelectionIndicator.Parent = TabButton
-		SelectionIndicator.AnchorPoint = Vector2.new(0, 0.5)
-		SelectionIndicator.BackgroundColor3 = NoHyper.Theme.MAIN
-		SelectionIndicator.BorderSizePixel = 0
-		SelectionIndicator.Position = UDim2.new(0, 0, 0.5, 0)
-		SelectionIndicator.Size = UDim2.new(0, 0, 0.7, 0)
-		SelectionIndicator.ZIndex = 10
-
-		UICorner_Indicator.CornerRadius = UDim.new(0, 3)
-		UICorner_Indicator.Parent = SelectionIndicator
+		UIGradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(100, 100, 100)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(120, 120, 120))}
+		UIGradient.Rotation = 190
+		UIGradient.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0.00, 0.05), NumberSequenceKeypoint.new(1.00, 0.00)}
+		UIGradient.Parent = TabButton
 
 		TextLabel.Parent = TabButton
 		TextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -654,9 +673,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		TextLabel.BorderSizePixel = 0
 		TextLabel.Position = UDim2.new(1.02499998, 0, 0.50999999, 0)
 		TextLabel.Size = UDim2.new(1.5, 0, 0.5, 0)
-		TextLabel.Font = Enum.Font.GothamMedium
+		TextLabel.Font = Enum.Font.GothamBold
 		TextLabel.Text = TabName or "Null"
-		TextLabel.TextColor3 = NoHyper.Theme.TEXT
+		TextLabel.TextColor3 = NoHyper.Theme.TEXT_PRIMARY
 		TextLabel.TextScaled = true
 		TextLabel.TextSize = 14.000
 		TextLabel.TextStrokeTransparency = 0.950
@@ -673,7 +692,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		Icon.Position = UDim2.new(0.125, 0, 0.5, 0)
 		Icon.Size = UDim2.new(0.800000012, 0, 0.800000012, 0)
 		Icon.SizeConstraint = Enum.SizeConstraint.RelativeYY
-		Icon.ImageColor3 = NoHyper.Theme.TEXT
+		Icon.ImageColor3 = NoHyper.Theme.TEXT_PRIMARY
 		SetImage(TabIcon,Icon)
 
 		Button.Name = "Button"
@@ -688,6 +707,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		Button.TextColor3 = Color3.fromRGB(0, 0, 0)
 		Button.TextSize = 14.000
 		Button.TextTransparency = 1.000
+
+		--[=========================================]
 
 		local TabFrame = Instance.new("Frame")
 		local LeftFrame = Instance.new("ScrollingFrame")
@@ -754,25 +775,21 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 		local call = function(val)
 			if val then
 				TabFrame.Visible = true
-				Tween:Create(TabButton,TweenInfo.new(0.15),{BackgroundTransparency = 0}):Play()
-				Tween:Create(SelectionIndicator,TweenInfo.new(0.2),{Size = UDim2.new(0.015, 0, 0.7, 0)}):Play()
-				Tween:Create(TextLabel,TweenInfo.new(0.2),{TextTransparency = 0,TextColor3 = NoHyper.Theme.MAIN}):Play()
-				Tween:Create(Icon,TweenInfo.new(0.2),{
+				Tween:Create(TabButton,TweenInfo.new(0.1),{BackgroundTransparency = 0}):Play()
+				Tween:Create(TextLabel,TweenInfo.new(0.3),{TextTransparency = 0,Size = UDim2.fromScale(1.5,0.5)}):Play()
+				Tween:Create(Icon,TweenInfo.new(0.3),{
 					ImageTransparency = 0,
-					ImageColor3 = NoHyper.Theme.MAIN,
 					Size = UDim2.new(0.800000012, 0, 0.800000012, 0)
 				}):Play()
 			else
 				TabFrame.Visible = false
-				Tween:Create(TabButton,TweenInfo.new(0.15),{BackgroundTransparency = 0.95}):Play()
-				Tween:Create(SelectionIndicator,TweenInfo.new(0.2),{Size = UDim2.new(0, 0, 0.7, 0)}):Play()
-				Tween:Create(TextLabel,TweenInfo.new(0.2),{
+				Tween:Create(TabButton,TweenInfo.new(0.1),{BackgroundTransparency = 0.95}):Play()
+				Tween:Create(TextLabel,TweenInfo.new(0.3),{
 					TextTransparency = 0.4,
-					TextColor3 = NoHyper.Theme.TEXT
+					Size = UDim2.fromScale(1.5,0.45)
 				}):Play()
-				Tween:Create(Icon,TweenInfo.new(0.2),{
+				Tween:Create(Icon,TweenInfo.new(0.3),{
 					ImageTransparency = 0.4,
-					ImageColor3 = NoHyper.Theme.TEXT,
 					Size = UDim2.new(0.65, 0, 0.65, 0)
 				}):Play()
 			end
@@ -811,6 +828,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			local SectionTitle = Instance.new("Frame")
 			local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 			local Icon = Instance.new("ImageLabel")
+			local UIGradient = Instance.new("UIGradient")
 			local TextLabel = Instance.new("TextLabel")
 			local Frame = Instance.new("Frame")
 			local Frame_2 = Instance.new("Frame")
@@ -827,8 +845,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			Section.Size = UDim2.new(NoHyper.SectionWidth, 0, 0, 33)
 			Section.ZIndex = 5
 
-			UICorner.Parent = Section
 			UICorner.CornerRadius = UDim.new(0, 6)
+			UICorner.Parent = Section
 
 			SectionTitle.Name = "SectionTitle"
 			SectionTitle.Parent = Section
@@ -858,6 +876,11 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			Icon.ImageColor3 = NoHyper.Theme.MAIN
 			SetImage(SectionIcon,Icon)
 
+			UIGradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(100, 100, 100)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(130, 130, 130))}
+			UIGradient.Rotation = 190
+			UIGradient.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0.00, 0.05), NumberSequenceKeypoint.new(1.00, 0.00)}
+			UIGradient.Parent = Icon
+
 			TextLabel.Parent = SectionTitle
 			TextLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 			TextLabel.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -867,9 +890,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			TextLabel.Position = UDim2.new(0.935000002, 0, 0.5, 0)
 			TextLabel.Size = UDim2.new(1.5664264, 0, 0.600000024, 0)
 			TextLabel.ZIndex = 8
-			TextLabel.Font = Enum.Font.GothamMedium
+			TextLabel.Font = Enum.Font.GothamBold
 			TextLabel.Text = SectionName or "General"
-			TextLabel.TextColor3 = NoHyper.Theme.TEXT
+			TextLabel.TextColor3 = NoHyper.Theme.TEXT_PRIMARY
 			TextLabel.TextScaled = true
 			TextLabel.TextSize = 14.000
 			TextLabel.TextStrokeTransparency = 0.950
@@ -879,7 +902,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			Frame.Parent = SectionTitle
 			Frame.AnchorPoint = Vector2.new(0.5, 1)
 			Frame.BackgroundColor3 = NoHyper.Theme.STROKE
-			Frame.BackgroundTransparency = 0.5
+			Frame.BackgroundTransparency = 0.650
 			Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			Frame.BorderSizePixel = 0
 			Frame.Position = UDim2.new(0.5, 0, 1, 0)
@@ -889,7 +912,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			Frame_2.Parent = Frame
 			Frame_2.AnchorPoint = Vector2.new(0.5, 0.5)
 			Frame_2.BackgroundColor3 = NoHyper.Theme.STROKE
-			Frame_2.BackgroundTransparency = 0.5
+			Frame_2.BackgroundTransparency = 0.650
 			Frame_2.BorderColor3 = Color3.fromRGB(0, 0, 0)
 			Frame_2.BorderSizePixel = 0
 			Frame_2.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -897,10 +920,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			Frame_2.ZIndex = 9
 
 			UICorner_2.Parent = Frame_2
-			UICorner_2.CornerRadius = UDim.new(0, 2)
 
 			UICorner_3.Parent = Frame
-			UICorner_3.CornerRadius = UDim.new(0, 2)
 
 			UIListLayout.Parent = Section
 			UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -908,7 +929,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			UIListLayout.Padding = UDim.new(0, 3)
 
 			UIStroke.Color = NoHyper.Theme.STROKE
-			UIStroke.Thickness = 1
+			UIStroke.Transparency = 0.3
 			UIStroke.Parent = Section
 
 			function Section_Hyper.update()
@@ -936,6 +957,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				local Frame = Instance.new("Frame")
 				local UICorner = Instance.new("UICorner")
 				local TextLabel = Instance.new("TextLabel")
+
+				--Properties:
 
 				Button.Name = "Button"
 				Button.Parent = Section
@@ -974,19 +997,19 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Frame.ZIndex = 10
 
 				Button_2.MouseEnter:Connect(function()
-					Tween:Create(Frame,TweenInfo.new(0.1),{BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
+					Tween:Create(Frame,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
 				end)
 
 				Button_2.MouseButton1Down:Connect(function()
-					Tween:Create(Frame,TweenInfo.new(0.05),{BackgroundColor3 = NoHyper.Theme.SYSTEM}):Play()
+					Tween:Create(Frame,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.SYSTEM}):Play()
 				end)
 
 				Button_2.MouseButton1Up:Connect(function()
-					Tween:Create(Frame,TweenInfo.new(0.1),{BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
+					Tween:Create(Frame,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 				end)
 
 				Button_2.MouseLeave:Connect(function()
-					Tween:Create(Frame,TweenInfo.new(0.1),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
+					Tween:Create(Frame,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 				end)
 
 				UICorner.CornerRadius = UDim.new(0, 5)
@@ -1001,9 +1024,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				TextLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
 				TextLabel.Size = UDim2.new(0.899999976, 0, 0.5, 0)
 				TextLabel.ZIndex = 10
-				TextLabel.Font = Enum.Font.GothamMedium
+				TextLabel.Font = Enum.Font.GothamBold
 				TextLabel.Text = ButtonName
-				TextLabel.TextColor3 = NoHyper.Theme.TEXT
+				TextLabel.TextColor3 = NoHyper.Theme.TEXT_PRIMARY
 				TextLabel.TextScaled = true
 				TextLabel.TextSize = 14.000
 				TextLabel.TextWrapped = true
@@ -1034,6 +1057,13 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 
 				end)
 
+				local ConfigKey = "Toggle_" .. ToggleName
+
+				-- Load saved value
+				if ConfigSystem.Data[ConfigKey] ~= nil then
+					Default = ConfigSystem.Data[ConfigKey]
+				end
+
 				local Toggle = Instance.new("Frame")
 				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 				local Text = Instance.new("TextLabel")
@@ -1041,6 +1071,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				local UICorner = Instance.new("UICorner")
 				local True = Instance.new("ImageLabel")
 				local Button = Instance.new("TextButton")
+
+				--Properties:
 
 				Toggle.Name = "Toggle"
 				Toggle.Parent = Section
@@ -1066,9 +1098,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Text.Position = UDim2.new(0.0516665913, 0, 0.499999881, 0)
 				Text.Size = UDim2.new(0.998333275, 0, 0.444999993, 0)
 				Text.ZIndex = 7
-				Text.Font = Enum.Font.GothamMedium
+				Text.Font = Enum.Font.GothamBold
 				Text.Text = ToggleName or "TOGGLE"
-				Text.TextColor3 = NoHyper.Theme.TEXT
+				Text.TextColor3 = NoHyper.Theme.TEXT_PRIMARY
 				Text.TextScaled = true
 				Text.TextSize = 14.000
 				Text.TextStrokeTransparency = 0.900
@@ -1102,7 +1134,6 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				True.Visible = false
 				True.ZIndex = 8
 				True.Image = "rbxassetid://3944680095"
-				True.ImageColor3 = NoHyper.Theme.TEXT
 
 				Button.Name = "Button"
 				Button.Parent = Toggle
@@ -1123,7 +1154,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						return
 					end
 
-					Tween:Create(Ui,TweenInfo.new(0.1),{BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
+					Tween:Create(Ui,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
 				end)
 
 				Button.MouseLeave:Connect(function()
@@ -1131,16 +1162,16 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						return
 					end
 
-					Tween:Create(Ui,TweenInfo.new(0.1),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
+					Tween:Create(Ui,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 				end)
 
 				local function Effect(vcal)
 					if vcal then
-						Tween:Create(Ui,TweenInfo.new(0.1),{BackgroundColor3 = NoHyper.Theme.MAIN}):Play()
+						Tween:Create(Ui,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.SYSTEM}):Play()
 						True.Visible = true
 					else
 						True.Visible = false
-						Tween:Create(Ui,TweenInfo.new(0.1),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
+						Tween:Create(Ui,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 					end
 				end
 
@@ -1149,11 +1180,12 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Button.MouseButton1Click:Connect(function()
 					Default = not Default
 					Effect(Default)
-					callback(Default)
 					
 					-- Save to config
-					HyperWindow.ConfigData[ToggleName] = Default
-					SaveConfig(NoHyper.ConfigName, HyperWindow.ConfigData)
+					ConfigSystem.Data[ConfigKey] = Default
+					SaveConfig()
+					
+					callback(Default)
 				end)
 
 				Section_Hyper.update()
@@ -1162,7 +1194,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 					{
 						name = 'Text',
 						callback = function(...)
-							Text.Text = tostring(...)
+							TextLabel.Text = tostring(...)
 						end,
 					},
 					{
@@ -1174,6 +1206,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						callback = function(v)
 							Default = v
 							Effect(v)
+							ConfigSystem.Data[ConfigKey] = v
+							SaveConfig()
 							callback(v)
 						end,
 					}
@@ -1191,6 +1225,15 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 					end)
 				end
 
+				local ConfigKey = "Keybind_" .. KeybindName
+
+				-- Load saved value
+				if ConfigSystem.Data[ConfigKey] ~= nil then
+					pcall(function()
+						Default = Enum.KeyCode[ConfigSystem.Data[ConfigKey]]
+					end)
+				end
+
 				local function toname(v:Enum.KeyCode)
 					if v then
 						return v.Name
@@ -1198,7 +1241,6 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 
 					return 'None'
 				end
-				
 				local Keybind = Instance.new("Frame")
 				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
 				local Text = Instance.new("TextLabel")
@@ -1206,6 +1248,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				local UICorner = Instance.new("UICorner")
 				local BindKey = Instance.new("TextLabel")
 				local Button = Instance.new("TextButton")
+
+				--Properties:
 
 				Keybind.Name = "Keybind"
 				Keybind.Parent = Section
@@ -1231,9 +1275,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Text.Position = UDim2.new(0.0516665913, 0, 0.499999881, 0)
 				Text.Size = UDim2.new(0.998333275, 0, 0.444999993, 0)
 				Text.ZIndex = 7
-				Text.Font = Enum.Font.GothamMedium
+				Text.Font = Enum.Font.GothamBold
 				Text.Text = KeybindName or "KEYBIND"
-				Text.TextColor3 = NoHyper.Theme.TEXT
+				Text.TextColor3 = NoHyper.Theme.TEXT_PRIMARY
 				Text.TextScaled = true
 				Text.TextSize = 14.000
 				Text.TextStrokeTransparency = 0.900
@@ -1264,9 +1308,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				BindKey.Position = UDim2.new(0, 0, 0.5, 0)
 				BindKey.Size = UDim2.new(1, 0, 0.649999976, 0)
 				BindKey.ZIndex = 7
-				BindKey.Font = Enum.Font.GothamMedium
+				BindKey.Font = Enum.Font.GothamBold
 				BindKey.Text = toname(Default)
-				BindKey.TextColor3 = NoHyper.Theme.TEXT
+				BindKey.TextColor3 = NoHyper.Theme.TEXT_PRIMARY
 				BindKey.TextScaled = true
 				BindKey.TextSize = 14.000
 				BindKey.TextWrapped = true
@@ -1291,14 +1335,14 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 					if BindConnect then
 						return
 					end
-					Tween:Create(Bind,TweenInfo.new(0.1),{BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
+					Tween:Create(Bind,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.TOUCH}):Play()
 				end)
 
 				Button.MouseLeave:Connect(function()
 					if BindConnect then
 						return
 					end
-					Tween:Create(Bind,TweenInfo.new(0.1),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
+					Tween:Create(Bind,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 				end)
 
 				local function UpdateText()
@@ -1323,13 +1367,14 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 					if BindConnect.KeyCode ~= Enum.KeyCode.Unknown then
 						BindKey.Text = toname(BindConnect.KeyCode)
 						Default = BindConnect.KeyCode
+						
+						-- Save to config
+						ConfigSystem.Data[ConfigKey] = Default.Name
+						SaveConfig()
+						
 						pcall(function()
 							task.spawn(callback,BindConnect.KeyCode)
 						end)
-						
-						-- Save to config
-						HyperWindow.ConfigData[KeybindName] = BindConnect.KeyCode.Name
-						SaveConfig(NoHyper.ConfigName, HyperWindow.ConfigData)
 					else
 						BindKey.Text = toname(Default)
 						UpdateText()
@@ -1337,17 +1382,16 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 
 					Tween:Create(Bind,TweenInfo.new(0.075),{BackgroundColor3 = NoHyper.Theme.BACKGROUND}):Play()
 
+
 					UpdateText()
 					BindConnect = nil
 				end)
-				
-				Section_Hyper.update()
 
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							Text.Text = tostring(...)
+							TextLabel.Text = tostring(...)
 						end,
 					},
 					{
@@ -1359,6 +1403,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						callback = function(v)
 							Default = v
 							BindKey.Text = toname(v)
+							ConfigSystem.Data[ConfigKey] = v.Name
+							SaveConfig()
 							UpdateText()
 							callback(v)
 						end,
@@ -1374,7 +1420,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 
 			function Section_Hyper:AddSlider(SliderName,Value:{Min:number,Max:number,Default:number,ValueT:string},callback)
 				Value = Value or {}
-				Value.Min = Value.Min or 1
+				Value.Min = Value.Min or 0
 				Value.Max = Value.Max or 100
 				Value.Default = Value.Default or Value.Min
 				Value.ValueT = Value.ValueT or ''
@@ -1382,6 +1428,13 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				callback = ToDefault(callback,function()
 
 				end)
+
+				local ConfigKey = "Slider_" .. SliderName
+
+				-- Load saved value
+				if ConfigSystem.Data[ConfigKey] ~= nil then
+					Value.Default = ConfigSystem.Data[ConfigKey]
+				end
 
 				local Slider = Instance.new("Frame")
 				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
@@ -1393,7 +1446,12 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				local Frame = Instance.new("Frame")
 				local UICorner_3 = Instance.new("UICorner")
 				local UIStroke = Instance.new("UIStroke")
+				local UIGradient = Instance.new("UIGradient")
+				local UIGradient_2 = Instance.new("UIGradient")
 				local ValueText = Instance.new("TextLabel")
+				local UIGradient_3 = Instance.new("UIGradient")
+
+				--Properties:
 
 				Slider.Name = "Slider"
 				Slider.Parent = Section
@@ -1419,9 +1477,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Text.Position = UDim2.new(0.0516665913, 0, 0.499999881, 0)
 				Text.Size = UDim2.new(0.998333275, 0, 0.444999993, 0)
 				Text.ZIndex = 7
-				Text.Font = Enum.Font.GothamMedium
+				Text.Font = Enum.Font.GothamBold
 				Text.Text = SliderName or "SLIDER"
-				Text.TextColor3 = NoHyper.Theme.TEXT
+				Text.TextColor3 = NoHyper.Theme.TEXT_PRIMARY
 				Text.TextScaled = true
 				Text.TextSize = 14.000
 				Text.TextStrokeTransparency = 0.900
@@ -1456,7 +1514,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 
 				Frame.Parent = SLIDE
 				Frame.AnchorPoint = Vector2.new(1, 0)
-				Frame.BackgroundColor3 = NoHyper.Theme.SYSTEM
+				Frame.BackgroundColor3 = NoHyper.Theme.MAIN
 				Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Frame.BorderSizePixel = 0
 				Frame.Position = UDim2.new(1.075, 0, 0, 0)
@@ -1464,13 +1522,23 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Frame.SizeConstraint = Enum.SizeConstraint.RelativeYY
 				Frame.ZIndex = 12
 
-				UICorner_3.CornerRadius = UDim.new(1, 0)
+				UICorner_3.CornerRadius = UDim.new(0, 5)
 				UICorner_3.Parent = Frame
 
-				UIStroke.Thickness = 1.5
-				UIStroke.Color = NoHyper.Theme.MAIN
+				UIStroke.Thickness = 2.000
+				UIStroke.Color = NoHyper.Theme.STROKE
 				UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 				UIStroke.Parent = Frame
+
+				UIGradient.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(100, 100, 100)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(130, 130, 130))}
+				UIGradient.Rotation = 190
+				UIGradient.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0.00, 0.05), NumberSequenceKeypoint.new(1.00, 0.00)}
+				UIGradient.Parent = UIStroke
+
+				UIGradient_2.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(100, 100, 100)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(130, 130, 130))}
+				UIGradient_2.Rotation = 190
+				UIGradient_2.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0.00, 0.05), NumberSequenceKeypoint.new(1.00, 0.00)}
+				UIGradient_2.Parent = SLIDE
 
 				ValueText.Name = "ValueText"
 				ValueText.Parent = Ui
@@ -1482,14 +1550,20 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				ValueText.Position = UDim2.new(0, 0, -0.150000006, 0)
 				ValueText.Size = UDim2.new(1, 0, 1, 0)
 				ValueText.ZIndex = 7
-				ValueText.Font = Enum.Font.GothamMedium
-				ValueText.Text = tostring(Value.Default)..' / '..tostring(Value.Max)..tostring(Value.ValueT)
-				ValueText.TextColor3 = NoHyper.Theme.TEXT
+				ValueText.Font = Enum.Font.GothamBold
+				-- Changed: Show value directly instead of percentage
+				ValueText.Text = tostring(Value.Default)..tostring(Value.ValueT)
+				ValueText.TextColor3 = NoHyper.Theme.TEXT_SECONDARY
 				ValueText.TextScaled = true
 				ValueText.TextSize = 14.000
 				ValueText.TextStrokeTransparency = 0.900
 				ValueText.TextTransparency = 0.400
 				ValueText.TextWrapped = true
+
+				UIGradient_3.Color = ColorSequence.new{ColorSequenceKeypoint.new(0.00, Color3.fromRGB(100, 100, 100)), ColorSequenceKeypoint.new(1.00, Color3.fromRGB(130, 130, 130))}
+				UIGradient_3.Rotation = 190
+				UIGradient_3.Transparency = NumberSequence.new{NumberSequenceKeypoint.new(0.00, 0.05), NumberSequenceKeypoint.new(1.00, 0.00)}
+				UIGradient_3.Parent = Ui
 
 				local Touch = false
 
@@ -1497,14 +1571,16 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 					local SizeScale = math.clamp((((Input.Position.X) - Ui.AbsolutePosition.X) / Ui.AbsoluteSize.X), 0, 1)
 					local Valuea = math.floor(((Value.Max - Value.Min) * SizeScale) + Value.Min)
 					local Size = UDim2.fromScale(SizeScale, 1)
-					ValueText.Text = tostring(Valuea)..' / '..tostring(Value.Max)..tostring(Value.ValueT)
+					-- Changed: Show value directly instead of "value / max"
+					ValueText.Text = tostring(Valuea)..tostring(Value.ValueT)
 					Tween:Create(SLIDE,TweenInfo.new(0.1),{Size = Size}):Play()
 					Value.Default = Valuea
-					callback(Valuea)
 					
 					-- Save to config
-					HyperWindow.ConfigData[SliderName] = Valuea
-					SaveConfig(NoHyper.ConfigName, HyperWindow.ConfigData)
+					ConfigSystem.Data[ConfigKey] = Valuea
+					SaveConfig()
+					
+					callback(Valuea)
 				end
 
 				Ui.InputBegan:Connect(function(Input)
@@ -1528,14 +1604,16 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						end
 					end
 				end)
-				
-				Section_Hyper.update()
+
+				-- Set initial position based on saved value
+				local initialScale = (Value.Default - Value.Min) / (Value.Max - Value.Min)
+				SLIDE.Size = UDim2.fromScale(initialScale, 1)
 
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							Text.Text = tostring(...)
+							TextLabel.Text = tostring(...)
 						end,
 					},
 					{
@@ -1547,8 +1625,10 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						callback = function(v)
 							Value.Default = v
 							local Size = UDim2.fromScale((v / Value.Max), 1)
-							ValueText.Text = tostring(v)..' / '..tostring(Value.Max)..tostring(Value.ValueT)
+							ValueText.Text = tostring(v)..tostring(Value.ValueT)
 							Tween:Create(SLIDE,TweenInfo.new(0.1),{Size = Size}):Play()
+							ConfigSystem.Data[ConfigKey] = v
+							SaveConfig()
 							callback(v)
 						end,
 					},
@@ -1564,6 +1644,13 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			function Section_Hyper:AddDropdown(DropdownName:string,DropdownInfo:{any},DropdownDefault:any,callback)
 				DropdownInfo = DropdownInfo or {}
 				DropdownDefault = DropdownDefault or DropdownInfo[1]
+
+				local ConfigKey = "Dropdown_" .. DropdownName
+
+				-- Load saved value
+				if ConfigSystem.Data[ConfigKey] ~= nil then
+					DropdownDefault = ConfigSystem.Data[ConfigKey]
+				end
 
 				local Dropdown = Instance.new("Frame")
 				local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
@@ -1581,6 +1668,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				local UIListLayout = Instance.new("UIListLayout")
 				local DOPWN = 'rbxassetid://7733717447'
 				local UP = 'rbxassetid://7072706796'
+
+				--Properties:
 
 				Dropdown.Name = "Dropdown"
 				Dropdown.Parent = Section
@@ -1605,9 +1694,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Text.Position = UDim2.new(0.0516665727, 0, 0.499999762, 0)
 				Text.Size = UDim2.new(0.948333681, 0, 0.445000023, 0)
 				Text.ZIndex = 7
-				Text.Font = Enum.Font.GothamMedium
+				Text.Font = Enum.Font.GothamBold
 				Text.Text = tostring(DropdownName or ' - ')
-				Text.TextColor3 = NoHyper.Theme.TEXT
+				Text.TextColor3 = NoHyper.Theme.TEXT_PRIMARY
 				Text.TextScaled = true
 				Text.TextSize = 14.000
 				Text.TextStrokeTransparency = 0.900
@@ -1639,9 +1728,9 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				ValueText.Position = UDim2.new(0.840817988, 0, 0.499999613, 0)
 				ValueText.Size = UDim2.new(1.58200002, 0, 0.449999988, 0)
 				ValueText.ZIndex = 8
-				ValueText.Font = Enum.Font.Gotham
+				ValueText.Font = Enum.Font.GothamBold
 				ValueText.Text = tostring(DropdownDefault or 'None')
-				ValueText.TextColor3 = NoHyper.Theme.TEXT
+				ValueText.TextColor3 = NoHyper.Theme.TEXT_SECONDARY
 				ValueText.TextScaled = true
 				ValueText.TextSize = 14.000
 				ValueText.TextTransparency = 0.400
@@ -1660,7 +1749,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				ValueIcon.SizeConstraint = Enum.SizeConstraint.RelativeYY
 				ValueIcon.ZIndex = 8
 
-				UICorner_2.CornerRadius = UDim.new(0, 4)
+				UICorner_2.CornerRadius = UDim.new(0, 5)
 				UICorner_2.Parent = ValueIcon
 
 				Iconcc.Name = "Icon.cc"
@@ -1672,7 +1761,6 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Iconcc.Size = UDim2.new(1, 0, 1, 0)
 				Iconcc.ZIndex = 7
 				Iconcc.Image = DOPWN
-				Iconcc.ImageColor3 = NoHyper.Theme.TEXT
 
 				Button.Name = "Button"
 				Button.Parent = Dropdown
@@ -1691,7 +1779,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				Drop.Name = "Drop"
 				Drop.Parent = Dropdown
 				Drop.AnchorPoint = Vector2.new(1, 0)
-				Drop.BackgroundColor3 = NoHyper.Theme.SECTION
+				Drop.BackgroundColor3 = NoHyper.Theme.BACKGROUND
 				Drop.BorderColor3 = Color3.fromRGB(0, 0, 0)
 				Drop.BorderSizePixel = 0
 				Drop.ClipsDescendants = true
@@ -1705,7 +1793,7 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				UICorner_3.Parent = Drop
 
 				UIStroke.Color = NoHyper.Theme.STROKE
-				UIStroke.Thickness = 1
+				UIStroke.Transparency = 0.3
 				UIStroke.Parent = Drop
 
 				UIListLayout.Parent = Drop
@@ -1754,19 +1842,20 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 
 					local Button = Instance.new("TextButton")
 					local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
-					local UICorner = Instance.new("UICorner")
 					local Frame = Instance.new("Frame")
+					local UICorner = Instance.new("UICorner")
+					local Frame_2 = Instance.new("Frame")
 
 					Button.Name = "Button"
-					Button.BackgroundColor3 = NoHyper.Theme.BACKGROUND
-					Button.BackgroundTransparency = 0.5
+					Button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+					Button.BackgroundTransparency = 1.000
 					Button.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					Button.BorderSizePixel = 0
 					Button.ClipsDescendants = true
 					Button.Size = UDim2.new(0.850000024, 0, 0.5, 0)
 					Button.ZIndex = 25
-					Button.Font = Enum.Font.GothamMedium
-					Button.TextColor3 = NoHyper.Theme.TEXT
+					Button.Font = Enum.Font.GothamBold
+					Button.TextColor3 = NoHyper.Theme.TEXT_PRIMARY
 					Button.TextScaled = true
 					Button.TextSize = 14.000
 					Button.TextTransparency = 0.100
@@ -1777,17 +1866,17 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 					UIAspectRatioConstraint.AspectRatio = 6.500
 					UIAspectRatioConstraint.AspectType = Enum.AspectType.ScaleWithParentSize
 
-					UICorner.CornerRadius = UDim.new(0, 4)
-					UICorner.Parent = Button
-
 					Frame.Parent = Button
 					Frame.AnchorPoint = Vector2.new(0.5, 0.5)
-					Frame.BackgroundColor3 = NoHyper.Theme.MAIN
+					Frame.BackgroundColor3 = NoHyper.Theme.SYSTEM
 					Frame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 					Frame.BorderSizePixel = 0
 					Frame.Position = UDim2.new(1, 0, 0.5, 0)
 					Frame.Size = UDim2.new(0.100000001, 0, 0.800000012, 0)
 					Frame.ZIndex = 20
+
+					UICorner.CornerRadius = UDim.new(0, 3)
+					UICorner.Parent = Frame
 
 					return Button,Frame
 				end
@@ -1822,19 +1911,20 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 							lastui = Toggle
 							DropdownDefault = v
 							ValueText.Text = tostring(DropdownDefault or 'None')
-							callback(v)
 							
 							-- Save to config
-							HyperWindow.ConfigData[DropdownName] = v
-							SaveConfig(NoHyper.ConfigName, HyperWindow.ConfigData)
+							ConfigSystem.Data[ConfigKey] = v
+							SaveConfig()
+							
+							callback(v)
 						end)
 
 						ubtton.MouseEnter:Connect(function()
-							Tween:Create(ubtton,TweenInfo.new(0.1),{TextColor3 = NoHyper.Theme.MAIN,BackgroundTransparency = 0}):Play()
+							Tween:Create(ubtton,TweenInfo.new(0.1),{TextColor3 = NoHyper.Theme.TOUCH}):Play()
 						end)
 
 						ubtton.MouseLeave:Connect(function()
-							Tween:Create(ubtton,TweenInfo.new(0.1),{TextColor3 = NoHyper.Theme.TEXT,BackgroundTransparency = 0.5}):Play()
+							Tween:Create(ubtton,TweenInfo.new(0.1),{TextColor3 = NoHyper.Theme.TEXT_PRIMARY}):Play()
 						end)
 					end
 				end
@@ -1847,14 +1937,12 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 					valnow = not valnow
 					Toggle(valnow)
 				end)
-				
-				Section_Hyper.update()
 
 				return Signal({
 					{
 						name = 'Text',
 						callback = function(...)
-							Text.Text = tostring(...)
+							TextLabel.Text = tostring(...)
 						end,
 					},
 					{
@@ -1866,6 +1954,8 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 						callback = function(v)
 							DropdownDefault = v
 							ValueText.Text = tostring(DropdownDefault or 'None')
+							ConfigSystem.Data[ConfigKey] = v
+							SaveConfig()
 							callback(v)
 						end,
 					},
@@ -1931,24 +2021,6 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 				end)(Link)
 			end)
 		end
-	end
-	
-	-- Auto-load last saved configuration
-	function HyperWindow:LoadConfig(configName)
-		configName = configName or NoHyper.ConfigName
-		local loadedData = LoadConfig(configName)
-		
-		if loadedData then
-			HyperWindow.ConfigData = loadedData
-			return true
-		end
-		return false
-	end
-	
-	-- Manually save current configuration
-	function HyperWindow:SaveConfig(configName)
-		configName = configName or NoHyper.ConfigName
-		return SaveConfig(configName, HyperWindow.ConfigData)
 	end
 
 	for i,v in ipairs({DiscordButton,WebsiteButton,YoutubeButton}) do
@@ -2175,11 +2247,6 @@ function NoHyper.new(WindowName,WindowLogo,WindowDescription)
 			end
 		end
 	end)
-	
-	-- Auto-load config on initialization
-	task.spawn(function()
-		HyperWindow:LoadConfig()
-	end)
 
 	return HyperWindow
 end
@@ -2195,5 +2262,4 @@ function NoHyper:LoopUpdate()
 		end
 	end)
 end
-
 return NoHyper;
