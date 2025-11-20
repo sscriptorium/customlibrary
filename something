@@ -5394,14 +5394,16 @@ function Library:CreateWindow(setup)
 		setup.Size = udim
 	end;
 
-    function WindowLibrary:Destroy()
-        ScreenGui:Destroy();
-        BlurEle.Destroy();
-        local g = (Library.env and Library.env()) or _G;
-        g.AcrylicUILoaded = false;
-        g.AcrylicUIInstance = nil;
-        return true;
-    end;
+	function WindowLibrary:Destroy()
+		ScreenGui:Destroy();
+		BlurEle.Destroy();
+		if WindowLibrary.__WMConn then WindowLibrary.__WMConn:Disconnect() end
+		if WindowLibrary.__WM then WindowLibrary.__WM:Destroy() end
+		local g = (Library.env and Library.env()) or _G;
+		g.AcrylicUILoaded = false;
+		g.AcrylicUIInstance = nil;
+		return true;
+	end;
     function WindowLibrary:Reload()
         local g = (Library.env and Library.env()) or _G;
         g.AcrylicUILoaded = true;
@@ -5828,9 +5830,36 @@ function Library:CreateWindow(setup)
 		end;
 	end)
 
-    local gg = (Library.env and Library.env()) or _G;
-    gg.AcrylicUIInstance = WindowLibrary;
-    return WindowLibrary;
+	local wm = WindowLibrary:AddWatermark("")
+	local Player = game:GetService('Players').LocalPlayer
+	local playerName = (Player and Player.Name) or "Player"
+	local function _exec()
+		local ok, name = pcall(function()
+			if getexecutorname then return getexecutorname() end
+			if identifyexecutor then return identifyexecutor() end
+			if syn then return "Synapse" end
+			if KRNL_LOADED then return "KRNL" end
+			return "Unknown"
+		end)
+		if ok and type(name) == "string" then return name end
+		return "Unknown"
+	end
+	local execName = _exec()
+	local last = tick()
+	local fps = 0
+	WindowLibrary.__WMConn = game:GetService('RunService').RenderStepped:Connect(function()
+		local now = tick()
+		local dt = now - last
+		last = now
+		fps = math.clamp(math.floor(1/(dt>0 and dt or 1)),0,240)
+		wm:Text(string.format("%s | FPS:%d | %s", playerName, fps, execName))
+		wm:Update()
+	end)
+	WindowLibrary.__WM = wm
+
+	local gg = (Library.env and Library.env()) or _G;
+	gg.AcrylicUIInstance = WindowLibrary;
+	return WindowLibrary;
 end;
 
 return Library;
