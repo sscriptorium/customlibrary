@@ -1420,7 +1420,6 @@ Library.Cloneref = cloneref or function(o) return o end;
 Library.TweenService = game:GetService('TweenService');
 Library.LocalPlayer = game:GetService('Players').LocalPlayer;
 Library.CoreGui = (game:FindFirstChild('CoreGui') and Library.Cloneref(game:GetService('CoreGui'))) or Library.LocalPlayer.PlayerGui;
-Library.GuiName = "AcrylicUI";
 Library.CurrentGui = nil;
 Library.CurrentWindow = nil;
 Library.SizeLibrary = {
@@ -1616,8 +1615,8 @@ local LoadAcrylic = function()
 
 	function GuiSystem.new(frame,NoAutoBackground)
 		local Part = Instance.new('Part',workspace);
-        local DepthOfField = Instance.new('DepthOfFieldEffect',game:GetService('Lighting'));
-        local SurfaceGui = Instance.new('SurfaceGui',Part);
+		local DepthOfField = Instance.new('DepthOfFieldEffect',game:GetService('Lighting'));
+		local SurfaceGui = Instance.new('SurfaceGui',Part);
 		local BlockMesh = Instance.new("BlockMesh");
 
 		BlockMesh.Parent = Part;
@@ -1637,11 +1636,11 @@ local LoadAcrylic = function()
 			Transparency = 0.8;
 		}):Play()
 
-        DepthOfField.Enabled = true;
-        DepthOfField.FarIntensity = 1;
-        DepthOfField.FocusDistance = 0;
-        DepthOfField.InFocusRadius = 500;
-        DepthOfField.NearIntensity = 1;
+		DepthOfField.Enabled = true;
+		DepthOfField.FarIntensity = 1;
+		DepthOfField.FocusDistance = 0;
+		DepthOfField.InFocusRadius = 500;
+		DepthOfField.NearIntensity = 1;
 
 		SurfaceGui.AlwaysOnTop = true;
 		SurfaceGui.Adornee = Part;
@@ -1649,12 +1648,9 @@ local LoadAcrylic = function()
 		SurfaceGui.Face = Enum.NormalId.Front;
 		SurfaceGui.ZIndexBehavior = Enum.ZIndexBehavior.Global;
 
-        DepthOfField.Name = GuiSystem:Hash();
-        Part.Name = GuiSystem:Hash();
-        SurfaceGui.Name = GuiSystem:Hash();
-        DepthOfField:SetAttribute('AcrylicUI',true)
-        Part:SetAttribute('AcrylicUI',true)
-        SurfaceGui:SetAttribute('AcrylicUI',true)
+		DepthOfField.Name = GuiSystem:Hash();
+		Part.Name = GuiSystem:Hash();
+		SurfaceGui.Name = GuiSystem:Hash();
 
 		local C4 = {
 			Update = nil,
@@ -1729,10 +1725,9 @@ local LoadAcrylic = function()
 				Transparency = 1
 			}):Play();
 
-            DepthOfField.Enabled = false;
-            DepthOfField:Destroy();
-            Part:Destroy()
-        end;
+			DepthOfField:Destroy();
+			Part:Destroy()
+		end;
 
 		return C4;
 	end;
@@ -2142,25 +2137,11 @@ function Library.Storage:Write(text)
 end;
 
 function Library:CreateWindow(setup)
-    if self.CurrentWindow and self.CurrentWindow.Destroy then
-        pcall(function() self.CurrentWindow:Destroy() end)
-    elseif self.CurrentGui and self.CurrentGui.Parent then
+    if self.CurrentGui and self.CurrentGui.Parent then
         pcall(function() self.CurrentGui:Destroy() end)
+        self.CurrentGui = nil
+        self.CurrentWindow = nil
     end
-    if self.ActiveBlur and self.ActiveBlur.Destroy then
-        pcall(function() self.ActiveBlur.Destroy() end)
-    end
-    self:CleanBlurArtifacts()
-    self.CurrentGui = nil
-    self.CurrentWindow = nil
-    self.ActiveBlur = nil
-    local cg = Library.CoreGui
-    local pg = Library.LocalPlayer and Library.LocalPlayer:FindFirstChild("PlayerGui")
-    local old1 = cg and cg:FindFirstChild(Library.GuiName)
-    local old2 = pg and pg:FindFirstChild(Library.GuiName)
-    if old1 then pcall(function() old1:Destroy() end) end
-    if old2 then pcall(function() old2:Destroy() end) end
-    self:CleanBlurArtifacts()
     setup = setup or {};
 
 	setup.Title = setup.Title or "Window";
@@ -2179,8 +2160,7 @@ function Library:CreateWindow(setup)
 
 	end
 
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = Library.GuiName
+	local ScreenGui = Instance.new("ScreenGui")
 	local MainFrame = Instance.new("Frame")
 	local DropShadow = Instance.new("ImageLabel")
 	local Ico = Instance.new("ImageLabel")
@@ -2224,8 +2204,7 @@ function Library:CreateWindow(setup)
 		end;
 	end)
 
-    local BlurEle = Library.UIBlur.new(MainFrame,true);
-    Library.ActiveBlur = BlurEle;
+	local BlurEle = Library.UIBlur.new(MainFrame,true);
 
 	DropShadow.Name = "DropShadow"
 	DropShadow.Parent = MainFrame
@@ -5540,12 +5519,11 @@ function Library:CreateWindow(setup)
 		setup.Size = udim
 	end;
 
-    function WindowLibrary:Destroy()
-        ScreenGui:Destroy();
-        BlurEle.Destroy();
-        Library.ActiveBlur = nil;
-        return true;
-    end;
+	function WindowLibrary:Destroy()
+		ScreenGui:Destroy();
+		BlurEle.Destroy();
+		return true;
+	end;
 
 	CloseButton.MouseButton1Click:Connect(function()
 		WindowLibrary:Dialog({
@@ -5975,41 +5953,12 @@ function Library:CreateWindow(setup)
     return WindowLibrary;
 end;
 
-function Library:GetGui()
-    local cg = Library.CoreGui
-    local pg = Library.LocalPlayer and Library.LocalPlayer:FindFirstChild("PlayerGui")
-    local g = cg and cg:FindFirstChild(Library.GuiName)
-    if g then return g end
-    local g2 = pg and pg:FindFirstChild(Library.GuiName)
-    return g2
-end;
-
 function Library:DestroyWindow()
-    if self.CurrentWindow and self.CurrentWindow.Destroy then
-        pcall(function() self.CurrentWindow:Destroy() end)
-    elseif self.CurrentGui and self.CurrentGui.Parent then
+    if self.CurrentGui and self.CurrentGui.Parent then
         pcall(function() self.CurrentGui:Destroy() end)
-    end
-    if self.ActiveBlur and self.ActiveBlur.Destroy then
-        pcall(function() self.ActiveBlur.Destroy() end)
     end
     self.CurrentGui = nil
     self.CurrentWindow = nil
-    self.ActiveBlur = nil
 end;
 
 return Library;
-function Library:CleanBlurArtifacts()
-    local Lighting = game:GetService('Lighting')
-    for _,v in ipairs(Lighting:GetChildren()) do
-        if v:IsA('DepthOfFieldEffect') and v:GetAttribute('AcrylicUI') then
-            pcall(function() v:Destroy() end)
-        end
-    end
-    for _,v in ipairs(workspace:GetChildren()) do
-        if v:GetAttribute('AcrylicUI') then
-            pcall(function() v:Destroy() end)
-        end
-    end
-end;
-z
