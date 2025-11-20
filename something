@@ -3074,6 +3074,7 @@ function Library:CreateWindow(setup)
 				local Frame = Instance.new("Frame")
 				local UIStroke = Instance.new("UIStroke")
 				local TextLabel = Instance.new("TextLabel")
+				local Avatar = Instance.new("ImageLabel")
 
 				Frame.Parent = Watermark
 				Frame.BackgroundColor3 = Library.Colors.Default
@@ -3105,11 +3106,20 @@ function Library:CreateWindow(setup)
 				TextLabel.ZIndex = 256;
 				TextLabel.RichText = true;
 
+				Avatar.Parent = Frame
+				Avatar.AnchorPoint = Vector2.new(0,0.5)
+				Avatar.BackgroundTransparency = 1
+				Avatar.BorderSizePixel = 0
+				Avatar.Position = UDim2.new(0,5,0.5,0)
+				Avatar.Size = UDim2.new(0,18,0,18)
+				Avatar.ZIndex = 256
+
 				local update = function()
 					local size = Library:GetTextSize(TextLabel.Text:gsub("<.->", ""),13,TextLabel.Font);
-
+					local aw = Avatar.Image ~= "" and Avatar.AbsoluteSize.X or 0
+					local ah = Avatar.Image ~= "" and Avatar.AbsoluteSize.Y or 0
 					Library:Tween(Frame , Library.TweenLibrary.FastEffect , {
-						Size = UDim2.new(0, size.X + 10, 0, size.Y + 5);
+						Size = UDim2.new(0, size.X + 10 + (aw>0 and aw + 6 or 0), 0, math.max(size.Y + 5, (ah>0 and ah + 4 or size.Y + 5)));
 					})
 				end;
 
@@ -3125,6 +3135,11 @@ function Library:CreateWindow(setup)
 
 				function Index:Text(a)
 					TextLabel.Text = a;
+					update()
+				end;
+
+				function Index:AvatarImage(img)
+					Avatar.Image = img or ""
 					update()
 				end;
 
@@ -5831,8 +5846,9 @@ function Library:CreateWindow(setup)
 	end)
 
 	local wm = WindowLibrary:AddWatermark("")
-	local Player = game:GetService('Players').LocalPlayer
-	local playerName = (Player and Player.Name) or "Player"
+	local PlayerService = game:GetService('Players')
+	local Stats = game:GetService('Stats')
+	local Player = PlayerService.LocalPlayer
 	local function _exec()
 		local ok, name = pcall(function()
 			if getexecutorname then return getexecutorname() end
@@ -5845,14 +5861,39 @@ function Library:CreateWindow(setup)
 		return "Unknown"
 	end
 	local execName = _exec()
+	local thumb = nil
+	local okThumb, url = pcall(function()
+		if Player then
+			return PlayerService:GetUserThumbnailAsync(Player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+		end
+		return nil
+	end)
+	if okThumb and url then thumb = url end
+	if thumb then wm:AvatarImage(thumb) end
 	local last = tick()
 	local fps = 0
+	local function _ping()
+		local p = nil
+		for _,child in ipairs(Stats:GetChildren()) do
+			if child.Name:lower():find('ping') and child:IsA('DoubleConstrainedValue') then
+				p = child.Value; break
+			end
+		end
+		if not p and Stats:FindFirstChild('Network') and Stats.Network:FindFirstChild('ServerStatsItem') then
+			local ps = Stats.Network.ServerStatsItem
+			if ps and ps:FindFirstChild('Ping') and ps.Ping:IsA('DoubleConstrainedValue') then
+				p = ps.Ping.Value
+			end
+		end
+		return p and math.floor(p) or 0
+	end
 	WindowLibrary.__WMConn = game:GetService('RunService').RenderStepped:Connect(function()
 		local now = tick()
 		local dt = now - last
 		last = now
 		fps = math.clamp(math.floor(1/(dt>0 and dt or 1)),0,240)
-		wm:Text(string.format("%s | FPS:%d | %s", playerName, fps, execName))
+		local ping = _ping()
+		wm:Text(string.format("FPS:%d | Ping:%sms | %s", fps, ping, execName))
 		wm:Update()
 	end)
 	WindowLibrary.__WM = wm
