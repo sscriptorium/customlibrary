@@ -1420,6 +1420,7 @@ Library.Cloneref = cloneref or function(o) return o end;
 Library.TweenService = game:GetService('TweenService');
 Library.LocalPlayer = game:GetService('Players').LocalPlayer;
 Library.CoreGui = (game:FindFirstChild('CoreGui') and Library.Cloneref(game:GetService('CoreGui'))) or Library.LocalPlayer.PlayerGui;
+Library.GuiName = "AcrylicUI";
 Library.CurrentGui = nil;
 Library.CurrentWindow = nil;
 Library.SizeLibrary = {
@@ -2142,6 +2143,12 @@ function Library:CreateWindow(setup)
         self.CurrentGui = nil
         self.CurrentWindow = nil
     end
+    local cg = Library.CoreGui
+    local pg = Library.LocalPlayer and Library.LocalPlayer:FindFirstChild("PlayerGui")
+    local old1 = cg and cg:FindFirstChild(Library.GuiName)
+    local old2 = pg and pg:FindFirstChild(Library.GuiName)
+    if old1 then pcall(function() old1:Destroy() end) end
+    if old2 then pcall(function() old2:Destroy() end) end
     setup = setup or {};
 
 	setup.Title = setup.Title or "Window";
@@ -2160,7 +2167,8 @@ function Library:CreateWindow(setup)
 
 	end
 
-	local ScreenGui = Instance.new("ScreenGui")
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = Library.GuiName
 	local MainFrame = Instance.new("Frame")
 	local DropShadow = Instance.new("ImageLabel")
 	local Ico = Instance.new("ImageLabel")
@@ -5951,6 +5959,15 @@ function Library:CreateWindow(setup)
     end)
 
     return WindowLibrary;
+end;
+
+function Library:GetGui()
+    local cg = Library.CoreGui
+    local pg = Library.LocalPlayer and Library.LocalPlayer:FindFirstChild("PlayerGui")
+    local g = cg and cg:FindFirstChild(Library.GuiName)
+    if g then return g end
+    local g2 = pg and pg:FindFirstChild(Library.GuiName)
+    return g2
 end;
 
 function Library:DestroyWindow()
