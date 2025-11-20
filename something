@@ -2,17 +2,27 @@
 -- This is not hyprland --
 
 local Library = {
-	Version = 'Acrylic.0.6',
-	Loaded = true,
-	Discord = 'discord.gg/wPaQZwhMHy',
-	env = getgenv or getfenv,
-	Executor = {"s","w","z","t","a","c"},
-	Skid = true,
-	pcall = pcall,
-	setfenv = setfenv,
-	info = debug.info,
-	xpcall = xpcall,
+    Version = 'Acrylic.0.6',
+    Loaded = true,
+    Discord = 'discord.gg/wPaQZwhMHy',
+    env = getgenv or getfenv,
+    Executor = {"s","w","z","t","a","c"},
+    Skid = true,
+    pcall = pcall,
+    setfenv = setfenv,
+    info = debug.info,
+    xpcall = xpcall,
 };
+
+do
+    local ok, gv = pcall(function()
+        return getgenv and getgenv() or nil
+    end)
+    if ok and gv then
+        gv.CustomLibrary = Library
+        gv.Library = gv.Library or Library
+    end
+end
 
 Library.Icons = {
 	aperture = "rbxassetid://7733666258",
@@ -1410,6 +1420,8 @@ Library.Cloneref = cloneref or function(o) return o end;
 Library.TweenService = game:GetService('TweenService');
 Library.LocalPlayer = game:GetService('Players').LocalPlayer;
 Library.CoreGui = (game:FindFirstChild('CoreGui') and Library.Cloneref(game:GetService('CoreGui'))) or Library.LocalPlayer.PlayerGui;
+Library.CurrentGui = nil;
+Library.CurrentWindow = nil;
 Library.SizeLibrary = {
 	Default = UDim2.fromOffset(580, 385),
 	Auth = UDim2.new(0.05, 250,0.05, 125),
@@ -2125,7 +2137,12 @@ function Library.Storage:Write(text)
 end;
 
 function Library:CreateWindow(setup)
-	setup = setup or {};
+    if self.CurrentGui and self.CurrentGui.Parent then
+        pcall(function() self.CurrentGui:Destroy() end)
+        self.CurrentGui = nil
+        self.CurrentWindow = nil
+    end
+    setup = setup or {};
 
 	setup.Title = setup.Title or "Window";
 	setup.Keybind = setup.Keybind or Enum.KeyCode.LeftControl;
@@ -2148,11 +2165,12 @@ function Library:CreateWindow(setup)
 	local DropShadow = Instance.new("ImageLabel")
 	local Ico = Instance.new("ImageLabel")
 
-	ScreenGui.Parent = Library.CoreGui
+    ScreenGui.Parent = Library.CoreGui
 	ScreenGui.ResetOnSpawn = false
 	ScreenGui.IgnoreGuiInset = false
 	ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-	Library.ProtectGui(ScreenGui);
+    Library.ProtectGui(ScreenGui);
+    Library.CurrentGui = ScreenGui
 
 	MainFrame.Name = "MainFrame"
 	MainFrame.Parent = ScreenGui
@@ -2511,7 +2529,7 @@ function Library:CreateWindow(setup)
 	Library:Tween(MainFrame , Library.TweenLibrary.WindowChanged,{Size = setup.Size})
 	Library:Tween(Ico , Library.TweenLibrary.SmallEffect,{ImageTransparency = 1})
 
-	local WindowLibrary = {};
+    local WindowLibrary = {};
 	local OpenDelay = tick();
 
 	local Block = Instance.new("Frame")
@@ -2781,6 +2799,7 @@ function Library:CreateWindow(setup)
     WindowLibrary.Toggle = true;
     WindowLibrary.SectionTab = {};
     WindowLibrary.TabsByTitle = {};
+    Library.CurrentWindow = WindowLibrary
 
     local function SaveState()
         local hs = game:GetService('HttpService')
@@ -5931,7 +5950,15 @@ function Library:CreateWindow(setup)
         end
     end)
 
-	return WindowLibrary;
+    return WindowLibrary;
+end;
+
+function Library:DestroyWindow()
+    if self.CurrentGui and self.CurrentGui.Parent then
+        pcall(function() self.CurrentGui:Destroy() end)
+    end
+    self.CurrentGui = nil
+    self.CurrentWindow = nil
 end;
 
 return Library;
