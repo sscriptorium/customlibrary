@@ -2117,6 +2117,15 @@ function Library.Config:Import(json)
     local ok,data = pcall(function() return hs:JSONDecode(json) end)
     if ok and typeof(data) == 'table' then self.Data = data end
 end;
+function Library.Config:Save()
+    local hs = game:GetService('HttpService')
+    local payload = {
+        Controls = self.Data,
+        PerformanceMode = Library.PerformanceMode,
+    }
+    local ok, json = pcall(function() return hs:JSONEncode(payload) end)
+    if ok then Library.Storage:Write(json) end
+end;
 
 Library.Storage = { File = 'ui_'..tostring(game.PlaceId)..'.json' };
 function Library.Storage:IsFile()
@@ -2148,8 +2157,34 @@ function Library:CreateWindow(setup)
 	setup.Keybind = setup.Keybind or Enum.KeyCode.LeftControl;
 	setup.Size = setup.Size or Library.SizeLibrary.Default;
 	setup.KeySystem = setup.KeySystem or false;
-	setup.Logo = setup.Logo or "rbxassetid://7733920644";
-	setup.ToggleMethod = setup.ToggleMethod or "Application";
+setup.Logo = setup.Logo or "rbxassetid://7733920644";
+setup.ToggleMethod = setup.ToggleMethod or "Application";
+
+do
+    local raw = Library.Storage:Read()
+    if raw then
+        local ok, data = pcall(function()
+            return game:GetService('HttpService'):JSONDecode(raw)
+        end)
+        if ok and typeof(data) == 'table' then
+            if data.Size then
+                setup.Size = UDim2.new(data.Size.X.Scale,data.Size.X.Offset,data.Size.Y.Scale,data.Size.Y.Offset)
+            end
+            if data.Position then
+                setup.InitialPosition = UDim2.new(data.Position.X.Scale,data.Position.X.Offset,data.Position.Y.Scale,data.Position.Y.Offset)
+            end
+            if data.PerformanceMode ~= nil then
+                Library.PerformanceMode = data.PerformanceMode
+            end
+            if data.Controls and typeof(data.Controls) == 'table' then
+                Library.Config.Data = data.Controls
+            end
+            if data.ActiveTabTitle then
+                Library.ActiveTabTitleDefault = data.ActiveTabTitle
+            end
+        end
+    end
+end
 	
 	if setup.KeySystem then
 		setup.KeySystemInfo = setup.KeySystemInfo or {};
@@ -2181,8 +2216,12 @@ function Library:CreateWindow(setup)
 	MainFrame.BorderColor3 = Color3.fromRGB(0, 0, 0)
 	MainFrame.BorderSizePixel = 0
 	MainFrame.ClipsDescendants = true
-	MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-	MainFrame.Size = UDim2.fromScale(0,0);
+MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+MainFrame.Size = UDim2.fromScale(0,0);
+
+if setup.InitialPosition then
+    MainFrame.Position = setup.InitialPosition
+end
 
 	spawn(function()
 		while MainFrame do task.wait(1)
@@ -2204,7 +2243,8 @@ function Library:CreateWindow(setup)
 		end;
 	end)
 
-	local BlurEle = Library.UIBlur.new(MainFrame,true);
+local BlurEle = Library.UIBlur.new(MainFrame,true);
+Library.ActiveBlur = BlurEle;
 
 	DropShadow.Name = "DropShadow"
 	DropShadow.Parent = MainFrame
@@ -2529,7 +2569,8 @@ function Library:CreateWindow(setup)
 	Library:Tween(MainFrame , Library.TweenLibrary.WindowChanged,{Size = setup.Size})
 	Library:Tween(Ico , Library.TweenLibrary.SmallEffect,{ImageTransparency = 1})
 
-    local WindowLibrary = {};
+local WindowLibrary = {};
+WindowLibrary.WindowTitle = setup.Title;
 	local OpenDelay = tick();
 
 	local Block = Instance.new("Frame")
@@ -2808,7 +2849,9 @@ function Library:CreateWindow(setup)
         local payload = {
             Size = { X = {Scale=s.X.Scale, Offset=s.X.Offset}, Y = {Scale=s.Y.Scale, Offset=s.Y.Offset} },
             Position = { X = {Scale=p.X.Scale, Offset=p.X.Offset}, Y = {Scale=p.Y.Scale, Offset=p.Y.Offset} },
-            PerformanceMode = Library.PerformanceMode
+            PerformanceMode = Library.PerformanceMode,
+            Controls = Library.Config.Data,
+            ActiveTabTitle = WindowLibrary.ActiveTabTitle
         }
         local ok, json = pcall(function() return hs:JSONEncode(payload) end)
         if ok then Library.Storage:Write(json) end
@@ -3534,7 +3577,12 @@ function Library:CreateWindow(setup)
 			end;
 		end;
 
-		TabToggle(not WindowLibrary.SectionTab[1])
+		if Library.ActiveTabTitleDefault and Library.ActiveTabTitleDefault == TabSetup.Title then
+			TabToggle(true)
+			WindowLibrary.ActiveTabTitle = TabSetup.Title
+		else
+			TabToggle(not WindowLibrary.SectionTab[1])
+		end
 
         table.insert(WindowLibrary.SectionTab,{Id = TFrame , TabToggle = TabToggle});
         WindowLibrary.TabsByTitle[TabSetup.Title] = {Frame=TFrame,Icon=Icon}
@@ -3551,6 +3599,7 @@ function Library:CreateWindow(setup)
             for i,v in ipairs(WindowLibrary.SectionTab) do
                 if v.Id == TFrame then
                     v.TabToggle(true);
+                    WindowLibrary.ActiveTabTitle = TabSetup.Title
                 else
                     v.TabToggle(false);
                 end;
@@ -3784,6 +3833,14 @@ function Library:CreateWindow(setup)
 			setup.Default = setup.Default or false;
 			setup.Callback = setup.Callback or function() end;
 
+			local group = (WindowLibrary.WindowTitle .. '|' .. TabSetup.Title)
+			local originalCb = setup.Callback
+			setup.Callback = function(val)
+				Library.Config:Set(group, setup.Title, val)
+				Library.Config:Save()
+				originalCb(val)
+			end
+
 			local ToggleBlock = Instance.new("Frame")
 			local DropShadow = Instance.new("ImageLabel")
 			local UIStroke = Instance.new("UIStroke")
@@ -3909,6 +3966,7 @@ function Library:CreateWindow(setup)
 				end;
 			end;
 
+			setup.Default = Library.Config:Get(group, setup.Title, setup.Default)
 			UILib(setup.Default);
 
             Button.MouseButton1Click:Connect(function()
@@ -3952,6 +4010,14 @@ function Library:CreateWindow(setup)
 			setup.PlaceHolder = setup.PlaceHolder or '';
 			setup.Default = setup.Default or '';
 			setup.Callback = setup.Callback or function() end;
+
+			local group = (WindowLibrary.WindowTitle .. '|' .. TabSetup.Title)
+			local originalCb = setup.Callback
+			setup.Callback = function(val)
+				Library.Config:Set(group, setup.Title, val)
+				Library.Config:Save()
+				originalCb(val)
+			end
 			setup.Numeric = setup.Numeric or false;
 
 			local TextBoxBlock = Instance.new("Frame")
@@ -4041,6 +4107,7 @@ function Library:CreateWindow(setup)
 			TextBox.ClearTextOnFocus = false
 			TextBox.Font = Enum.Font.Gotham
 			TextBox.PlaceholderColor3 = Library.Colors.TextColor
+			setup.Default = Library.Config:Get(group, setup.Title, setup.Default)
 			TextBox.Text = setup.Default
 			TextBox.PlaceholderText = setup.PlaceHolder;
 			TextBox.TextColor3 = Library.Colors.TextColor
@@ -4254,6 +4321,14 @@ function Library:CreateWindow(setup)
 			setup.Round = setup.Round or 0;
 			setup.Callback = setup.Callback or function() end;
 
+			local group = (WindowLibrary.WindowTitle .. '|' .. TabSetup.Title)
+			local originalCb = setup.Callback
+			setup.Callback = function(val)
+				Library.Config:Set(group, setup.Title, val)
+				Library.Config:Save()
+				originalCb(val)
+			end
+
 			local SliderBlock = Instance.new("Frame")
 			local DropShadow = Instance.new("ImageLabel")
 			local UIStroke = Instance.new("UIStroke")
@@ -4393,6 +4468,7 @@ function Library:CreateWindow(setup)
 				Block.Size = UDim2.new(0, (SliderBlock.AbsoluteSize.X / 2), 0.225, 0)
 			end;
 
+			setup.Default = Library.Config:Get(group, setup.Title, setup.Default)
 			Library:Tween(Move , Library.TweenLibrary.FastEffect,{
 				Position = UDim2.new((setup.Default - setup.Min) / (setup.Max - setup.Min), 0, 0.5, 0)
 			});
@@ -4461,6 +4537,15 @@ function Library:CreateWindow(setup)
 			setup.Title = setup.Title or "Keybind";
 			setup.Default = setup.Default or "NONE";
 			setup.Callback = setup.Callback or function() end;
+
+			local group = (WindowLibrary.WindowTitle .. '|' .. TabSetup.Title)
+			local originalCb = setup.Callback
+			setup.Callback = function(val)
+				local keyName = Parser(val)
+				Library.Config:Set(group, setup.Title, keyName)
+				Library.Config:Save()
+				originalCb(val)
+			end
 
 			local Parser = function(code)
 				if typeof(code) == 'EnumItem' then
@@ -4565,6 +4650,7 @@ function Library:CreateWindow(setup)
 			ValueText.Size = UDim2.new(0.800000012, 0, 0.800000012, 0)
 			ValueText.ZIndex = 17
 			ValueText.Font = Enum.Font.Gotham
+			setup.Default = Library.Config:Get(group, setup.Title, setup.Default)
 			ValueText.Text = Parser(setup.Default)
 			ValueText.TextColor3 = Library.Colors.TextColor
 			ValueText.TextScaled = true
@@ -4660,6 +4746,16 @@ function Library:CreateWindow(setup)
 			setup.Default = setup.Default;
 			setup.MaxMulti = setup.MaxMulti or math.huge;
 			setup.Callback = setup.Callback or function() end;
+
+			local group = (WindowLibrary.WindowTitle .. '|' .. TabSetup.Title)
+			local originalCb = setup.Callback
+			setup.Callback = function(val)
+				Library.Config:Set(group, setup.Title, val)
+				Library.Config:Save()
+				originalCb(val)
+			end
+
+			setup.Default = Library.Config:Get(group, setup.Title, setup.Default)
 
 			local Fconcat = function(a)
 				if typeof(a) ~= 'table' then
