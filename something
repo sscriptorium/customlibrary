@@ -1616,8 +1616,8 @@ local LoadAcrylic = function()
 
 	function GuiSystem.new(frame,NoAutoBackground)
 		local Part = Instance.new('Part',workspace);
-		local DepthOfField = Instance.new('DepthOfFieldEffect',game:GetService('Lighting'));
-		local SurfaceGui = Instance.new('SurfaceGui',Part);
+        local DepthOfField = Instance.new('DepthOfFieldEffect',game:GetService('Lighting'));
+        local SurfaceGui = Instance.new('SurfaceGui',Part);
 		local BlockMesh = Instance.new("BlockMesh");
 
 		BlockMesh.Parent = Part;
@@ -1637,11 +1637,11 @@ local LoadAcrylic = function()
 			Transparency = 0.8;
 		}):Play()
 
-		DepthOfField.Enabled = true;
-		DepthOfField.FarIntensity = 1;
-		DepthOfField.FocusDistance = 0;
-		DepthOfField.InFocusRadius = 500;
-		DepthOfField.NearIntensity = 1;
+        DepthOfField.Enabled = true;
+        DepthOfField.FarIntensity = 1;
+        DepthOfField.FocusDistance = 0;
+        DepthOfField.InFocusRadius = 500;
+        DepthOfField.NearIntensity = 1;
 
 		SurfaceGui.AlwaysOnTop = true;
 		SurfaceGui.Adornee = Part;
@@ -1649,9 +1649,12 @@ local LoadAcrylic = function()
 		SurfaceGui.Face = Enum.NormalId.Front;
 		SurfaceGui.ZIndexBehavior = Enum.ZIndexBehavior.Global;
 
-		DepthOfField.Name = GuiSystem:Hash();
-		Part.Name = GuiSystem:Hash();
-		SurfaceGui.Name = GuiSystem:Hash();
+        DepthOfField.Name = GuiSystem:Hash();
+        Part.Name = GuiSystem:Hash();
+        SurfaceGui.Name = GuiSystem:Hash();
+        DepthOfField:SetAttribute('AcrylicUI',true)
+        Part:SetAttribute('AcrylicUI',true)
+        SurfaceGui:SetAttribute('AcrylicUI',true)
 
 		local C4 = {
 			Update = nil,
@@ -1726,9 +1729,10 @@ local LoadAcrylic = function()
 				Transparency = 1
 			}):Play();
 
-			DepthOfField:Destroy();
-			Part:Destroy()
-		end;
+            DepthOfField.Enabled = false;
+            DepthOfField:Destroy();
+            Part:Destroy()
+        end;
 
 		return C4;
 	end;
@@ -2146,6 +2150,7 @@ function Library:CreateWindow(setup)
     if self.ActiveBlur and self.ActiveBlur.Destroy then
         pcall(function() self.ActiveBlur.Destroy() end)
     end
+    self:CleanBlurArtifacts()
     self.CurrentGui = nil
     self.CurrentWindow = nil
     self.ActiveBlur = nil
@@ -2155,6 +2160,7 @@ function Library:CreateWindow(setup)
     local old2 = pg and pg:FindFirstChild(Library.GuiName)
     if old1 then pcall(function() old1:Destroy() end) end
     if old2 then pcall(function() old2:Destroy() end) end
+    self:CleanBlurArtifacts()
     setup = setup or {};
 
 	setup.Title = setup.Title or "Window";
@@ -5993,3 +5999,16 @@ function Library:DestroyWindow()
 end;
 
 return Library;
+function Library:CleanBlurArtifacts()
+    local Lighting = game:GetService('Lighting')
+    for _,v in ipairs(Lighting:GetChildren()) do
+        if v:IsA('DepthOfFieldEffect') and v:GetAttribute('AcrylicUI') then
+            pcall(function() v:Destroy() end)
+        end
+    end
+    for _,v in ipairs(workspace:GetChildren()) do
+        if v:GetAttribute('AcrylicUI') then
+            pcall(function() v:Destroy() end)
+        end
+    end
+end;
