@@ -2118,14 +2118,11 @@ function Library.Config:Import(json)
     if ok and typeof(data) == 'table' then self.Data = data end
 end;
 function Library.Config:Save()
-    local hs = game:GetService('HttpService')
-    local payload = {
-        Controls = self.Data,
-        PerformanceMode = Library.PerformanceMode,
-        ActiveTabTitle = Library.CurrentWindow and Library.CurrentWindow.ActiveTabTitle or nil,
-    }
-    local ok, json = pcall(function() return hs:JSONEncode(payload) end)
-    if ok then Library.Storage:Write(json) end
+    if Library.Settings then
+        Library.Settings:Set('controls', self.Data)
+        Library.Settings:Set('performanceMode', Library.PerformanceMode)
+        Library.Settings:Set('activeTabTitle', Library.CurrentWindow and Library.CurrentWindow.ActiveTabTitle or nil)
+    end
 end;
 
 Library.Storage = { File = 'ui_'..tostring(game.PlaceId)..'.json' };
@@ -2159,6 +2156,61 @@ function Library.Storage:Write(text)
     return false
 end;
 
+local SettingsManager = {}
+SettingsManager.__index = SettingsManager
+local SETTINGS_FILE = "last_settings.json"
+function SettingsManager.new()
+    local self = setmetatable({}, SettingsManager)
+    self.settings = {}
+    self.HttpService = game:GetService("HttpService")
+    return self
+end
+function SettingsManager:Load()
+    local success, result = pcall(function()
+        if readfile and isfile and isfile(SETTINGS_FILE) then
+            local data = readfile(SETTINGS_FILE)
+            return self.HttpService:JSONDecode(data)
+        end
+        return {}
+    end)
+    if success and type(result) == "table" then
+        self.settings = result
+        return true
+    else
+        self.settings = {}
+        return false
+    end
+end
+function SettingsManager:Save()
+    local success, err = pcall(function()
+        if writefile then
+            local data = self.HttpService:JSONEncode(self.settings)
+            writefile(SETTINGS_FILE, data)
+        end
+    end)
+    if not success then
+        return false
+    end
+    return true
+end
+function SettingsManager:Get(key, default)
+    return self.settings[key] or default
+end
+function SettingsManager:Set(key, value)
+    self.settings[key] = value
+    self:Save()
+end
+function SettingsManager:GetAll()
+    return self.settings
+end
+function SettingsManager:Clear()
+    self.settings = {}
+    self:Save()
+end
+
+Library.Settings = SettingsManager.new()
+Library.Settings:Load()
+
 function Library:CreateWindow(setup)
     if self.CurrentGui and self.CurrentGui.Parent then
         pcall(function() self.CurrentGui:Destroy() end)
@@ -2175,29 +2227,21 @@ setup.Logo = setup.Logo or "rbxassetid://7733920644";
 setup.ToggleMethod = setup.ToggleMethod or "Application";
 
 do
-    local raw = Library.Storage:Read()
-    if raw then
-        local ok, data = pcall(function()
-            return game:GetService('HttpService'):JSONDecode(raw)
-        end)
-        if ok and typeof(data) == 'table' then
-            if data.Size then
-                setup.Size = UDim2.new(data.Size.X.Scale,data.Size.X.Offset,data.Size.Y.Scale,data.Size.Y.Offset)
-            end
-            if data.Position then
-                setup.InitialPosition = UDim2.new(data.Position.X.Scale,data.Position.X.Offset,data.Position.Y.Scale,data.Position.Y.Offset)
-            end
-            if data.PerformanceMode ~= nil then
-                Library.PerformanceMode = data.PerformanceMode
-            end
-            if data.Controls and typeof(data.Controls) == 'table' then
-                Library.Config.Data = data.Controls
-            end
-            if data.ActiveTabTitle then
-                Library.ActiveTabTitleDefault = data.ActiveTabTitle
-            end
+    local win = Library.Settings:Get('window', nil)
+    if win and typeof(win) == 'table' then
+        if win.Size then
+            setup.Size = UDim2.new(win.Size.X.Scale,win.Size.X.Offset,win.Size.Y.Scale,win.Size.Y.Offset)
+        end
+        if win.Position then
+            setup.InitialPosition = UDim2.new(win.Position.X.Scale,win.Position.X.Offset,win.Position.Y.Scale,win.Position.Y.Offset)
         end
     end
+    local perf = Library.Settings:Get('performanceMode', Library.PerformanceMode)
+    if perf ~= nil then Library.PerformanceMode = perf end
+    local controls = Library.Settings:Get('controls', nil)
+    if controls and typeof(controls) == 'table' then Library.Config.Data = controls end
+    local active = Library.Settings:Get('activeTabTitle', nil)
+    if active then Library.ActiveTabTitleDefault = active end
 end
 	
 	if setup.KeySystem then
@@ -2857,18 +2901,12 @@ WindowLibrary.WindowTitle = setup.Title;
     Library.CurrentWindow = WindowLibrary
 
     local function SaveState()
-        local hs = game:GetService('HttpService')
         local s = MainFrame.Size
         local p = MainFrame.Position
-        local payload = {
+        Library.Settings:Set('window',{
             Size = { X = {Scale=s.X.Scale, Offset=s.X.Offset}, Y = {Scale=s.Y.Scale, Offset=s.Y.Offset} },
-            Position = { X = {Scale=p.X.Scale, Offset=p.X.Offset}, Y = {Scale=p.Y.Scale, Offset=p.Y.Offset} },
-            PerformanceMode = Library.PerformanceMode,
-            Controls = Library.Config.Data,
-            ActiveTabTitle = WindowLibrary.ActiveTabTitle
-        }
-        local ok, json = pcall(function() return hs:JSONEncode(payload) end)
-        if ok then Library.Storage:Write(json) end
+            Position = { X = {Scale=p.X.Scale, Offset=p.X.Offset}, Y = {Scale=p.Y.Scale, Offset=p.Y.Offset} }
+        })
     end
 
 	local InitDropdown = function()
@@ -3618,7 +3656,7 @@ WindowLibrary.WindowTitle = setup.Title;
                     v.TabToggle(false);
                 end;
             end;
-            Library.Config:Save()
+            if Library.Settings then Library.Settings:Set('activeTabTitle',TabSetup.Title) end
         end)
 
         do
@@ -3848,7 +3886,7 @@ WindowLibrary.WindowTitle = setup.Title;
 			setup.Default = setup.Default or false;
 			setup.Callback = setup.Callback or function() end;
 
-			local group = (WindowLibrary.WindowTitle .. '|' .. TabSetup.Title)
+			local group = (tostring(game.PlaceId) .. '|' .. TabSetup.Title)
 			local originalCb = setup.Callback
 			setup.Callback = function(val)
 				Library.Config:Set(group, setup.Title, val)
@@ -4026,7 +4064,7 @@ WindowLibrary.WindowTitle = setup.Title;
 			setup.Default = setup.Default or '';
 			setup.Callback = setup.Callback or function() end;
 
-			local group = (WindowLibrary.WindowTitle .. '|' .. TabSetup.Title)
+			local group = (tostring(game.PlaceId) .. '|' .. TabSetup.Title)
 			local originalCb = setup.Callback
 			setup.Callback = function(val)
 				Library.Config:Set(group, setup.Title, val)
@@ -4336,7 +4374,7 @@ WindowLibrary.WindowTitle = setup.Title;
 			setup.Round = setup.Round or 0;
 			setup.Callback = setup.Callback or function() end;
 
-			local group = (WindowLibrary.WindowTitle .. '|' .. TabSetup.Title)
+			local group = (tostring(game.PlaceId) .. '|' .. TabSetup.Title)
 			local originalCb = setup.Callback
 			setup.Callback = function(val)
 				Library.Config:Set(group, setup.Title, val)
@@ -4553,7 +4591,7 @@ WindowLibrary.WindowTitle = setup.Title;
 			setup.Default = setup.Default or "NONE";
 			setup.Callback = setup.Callback or function() end;
 
-			local group = (WindowLibrary.WindowTitle .. '|' .. TabSetup.Title)
+			local group = (tostring(game.PlaceId) .. '|' .. TabSetup.Title)
 			local originalCb = setup.Callback
 			setup.Callback = function(val)
 				local keyName = Parser(val)
@@ -4762,7 +4800,7 @@ WindowLibrary.WindowTitle = setup.Title;
 			setup.MaxMulti = setup.MaxMulti or math.huge;
 			setup.Callback = setup.Callback or function() end;
 
-			local group = (WindowLibrary.WindowTitle .. '|' .. TabSetup.Title)
+			local group = (tostring(game.PlaceId) .. '|' .. TabSetup.Title)
 			local originalCb = setup.Callback
 			setup.Callback = function(val)
 				Library.Config:Set(group, setup.Title, val)
@@ -6057,6 +6095,7 @@ WindowLibrary.WindowTitle = setup.Title;
         if input.KeyCode == Enum.KeyCode.F8 then
             Library.PerformanceMode = not Library.PerformanceMode
             WindowLibrary:Notify({Title = "Performance Mode", Description = Library.PerformanceMode and "Enabled" or "Disabled", Duration = 2})
+            Library.Settings:Set('performanceMode',Library.PerformanceMode)
             SaveState()
         end
     end)
