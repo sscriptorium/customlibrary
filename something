@@ -61,6 +61,16 @@ function Library.SaveSystem:Set(key, value)
     self.Settings[key] = value
     self:Save()
 end;
+function Library.SaveSystem:ApplySavedSettings(callback)
+    if not self.Loaded then
+        self:Load()
+    end;
+    for key, value in pairs(self.Settings) do
+        if callback then
+            callback(key, value)
+        end
+    end
+end;
 Library.SaveSystem:Load()
 
 Library.Icons = {
@@ -1470,28 +1480,28 @@ Library.SizeLibrary = {
 Library.Theme = {}
 
 Library.Colors = {
-	Hightlight = Color3.fromRGB(0, 255, 255),
-	Default = Color3.fromRGB(32, 33, 36),
-	Disable = Color3.fromRGB(167, 173, 188),
-	TextColor = Color3.fromRGB(220, 224, 234),
+	Hightlight = Color3.fromRGB(160, 160, 160),
+	Default = Color3.fromRGB(20, 20, 20),
+	Disable = Color3.fromRGB(80, 80, 80),
+	TextColor = Color3.fromRGB(200, 200, 200),
 
 }
 
 function Library.Theme:Default()
 	Library.Colors = {
-		Hightlight = Color3.fromRGB(0, 255, 255),
-		Default = Color3.fromRGB(32, 33, 36),
-		Disable = Color3.fromRGB(167, 173, 188),
-		TextColor = Color3.fromRGB(220, 224, 234),
+		Hightlight = Color3.fromRGB(160, 160, 160),
+		Default = Color3.fromRGB(20, 20, 20),
+		Disable = Color3.fromRGB(80, 80, 80),
+		TextColor = Color3.fromRGB(200, 200, 200),
 	}
 end;
 
 function Library.Theme:Dark()
 	Library.Colors = {
-		Hightlight = Color3.fromRGB(255, 255, 255),
-		Default = Color3.fromRGB(20, 20, 22),
-		Disable = Color3.fromRGB(167, 173, 188),
-		TextColor = Color3.fromRGB(220, 224, 234),
+		Hightlight = Color3.fromRGB(160, 160, 160),
+		Default = Color3.fromRGB(20, 20, 20),
+		Disable = Color3.fromRGB(80, 80, 80),
+		TextColor = Color3.fromRGB(200, 200, 200),
 	}
 end;
 
@@ -4698,12 +4708,14 @@ function Library:CreateWindow(setup)
 				end)
 			end;
 
-			local OnCallback = function(a)
-				ValueText.Text = (setup.Multi and Fconcat(a)) or tostring(a);
-				setup.Default = a;
-				UpdateSize()
-				setup.Callback(a)
-			end;
+            local OnCallback = function(a)
+                ValueText.Text = (setup.Multi and Fconcat(a)) or tostring(a);
+                setup.Default = a;
+                UpdateSize()
+                setup.Callback(a)
+                local __key = tostring(game.PlaceId) .. "|" .. TabSetup.Title .. "|" .. setup.Title;
+                Library.SaveSystem:Set(__key, a)
+            end;
 
 			UpdateSize();
 
