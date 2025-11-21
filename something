@@ -73,6 +73,33 @@ function Library.SaveSystem:ApplySavedSettings(callback)
 end;
 Library.SaveSystem:Load()
 
+Library.BackgroundImage = { Enabled = false, ImageId = "", Transparency = 0.5, Instance = nil }
+function Library.BackgroundImage:Set(imageId, transparency)
+    self.ImageId = imageId or self.ImageId
+    self.Transparency = transparency or self.Transparency
+    self.Enabled = self.ImageId ~= nil and self.ImageId ~= ""
+    if self.Instance then
+        self.Instance.Image = "rbxassetid://" .. tostring(self.ImageId)
+        self.Instance.ImageTransparency = self.Transparency
+    end
+end;
+function Library.BackgroundImage:Create(parent)
+    if not self.Enabled then return end
+    local bgImage = Instance.new("ImageLabel")
+    bgImage.Name = "BackgroundImage"
+    bgImage.Parent = parent
+    bgImage.BackgroundTransparency = 1
+    bgImage.BorderSizePixel = 0
+    bgImage.Size = UDim2.new(1, 0, 1, 0)
+    bgImage.Position = UDim2.new(0, 0, 0, 0)
+    bgImage.ZIndex = -1
+    bgImage.Image = "rbxassetid://" .. tostring(self.ImageId)
+    bgImage.ImageTransparency = self.Transparency
+    bgImage.ScaleType = Enum.ScaleType.Crop
+    self.Instance = bgImage
+    return bgImage
+end;
+
 Library.Icons = {
 	aperture = "rbxassetid://7733666258",
 	bug = "rbxassetid://7733701545",
@@ -2123,12 +2150,14 @@ end;
 function Library:CreateWindow(setup)
     setup = setup or {};
 
-	setup.Title = setup.Title or "Window";
-	setup.Keybind = setup.Keybind or Enum.KeyCode.LeftControl;
-	setup.Size = setup.Size or Library.SizeLibrary.Default;
-	setup.KeySystem = setup.KeySystem or false;
+    setup.Title = setup.Title or "Window";
+    setup.Keybind = setup.Keybind or Enum.KeyCode.LeftControl;
+    setup.Size = setup.Size or Library.SizeLibrary.Default;
+    setup.KeySystem = setup.KeySystem or false;
     setup.Logo = setup.Logo or "rbxassetid://7733920644";
     setup.ToggleMethod = setup.ToggleMethod or "Application";
+    setup.BackgroundImageId = setup.BackgroundImageId or nil;
+    setup.BackgroundImageTransparency = setup.BackgroundImageTransparency or 0.5;
     local g = (Library.env and Library.env()) or _G;
     if g.AcrylicUILoaded then
         if g.AcrylicUIInstance and g.AcrylicUIInstance.Reload then
@@ -2147,10 +2176,10 @@ function Library:CreateWindow(setup)
 
 	end
 
-	local ScreenGui = Instance.new("ScreenGui")
-	local MainFrame = Instance.new("Frame")
-	local DropShadow = Instance.new("ImageLabel")
-	local Ico = Instance.new("ImageLabel")
+    local ScreenGui = Instance.new("ScreenGui")
+    local MainFrame = Instance.new("Frame")
+    local DropShadow = Instance.new("ImageLabel")
+    local Ico = Instance.new("ImageLabel")
 
 	ScreenGui.Parent = Library.CoreGui
 	ScreenGui.ResetOnSpawn = false
@@ -2168,7 +2197,14 @@ function Library:CreateWindow(setup)
 	MainFrame.BorderSizePixel = 0
 	MainFrame.ClipsDescendants = true
 	MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-	MainFrame.Size = UDim2.fromScale(0,0);
+    MainFrame.Size = UDim2.fromScale(0,0);
+
+    if setup.BackgroundImageId then
+        Library.BackgroundImage:Set(setup.BackgroundImageId, setup.BackgroundImageTransparency)
+    end
+    if Library.BackgroundImage.Enabled then
+        Library.BackgroundImage:Create(MainFrame)
+    end
 
 	spawn(function()
 		while MainFrame do task.wait(1)
@@ -2190,7 +2226,7 @@ function Library:CreateWindow(setup)
 		end;
 	end)
 
-	local BlurEle = Library.UIBlur.new(MainFrame,true);
+    local BlurEle = Library.UIBlur.new(MainFrame,true);
 
 	DropShadow.Name = "DropShadow"
 	DropShadow.Parent = MainFrame
@@ -2698,7 +2734,7 @@ function Library:CreateWindow(setup)
 	DataScrollingFrame.Size = UDim2.new(0.99000001, 0, 0.980000019, 0)
 	DataScrollingFrame.ScrollBarThickness = 0
 
-	UIListLayout_2.Parent = DataScrollingFrame
+    UIListLayout_2.Parent = DataScrollingFrame
 	UIListLayout_2.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
 	UIListLayout_2.Padding = UDim.new(0, 1000)
@@ -2770,9 +2806,10 @@ function Library:CreateWindow(setup)
 	TabFrames.Size = UDim2.new(0.670454323, 0, 0.88989073, 0)
 	TabFrames.ZIndex = 4
 
-	WindowLibrary.FullScreen = false;
-	WindowLibrary.Status = 'Show';
-	WindowLibrary.Toggle = true;
+    WindowLibrary.FullScreen = false;
+    WindowLibrary.Status = 'Show';
+    WindowLibrary.Toggle = true;
+    WindowLibrary.__elements = { toggles = {}, sliders = {}, dropdowns = {} };
 	WindowLibrary.SectionTab = {};
 
 	local InitDropdown = function()
@@ -3792,6 +3829,7 @@ function Library:CreateWindow(setup)
 			local __key = tostring(game.PlaceId) .. "|" .. TabSetup.Title .. "|" .. setup.Title;
 			setup.Default = Library.SaveSystem:Get(__key, setup.Default);
 			UILib(setup.Default);
+			setup.Callback(setup.Default)
 
 			Button.MouseButton1Click:Connect(function()
 				setup.Default = not setup.Default;
@@ -3817,6 +3855,8 @@ function Library:CreateWindow(setup)
 				ToggleBlock.Visible = value;
 			end;
 
+			local el = { key = __key, set = function(v) RootSkid:Value(v) end }
+			table.insert(WindowLibrary.__elements.toggles, el)
 			return RootSkid;
 		end;
 
@@ -4288,6 +4328,8 @@ function Library:CreateWindow(setup)
 			Library:Tween(Move , Library.TweenLibrary.FastEffect,{
 				Position = UDim2.new((setup.Default - setup.Min) / (setup.Max - setup.Min), 0, 0.5, 0)
 			});
+			ValueText.Text = tostring(setup.Default)
+			setup.Callback(setup.Default)
 
 			SliderBlock:GetPropertyChangedSignal('AbsoluteSize'):Connect(UpdateSize);
 
@@ -4347,6 +4389,8 @@ function Library:CreateWindow(setup)
 				SliderBlock.Visible = value;
 			end;
 
+			local el = { key = __key, set = function(v) RootSkid:Value(v) end }
+			table.insert(WindowLibrary.__elements.sliders, el)
 			return RootSkid;
 		end;
 
@@ -4684,6 +4728,7 @@ function Library:CreateWindow(setup)
 			local persisted = Library.SaveSystem:Get(__key, setup.Default);
 			setup.Default = persisted;
 			ValueText.Text = (setup.Multi and Fconcat(setup.Default or {})) or tostring(setup.Default or "NONE");
+			setup.Callback(setup.Default)
 			ValueText.TextColor3 = Library.Colors.TextColor
 			ValueText.TextScaled = true
 			ValueText.TextSize = 14.000
@@ -4758,6 +4803,8 @@ function Library:CreateWindow(setup)
 				DropdownBlock.Visible = value;
 			end;
 
+			local el = { key = __key, set = function(v) RootSkid:Value(v) end }
+			table.insert(WindowLibrary.__elements.dropdowns, el)
 			return RootSkid;
 		end;
 
@@ -5440,7 +5487,26 @@ function Library:CreateWindow(setup)
             Library:Tween(Block , Library.TweenLibrary.SmallEffect,{Position = UDim2.new(0.5, 0, 0.5, 0)});
             Library:Tween(MainFrame , Library.TweenLibrary.SmallEffect,{Size = setup.Size,Position = WindowLibrary.SavedPosition or UDim2.fromScale(0.5,0.5)});
         end;
+        for _, el in pairs(WindowLibrary.__elements.toggles) do
+            local v = Library.SaveSystem:Get(el.key)
+            if v ~= nil then el.set(v) end
+        end
+        for _, el in pairs(WindowLibrary.__elements.sliders) do
+            local v = Library.SaveSystem:Get(el.key)
+            if v ~= nil then el.set(v) end
+        end
+        for _, el in pairs(WindowLibrary.__elements.dropdowns) do
+            local v = Library.SaveSystem:Get(el.key)
+            if v ~= nil then el.set(v) end
+        end
         return true;
+    end;
+
+    function WindowLibrary:SetBackgroundImage(imageId, transparency)
+        Library.BackgroundImage:Set(imageId, transparency)
+        if not Library.BackgroundImage.Instance then
+            Library.BackgroundImage:Create(MainFrame)
+        end
     end;
 
 	CloseButton.MouseButton1Click:Connect(function()
