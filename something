@@ -2454,9 +2454,6 @@ function Library:CreateWindow(setup)
     if setup.BackgroundImageId then
         Library.BackgroundImage:Set(setup.BackgroundImageId, setup.BackgroundImageTransparency)
     end
-    if Library.BackgroundImage.Enabled then
-        Library.BackgroundImage:Create(MainFrame)
-    end
 
     
 
@@ -2525,7 +2522,10 @@ function Library:CreateWindow(setup)
             YouTube = "@Kohrynth"
         })
     end
-	__runLoading()
+    __runLoading()
+    if Library.BackgroundImage.Enabled then
+        Library.BackgroundImage:Create(MainFrame)
+    end
 
 	if setup.KeySystem then
 		setup.KeySystemInfo.Enabled = true;
@@ -5754,17 +5754,21 @@ function Library:CreateWindow(setup)
             Library:Tween(Block , Library.TweenLibrary.SmallEffect,{Position = UDim2.new(0.5, 0, 0.5, 0)});
             Library:Tween(MainFrame , Library.TweenLibrary.SmallEffect,{Size = setup.Size,Position = WindowLibrary.SavedPosition or UDim2.fromScale(0.5,0.5)});
         end;
+        local __loadedAny = false
         for _, el in pairs(WindowLibrary.__elements.toggles) do
             local v = Library.SaveSystem:Get(el.key)
-            if v ~= nil then el.set(v) end
+            if v ~= nil then el.set(v); __loadedAny = true end
         end
         for _, el in pairs(WindowLibrary.__elements.sliders) do
             local v = Library.SaveSystem:Get(el.key)
-            if v ~= nil then el.set(v) end
+            if v ~= nil then el.set(v); __loadedAny = true end
         end
         for _, el in pairs(WindowLibrary.__elements.dropdowns) do
             local v = Library.SaveSystem:Get(el.key)
-            if v ~= nil then el.set(v) end
+            if v ~= nil then el.set(v); __loadedAny = true end
+        end
+        if __loadedAny and WindowLibrary.Notify then
+            WindowLibrary:Notify({ Title = "Settings", Description = "Previous settings were loaded", Duration = 3 })
         end
         return true;
     end;
