@@ -2521,8 +2521,8 @@ function Library:CreateWindow(setup)
         ls.TotalDuration = ls.TotalDuration or 15
         ls:Run(MainFrame, {
             Welcome = "Hello, Thanks For Using Kohrynth Hub",
-            Discord = "discord.gg/wPaQZwhMHy",
-            YouTube = "@KohrynthHub"
+            Discord = "discord.gg/Kohrynth",
+            YouTube = "@Kohrynth"
         })
     end
 	__runLoading()
