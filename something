@@ -1533,6 +1533,234 @@ function Library.Theme:Dark()
 	}
 end;
 
+Library.LoadingScreen = {
+    TotalDuration = 15,
+    Discord = "discord.gg/wPaQZwhMHy",
+    YouTube = "@KohrynthHub"
+}
+function Library.LoadingScreen:_exec()
+    local ok, name = pcall(function()
+        if getexecutorname then return getexecutorname() end
+        if identifyexecutor then return identifyexecutor() end
+        if syn then return "Synapse" end
+        if KRNL_LOADED then return "KRNL" end
+        return "Unknown"
+    end)
+    if ok and type(name) == "string" then return name end
+    return "Unknown"
+end
+function Library.LoadingScreen:_game()
+    local mp = game:GetService('MarketplaceService')
+    local ok, info = pcall(function() return mp:GetProductInfo(game.PlaceId) end)
+    if ok and info and info.Name then return tostring(info.Name) end
+    return "Unknown Game"
+end
+function Library.LoadingScreen:_avatar()
+    local Players = game:GetService('Players')
+    local plr = Players.LocalPlayer
+    local ok, url = pcall(function()
+        return Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+    end)
+    if ok and url then return url end
+    return "rbxassetid://7733920644"
+end
+function Library.LoadingScreen:Initialize(parent, opts)
+    opts = opts or {}
+    local container = Instance.new('Frame')
+    local welcome = Instance.new('TextLabel')
+    local avatar = Instance.new('ImageLabel')
+    local corner = Instance.new('UICorner')
+    local stroke = Instance.new('UIStroke')
+    local info = Instance.new('Frame')
+    local discord = Instance.new('TextLabel')
+    local youtube = Instance.new('TextLabel')
+    local username = Instance.new('TextLabel')
+    local executor = Instance.new('TextLabel')
+    local gamename = Instance.new('TextLabel')
+    local pbg = Instance.new('Frame')
+    local pfill = Instance.new('Frame')
+    local pc = Instance.new('UICorner')
+    local pbc = Instance.new('UICorner')
+    local status = Instance.new('TextLabel')
+    container.Parent = parent
+    container.AnchorPoint = Vector2.new(0.5, 0.5)
+    container.BackgroundTransparency = 1
+    container.Position = UDim2.new(0.5, 0, 0.5, 0)
+    container.Size = UDim2.new(0, 500, 0, 360)
+    container.ZIndex = 50
+    welcome.Parent = container
+    welcome.BackgroundTransparency = 1
+    welcome.Position = UDim2.new(0.5, 0, 0.05, 0)
+    welcome.AnchorPoint = Vector2.new(0.5, 0)
+    welcome.Size = UDim2.new(0.9, 0, 0.15, 0)
+    welcome.Font = Enum.Font.GothamBold
+    welcome.Text = opts.Welcome or "Hello, Thanks For Using Kohrynth Hub"
+    welcome.TextColor3 = Library.Colors.TextColor
+    welcome.TextScaled = true
+    welcome.TextTransparency = 1
+    welcome.ZIndex = 51
+    avatar.Parent = container
+    avatar.AnchorPoint = Vector2.new(0.5, 0)
+    avatar.BackgroundColor3 = Library.Colors.Default
+    avatar.BackgroundTransparency = 0.5
+    avatar.Position = UDim2.new(0.5, 0, 0.23, 0)
+    avatar.Size = UDim2.new(0, 80, 0, 80)
+    avatar.Image = self:_avatar()
+    avatar.ImageTransparency = 1
+    avatar.ZIndex = 51
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = avatar
+    stroke.Parent = avatar
+    stroke.Color = Library.Colors.Hightlight
+    stroke.Thickness = 2
+    stroke.Transparency = 1
+    info.Parent = container
+    info.AnchorPoint = Vector2.new(0.5, 0)
+    info.BackgroundTransparency = 1
+    info.Position = UDim2.new(0.5, 0, 0.5, 0)
+    info.Size = UDim2.new(0.9, 0, 0.28, 0)
+    info.ZIndex = 51
+    discord.Parent = info
+    discord.BackgroundTransparency = 1
+    discord.Position = UDim2.new(0, 0, 0, 0)
+    discord.Size = UDim2.new(1, 0, 0.16, 0)
+    discord.Font = Enum.Font.Gotham
+    discord.Text = "Discord: " .. (opts.Discord or self.Discord)
+    discord.TextColor3 = Color3.fromRGB(88, 101, 242)
+    discord.TextSize = 14
+    discord.TextTransparency = 1
+    discord.TextXAlignment = Enum.TextXAlignment.Left
+    discord.ZIndex = 51
+    youtube.Parent = info
+    youtube.BackgroundTransparency = 1
+    youtube.Position = UDim2.new(0, 0, 0.18, 0)
+    youtube.Size = UDim2.new(1, 0, 0.16, 0)
+    youtube.Font = Enum.Font.Gotham
+    youtube.Text = "YouTube: " .. (opts.YouTube or self.YouTube)
+    youtube.TextColor3 = Color3.fromRGB(255, 0, 0)
+    youtube.TextSize = 14
+    youtube.TextTransparency = 1
+    youtube.TextXAlignment = Enum.TextXAlignment.Left
+    youtube.ZIndex = 51
+    username.Parent = info
+    username.BackgroundTransparency = 1
+    username.Position = UDim2.new(0, 0, 0.36, 0)
+    username.Size = UDim2.new(1, 0, 0.16, 0)
+    username.Font = Enum.Font.Gotham
+    username.Text = "User: " .. tostring(Library.LocalPlayer and Library.LocalPlayer.Name or "")
+    username.TextColor3 = Library.Colors.TextColor
+    username.TextSize = 14
+    username.TextTransparency = 1
+    username.TextXAlignment = Enum.TextXAlignment.Left
+    username.ZIndex = 51
+    executor.Parent = info
+    executor.BackgroundTransparency = 1
+    executor.Position = UDim2.new(0, 0, 0.54, 0)
+    executor.Size = UDim2.new(1, 0, 0.16, 0)
+    executor.Font = Enum.Font.Gotham
+    executor.Text = "Executor: " .. self:_exec()
+    executor.TextColor3 = Library.Colors.Hightlight
+    executor.TextSize = 14
+    executor.TextTransparency = 1
+    executor.TextXAlignment = Enum.TextXAlignment.Left
+    executor.ZIndex = 51
+    gamename.Parent = info
+    gamename.BackgroundTransparency = 1
+    gamename.Position = UDim2.new(0, 0, 0.72, 0)
+    gamename.Size = UDim2.new(1, 0, 0.16, 0)
+    gamename.Font = Enum.Font.Gotham
+    gamename.Text = "Game: " .. self:_game()
+    gamename.TextColor3 = Library.Colors.TextColor
+    gamename.TextSize = 14
+    gamename.TextTransparency = 1
+    gamename.TextXAlignment = Enum.TextXAlignment.Left
+    gamename.TextTruncate = Enum.TextTruncate.AtEnd
+    gamename.ZIndex = 51
+    pbg.Parent = container
+    pbg.AnchorPoint = Vector2.new(0.5, 0)
+    pbg.BackgroundColor3 = Library.Colors.Disable
+    pbg.BackgroundTransparency = 0.5
+    pbg.Position = UDim2.new(0.5, 0, 0.82, 0)
+    pbg.Size = UDim2.new(0.9, 0, 0.05, 0)
+    pbg.BorderSizePixel = 0
+    pbg.ZIndex = 51
+    pbc.CornerRadius = UDim.new(0.5, 0)
+    pbc.Parent = pbg
+    pfill.Parent = pbg
+    pfill.BackgroundColor3 = Library.Colors.Hightlight
+    pfill.BorderSizePixel = 0
+    pfill.Size = UDim2.new(0, 0, 1, 0)
+    pfill.ZIndex = 52
+    pc.CornerRadius = UDim.new(0.5, 0)
+    pc.Parent = pfill
+    status.Parent = container
+    status.AnchorPoint = Vector2.new(0.5, 0)
+    status.BackgroundTransparency = 1
+    status.Position = UDim2.new(0.5, 0, 0.90, 0)
+    status.Size = UDim2.new(0.9, 0, 0.06, 0)
+    status.Font = Enum.Font.Gotham
+    status.Text = "Initializing..."
+    status.TextColor3 = Library.Colors.TextColor
+    status.TextSize = 12
+    status.TextTransparency = 1
+    status.ZIndex = 51
+    self.__refs = { container = container, welcome = welcome, avatar = avatar, stroke = stroke, discord = discord, youtube = youtube, username = username, executor = executor, gamename = gamename, pbg = pbg, pfill = pfill, status = status }
+    return self.__refs
+end
+function Library.LoadingScreen:Animate(total)
+    local r = self.__refs
+    Library:Tween(r.welcome, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
+    task.wait(0.3)
+    Library:Tween(r.avatar, Library.TweenLibrary.SmallEffect, { ImageTransparency = 0 })
+    Library:Tween(r.stroke, Library.TweenLibrary.SmallEffect, { Transparency = 0 })
+    task.wait(0.3)
+    Library:Tween(r.discord, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
+    task.wait(0.1)
+    Library:Tween(r.youtube, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
+    task.wait(0.1)
+    Library:Tween(r.username, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
+    task.wait(0.1)
+    Library:Tween(r.executor, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
+    task.wait(0.1)
+    Library:Tween(r.gamename, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
+    task.wait(0.2)
+    Library:Tween(r.status, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
+    local stages = {
+        {p=0.14, m="Initializing..."},
+        {p=0.28, m="Loading assets..."},
+        {p=0.42, m="Connecting to services..."},
+        {p=0.57, m="Setting up interface..."},
+        {p=0.71, m="Preparing scripts..."},
+        {p=0.85, m="Almost ready..."},
+        {p=1.00, m="Loading Complete!"}
+    }
+    local per = (total or self.TotalDuration or 15) / #stages
+    for _, s in ipairs(stages) do
+        r.status.Text = s.m
+        Library.TweenService:Create(r.pfill, TweenInfo.new(per*0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = UDim2.new(s.p, 0, 1, 0) }):Play()
+        task.wait(per)
+    end
+    Library:Tween(r.container, Library.TweenLibrary.WindowChanged, { BackgroundTransparency = 1 })
+    Library:Tween(r.welcome, Library.TweenLibrary.WindowChanged, { TextTransparency = 1 })
+    for _, e in ipairs({r.discord, r.youtube, r.username, r.executor, r.gamename, r.status}) do
+        Library:Tween(e, Library.TweenLibrary.WindowChanged, { TextTransparency = 1 })
+    end
+    Library:Tween(r.avatar, Library.TweenLibrary.WindowChanged, { ImageTransparency = 1 })
+    Library:Tween(r.pbg, Library.TweenLibrary.WindowChanged, { BackgroundTransparency = 1 })
+    Library:Tween(r.stroke, Library.TweenLibrary.WindowChanged, { Transparency = 1 })
+    task.wait(0.8)
+    r.container:Destroy()
+end
+function Library.LoadingScreen:Run(parent, opts)
+    self.TotalDuration = (opts and opts.Duration) or self.TotalDuration
+    if opts then
+        if opts.Discord then self.Discord = opts.Discord end
+        if opts.YouTube then self.YouTube = opts.YouTube end
+    end
+    self:Initialize(parent, opts)
+    self:Animate(self.TotalDuration)
+end
+
 function Library.Theme:Discord()
 	Library.Colors = {
 		Hightlight = Color3.fromRGB(114,137,218),
@@ -2262,6 +2490,18 @@ function Library:CreateWindow(setup)
 
 	Library:Tween(MainFrame , Library.TweenLibrary.SmallEffect,{Size = Library.SizeLibrary.Loading})
 	Library:Tween(Ico , Library.TweenLibrary.SmallEffect,{ImageTransparency = 0.25})
+
+	local function __runLoading()
+		local ls = Library.LoadingScreen
+		if not ls or setup.SkipLoading then return end
+		ls.TotalDuration = ls.TotalDuration or 15
+		ls:Run(MainFrame, {
+			Welcome = "Hello, Thanks For Using Kohrynth Hub",
+			Discord = "discord.gg/wPaQZwhMHy",
+			YouTube = "@KohrynthHub"
+		})
+	end
+	__runLoading()
 
 	if setup.KeySystem then
 		setup.KeySystemInfo.Enabled = true;
@@ -6044,282 +6284,8 @@ function Library:CreateWindow(setup)
 	WindowLibrary.__WM = wm
 
 	local gg = (Library.env and Library.env()) or _G;
-    gg.AcrylicUIInstance = WindowLibrary;
-    return WindowLibrary;
+	gg.AcrylicUIInstance = WindowLibrary;
+	return WindowLibrary;
 end;
-
-if not Library.LoadingScreen then
-    Library.LoadingScreen = {}
-end
-
-function Library.LoadingScreen:__getExecutor()
-    if syn then return "Synapse" end
-    if KRNL_LOADED then return "KRNL" end
-    if fluxus or (getgenv and getgenv().is_fluxus) then return "Fluxus" end
-    local ok, name = pcall(function()
-        if getexecutorname then return getexecutorname() end
-        if identifyexecutor then return identifyexecutor() end
-        return nil
-    end)
-    if ok and name then return tostring(name) end
-    return "Unknown"
-end
-
-function Library.LoadingScreen:__getGameName()
-    local mp = game:GetService("MarketplaceService")
-    local ok, info = pcall(function() return mp:GetProductInfo(game.PlaceId) end)
-    if ok and info and info.Name then return tostring(info.Name) end
-    return "Unknown Game"
-end
-
-function Library.LoadingScreen:__getAvatar()
-    local Players = game:GetService("Players")
-    local plr = Players.LocalPlayer
-    local ok, url = pcall(function()
-        return Players:GetUserThumbnailAsync(plr.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
-    end)
-    if ok and url then return url end
-    return "rbxassetid://7733920644"
-end
-
-function Library.LoadingScreen:Show(parentGui, onComplete)
-    local holder = parentGui
-    if not holder then
-        holder = Instance.new("ScreenGui")
-        holder.Name = "KohrynthLoadingHolder"
-        holder.ResetOnSpawn = false
-        holder.ZIndexBehavior = Enum.ZIndexBehavior.Global
-        holder.Parent = Library.CoreGui
-        Library.ProtectGui(holder)
-    end
-
-    local LoadingFrame = Instance.new("Frame")
-    LoadingFrame.Name = "KohrynthLoadingScreen"
-    LoadingFrame.Parent = holder
-    LoadingFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    LoadingFrame.BackgroundColor3 = Library.Colors.Default
-    LoadingFrame.BackgroundTransparency = 0.1
-    LoadingFrame.BorderSizePixel = 0
-    LoadingFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    LoadingFrame.Size = UDim2.new(1, 0, 1, 0)
-    LoadingFrame.ZIndex = 200
-
-    local DropShadow = Instance.new("ImageLabel")
-    DropShadow.Name = "DropShadow"
-    DropShadow.Parent = LoadingFrame
-    DropShadow.BackgroundTransparency = 1
-    DropShadow.Position = UDim2.new(0, -5, 0, -5)
-    DropShadow.Size = UDim2.new(1, 10, 1, 10)
-    DropShadow.ZIndex = 199
-    DropShadow.Image = "rbxassetid://297694300"
-    DropShadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-    DropShadow.ImageTransparency = 0.5
-    DropShadow.ScaleType = Enum.ScaleType.Slice
-    DropShadow.SliceCenter = Rect.new(95, 103, 894, 902)
-
-    local container = Instance.new("Frame")
-    container.Name = "LoadingContainer"
-    container.Parent = LoadingFrame
-    container.AnchorPoint = Vector2.new(0.5, 0.5)
-    container.BackgroundTransparency = 1
-    container.Position = UDim2.new(0.5, 0, 0.5, 0)
-    container.Size = UDim2.new(0, 500, 0, 350)
-    container.ZIndex = 201
-
-    local WelcomeText = Instance.new("TextLabel")
-    WelcomeText.Parent = container
-    WelcomeText.BackgroundTransparency = 1
-    WelcomeText.Position = UDim2.new(0.5, 0, 0.05, 0)
-    WelcomeText.AnchorPoint = Vector2.new(0.5, 0)
-    WelcomeText.Size = UDim2.new(0.9, 0, 0.15, 0)
-    WelcomeText.Font = Enum.Font.GothamBold
-    WelcomeText.Text = "Hello, Thanks For Using Kohrynth Hub"
-    WelcomeText.TextColor3 = Library.Colors.TextColor
-    WelcomeText.TextScaled = true
-    WelcomeText.TextTransparency = 1
-    WelcomeText.ZIndex = 202
-
-    local AvatarImage = Instance.new("ImageLabel")
-    AvatarImage.Parent = container
-    AvatarImage.AnchorPoint = Vector2.new(0.5, 0)
-    AvatarImage.BackgroundColor3 = Library.Colors.Default
-    AvatarImage.BackgroundTransparency = 0.5
-    AvatarImage.Position = UDim2.new(0.5, 0, 0.23, 0)
-    AvatarImage.Size = UDim2.new(0, 80, 0, 80)
-    AvatarImage.Image = self:__getAvatar()
-    AvatarImage.ImageTransparency = 1
-    AvatarImage.ZIndex = 202
-    local AvatarCorner = Instance.new("UICorner")
-    AvatarCorner.CornerRadius = UDim.new(1, 0)
-    AvatarCorner.Parent = AvatarImage
-    local AvatarBorder = Instance.new("UIStroke")
-    AvatarBorder.Parent = AvatarImage
-    AvatarBorder.Color = Library.Colors.Hightlight
-    AvatarBorder.Thickness = 2
-    AvatarBorder.Transparency = 1
-
-    local Info = Instance.new("Frame")
-    Info.Parent = container
-    Info.AnchorPoint = Vector2.new(0.5, 0)
-    Info.BackgroundTransparency = 1
-    Info.Position = UDim2.new(0.5, 0, 0.5, 0)
-    Info.Size = UDim2.new(0.9, 0, 0.25, 0)
-    Info.ZIndex = 202
-
-    local DiscordLabel = Instance.new("TextLabel")
-    DiscordLabel.Parent = Info
-    DiscordLabel.BackgroundTransparency = 1
-    DiscordLabel.Position = UDim2.new(0, 0, 0, 0)
-    DiscordLabel.Size = UDim2.new(1, 0, 0.2, 0)
-    DiscordLabel.Font = Enum.Font.Gotham
-    DiscordLabel.Text = "Discord: discord.gg/wPaQZwhMHy"
-    DiscordLabel.TextColor3 = Library.Colors.TextColor
-    DiscordLabel.TextSize = 14
-    DiscordLabel.TextTransparency = 1
-    DiscordLabel.TextXAlignment = Enum.TextXAlignment.Left
-    DiscordLabel.ZIndex = 202
-
-    local YouTubeLabel = Instance.new("TextLabel")
-    YouTubeLabel.Parent = Info
-    YouTubeLabel.BackgroundTransparency = 1
-    YouTubeLabel.Position = UDim2.new(0, 0, 0.25, 0)
-    YouTubeLabel.Size = UDim2.new(1, 0, 0.2, 0)
-    YouTubeLabel.Font = Enum.Font.Gotham
-    YouTubeLabel.Text = "YouTube: @KohrynthHub"
-    YouTubeLabel.TextColor3 = Library.Colors.TextColor
-    YouTubeLabel.TextSize = 14
-    YouTubeLabel.TextTransparency = 1
-    YouTubeLabel.TextXAlignment = Enum.TextXAlignment.Left
-    YouTubeLabel.ZIndex = 202
-
-    local ExecutorLabel = Instance.new("TextLabel")
-    ExecutorLabel.Parent = Info
-    ExecutorLabel.BackgroundTransparency = 1
-    ExecutorLabel.Position = UDim2.new(0, 0, 0.5, 0)
-    ExecutorLabel.Size = UDim2.new(1, 0, 0.2, 0)
-    ExecutorLabel.Font = Enum.Font.Gotham
-    ExecutorLabel.Text = "Executor: " .. self:__getExecutor()
-    ExecutorLabel.TextColor3 = Library.Colors.Hightlight
-    ExecutorLabel.TextSize = 14
-    ExecutorLabel.TextTransparency = 1
-    ExecutorLabel.TextXAlignment = Enum.TextXAlignment.Left
-    ExecutorLabel.ZIndex = 202
-
-    local GameLabel = Instance.new("TextLabel")
-    GameLabel.Parent = Info
-    GameLabel.BackgroundTransparency = 1
-    GameLabel.Position = UDim2.new(0, 0, 0.75, 0)
-    GameLabel.Size = UDim2.new(1, 0, 0.2, 0)
-    GameLabel.Font = Enum.Font.Gotham
-    GameLabel.Text = "Game: " .. self:__getGameName()
-    GameLabel.TextColor3 = Library.Colors.TextColor
-    GameLabel.TextSize = 14
-    GameLabel.TextTransparency = 1
-    GameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    GameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-    GameLabel.ZIndex = 202
-
-    local ProgressBG = Instance.new("Frame")
-    ProgressBG.Parent = container
-    ProgressBG.AnchorPoint = Vector2.new(0.5, 0)
-    ProgressBG.BackgroundColor3 = Library.Colors.Disable
-    ProgressBG.BackgroundTransparency = 0.5
-    ProgressBG.Position = UDim2.new(0.5, 0, 0.8, 0)
-    ProgressBG.Size = UDim2.new(0.9, 0, 0.05, 0)
-    ProgressBG.BorderSizePixel = 0
-    ProgressBG.ZIndex = 202
-    local ProgressBGCorner = Instance.new("UICorner")
-    ProgressBGCorner.CornerRadius = UDim.new(0.5, 0)
-    ProgressBGCorner.Parent = ProgressBG
-
-    local Progress = Instance.new("Frame")
-    Progress.Parent = ProgressBG
-    Progress.BackgroundColor3 = Library.Colors.Hightlight
-    Progress.BorderSizePixel = 0
-    Progress.Size = UDim2.new(0, 0, 1, 0)
-    Progress.ZIndex = 203
-    local ProgressCorner = Instance.new("UICorner")
-    ProgressCorner.CornerRadius = UDim.new(0.5, 0)
-    ProgressCorner.Parent = Progress
-
-    local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Parent = container
-    StatusLabel.AnchorPoint = Vector2.new(0.5, 0)
-    StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Position = UDim2.new(0.5, 0, 0.88, 0)
-    StatusLabel.Size = UDim2.new(0.9, 0, 0.08, 0)
-    StatusLabel.Font = Enum.Font.Gotham
-    StatusLabel.Text = "Initializing..."
-    StatusLabel.TextColor3 = Library.Colors.TextColor
-    StatusLabel.TextSize = 12
-    StatusLabel.TextTransparency = 1
-    StatusLabel.ZIndex = 202
-
-    Library:Tween(WelcomeText, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
-    task.wait(0.3)
-    Library:Tween(AvatarImage, Library.TweenLibrary.SmallEffect, { ImageTransparency = 0 })
-    Library:Tween(AvatarBorder, Library.TweenLibrary.SmallEffect, { Transparency = 0 })
-    task.wait(0.3)
-    Library:Tween(DiscordLabel, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
-    task.wait(0.1)
-    Library:Tween(YouTubeLabel, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
-    task.wait(0.1)
-    Library:Tween(ExecutorLabel, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
-    task.wait(0.1)
-    Library:Tween(GameLabel, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
-    task.wait(0.2)
-    Library:Tween(StatusLabel, Library.TweenLibrary.SmallEffect, { TextTransparency = 0 })
-
-    local stages = {
-        {p = 0.2, m = "Loading UI Components..."},
-        {p = 0.4, m = "Initializing Systems..."},
-        {p = 0.6, m = "Loading Features..."},
-        {p = 0.8, m = "Finalizing Setup..."},
-        {p = 1.0, m = "Loading Complete!"}
-    }
-    for _, s in ipairs(stages) do
-        StatusLabel.Text = s.m
-        Library.TweenService:Create(Progress, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Size = UDim2.new(s.p, 0, 1, 0) }):Play()
-        task.wait(2.5)
-    end
-    task.wait(0.5)
-
-    Library:Tween(LoadingFrame, Library.TweenLibrary.WindowChanged, { BackgroundTransparency = 1 })
-    for _, element in ipairs({WelcomeText, AvatarImage, DiscordLabel, YouTubeLabel, ExecutorLabel, GameLabel, StatusLabel, ProgressBG}) do
-        if element:IsA("TextLabel") then
-            Library:Tween(element, Library.TweenLibrary.WindowChanged, { TextTransparency = 1 })
-        elseif element:IsA("ImageLabel") then
-            Library:Tween(element, Library.TweenLibrary.WindowChanged, { ImageTransparency = 1 })
-        else
-            Library:Tween(element, Library.TweenLibrary.WindowChanged, { BackgroundTransparency = 1 })
-        end
-    end
-    Library:Tween(AvatarBorder, Library.TweenLibrary.WindowChanged, { Transparency = 1 })
-    task.wait(1.0)
-    holder:Destroy()
-    if onComplete then onComplete() end
-end
-
-if not Library.__WrappedCreateWindow then
-    Library.__WrappedCreateWindow = true
-    local OriginalCreateWindow = Library.CreateWindow
-    function Library:CreateWindow(setup)
-        local LoadingHolder = Instance.new("ScreenGui")
-        LoadingHolder.Name = "KohrynthLoadingHolder"
-        LoadingHolder.Parent = Library.CoreGui
-        LoadingHolder.ResetOnSpawn = false
-        LoadingHolder.ZIndexBehavior = Enum.ZIndexBehavior.Global
-        Library.ProtectGui(LoadingHolder)
-
-        local done = Instance.new("BindableEvent")
-        task.spawn(function()
-            self.LoadingScreen:Show(LoadingHolder, function()
-                done:Fire()
-            end)
-        end)
-        done.Event:Wait()
-        return OriginalCreateWindow(self, setup)
-    end
-end
 
 return Library;
