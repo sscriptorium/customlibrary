@@ -2,16 +2,17 @@
 -- This is not hyprland --
 
 local Library = {
-	Version = 'Acrylic.0.6',
-	Loaded = true,
-	Discord = 'discord.gg/wPaQZwhMHy',
-	env = getgenv or getfenv,
-	Executor = {"s","w","z","t","a","c"},
-	Skid = true,
-	pcall = pcall,
-	setfenv = setfenv,
-	info = debug.info,
-	xpcall = xpcall,
+    Version = 'Acrylic.0.6',
+    Loaded = true,
+    Discord = 'discord.gg/kohrynth',
+    env = getgenv or getfenv,
+    Executor = {"s","w","z","t","a","c"},
+    Skid = true,
+    pcall = pcall,
+    setfenv = setfenv,
+    info = debug.info,
+    xpcall = xpcall,
+    YouTube = 'Kohrynth',
 };
 Library.SaveSystem = {
     FileName = "AcrylicUI_Settings.json",
@@ -1498,12 +1499,14 @@ Library.TweenService = game:GetService('TweenService');
 Library.LocalPlayer = game:GetService('Players').LocalPlayer;
 Library.CoreGui = (game:FindFirstChild('CoreGui') and Library.Cloneref(game:GetService('CoreGui'))) or Library.LocalPlayer.PlayerGui;
 Library.SizeLibrary = {
-	Default = UDim2.fromOffset(580, 385),
-	Auth = UDim2.new(0.05, 250,0.05, 125),
-	Max = UDim2.fromScale(1,1),
+    Default = UDim2.fromOffset(580, 385),
+    Auth = UDim2.new(0.05, 250,0.05, 125),
+    Max = UDim2.fromScale(1,1),
     Loading = UDim2.new(0, 500,0, 360),
-	Close = UDim2.new(0.01, 25,0.01, 25)
+    Close = UDim2.new(0.01, 25,0.01, 25)
 };
+
+ 
 
 Library.Theme = {}
 
@@ -1535,8 +1538,8 @@ end;
 
 Library.LoadingScreen = {
     TotalDuration = 15,
-    Discord = "discord.gg/wPaQZwhMHy",
-    YouTube = "@KohrynthHub"
+    Discord = "discord.gg/kohrynth",
+    YouTube = "Kohrynth"
 }
 function Library.LoadingScreen:_exec()
     local ok, name = pcall(function()
@@ -1760,6 +1763,26 @@ function Library.LoadingScreen:Run(parent, opts)
     self:Initialize(parent, opts)
     self:Animate(self.TotalDuration)
 end
+
+local function ApplyUILoadingConfig()
+    local ok, _ = pcall(function()
+        if isfile and readfile and isfile('uilibrary.txt') then
+            local content = readfile('uilibrary.txt')
+            for line in string.gmatch(content, "[^\r\n]+") do
+                local k, v = string.match(line, "^%s*(%w+)%s*=%s*(.+)%s*$")
+                if k == 'Discord' and v and v ~= '' then
+                    Library.LoadingScreen.Discord = v
+                    Library.Discord = v
+                elseif (k == 'YouTube' or k == 'Youtube') and v and v ~= '' then
+                    Library.LoadingScreen.YouTube = v
+                    Library.YouTube = v
+                end
+            end
+        end
+    end)
+end
+
+ApplyUILoadingConfig()
 
 function Library.Theme:Discord()
 	Library.Colors = {
