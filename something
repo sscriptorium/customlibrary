@@ -1501,7 +1501,7 @@ Library.SizeLibrary = {
 	Default = UDim2.fromOffset(580, 385),
 	Auth = UDim2.new(0.05, 250,0.05, 125),
 	Max = UDim2.fromScale(1,1),
-	Loading = UDim2.new(0, 90,0, 90),
+    Loading = UDim2.new(0, 500,0, 360),
 	Close = UDim2.new(0.01, 25,0.01, 25)
 };
 
@@ -1586,7 +1586,7 @@ function Library.LoadingScreen:Initialize(parent, opts)
     container.AnchorPoint = Vector2.new(0.5, 0.5)
     container.BackgroundTransparency = 1
     container.Position = UDim2.new(0.5, 0, 0.5, 0)
-    container.Size = UDim2.new(0, 500, 0, 360)
+    container.Size = UDim2.new(1, -20, 1, -20)
     container.ZIndex = 50
     welcome.Parent = container
     welcome.BackgroundTransparency = 1
@@ -2489,18 +2489,19 @@ function Library:CreateWindow(setup)
 	Ico.ImageTransparency = 1.000
 
 	Library:Tween(MainFrame , Library.TweenLibrary.SmallEffect,{Size = Library.SizeLibrary.Loading})
-	Library:Tween(Ico , Library.TweenLibrary.SmallEffect,{ImageTransparency = 0.25})
+    Library:Tween(Ico , Library.TweenLibrary.SmallEffect,{ImageTransparency = 0.25})
 
-	local function __runLoading()
-		local ls = Library.LoadingScreen
-		if not ls or setup.SkipLoading then return end
-		ls.TotalDuration = ls.TotalDuration or 15
-		ls:Run(MainFrame, {
-			Welcome = "Hello, Thanks For Using Kohrynth Hub",
-			Discord = "discord.gg/wPaQZwhMHy",
-			YouTube = "@KohrynthHub"
-		})
-	end
+    local function __runLoading()
+        local ls = Library.LoadingScreen
+        if not ls or setup.SkipLoading then return end
+        Library:Tween(Ico , Library.TweenLibrary.SmallEffect,{ImageTransparency = 1})
+        ls.TotalDuration = ls.TotalDuration or 15
+        ls:Run(MainFrame, {
+            Welcome = "Hello, Thanks For Using Kohrynth Hub",
+            Discord = "discord.gg/wPaQZwhMHy",
+            YouTube = "@KohrynthHub"
+        })
+    end
 	__runLoading()
 
 	if setup.KeySystem then
