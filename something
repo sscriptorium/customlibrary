@@ -2547,6 +2547,9 @@ function Library:CreateWindow(setup)
                 if okCheck and status and status.code == "KEY_VALID" then
                     pcall(function() luarmorApi.load_script() end)
                     setup.KeySystem = false
+                    local gg = (Library.env and Library.env()) or _G
+                    gg.AcrylicKeyAccepted = true
+                    Library.SaveSystem:Set("Luarmor.Key.Valid", true)
                 end
             end
             setup.KeySystemInfo.OnLogin = function(key)
@@ -2556,6 +2559,7 @@ function Library:CreateWindow(setup)
                 end)
                 if ok and status and status.code == "KEY_VALID" then
                     Library.SaveSystem:Set("Luarmor.Key", key)
+                    Library.SaveSystem:Set("Luarmor.Key.Valid", true)
                     pcall(function() luarmorApi.load_script() end)
                     local gg = (Library.env and Library.env()) or _G
                     gg.AcrylicKeyAccepted = true
@@ -2623,6 +2627,20 @@ function Library:CreateWindow(setup)
 		Title.TextStrokeTransparency = 0.950
 		Title.TextWrapped = true
 		Title.RichText = true;
+
+		local StatusLabel = Instance.new("TextLabel")
+		StatusLabel.Name = "Status"
+		StatusLabel.Parent = AuthFunction
+		StatusLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+		StatusLabel.BackgroundTransparency = 1
+		StatusLabel.Position = UDim2.new(0.5, 0, 0.26, 0)
+		StatusLabel.Size = UDim2.new(0.7, 0, 0.06, 0)
+		StatusLabel.Font = Enum.Font.Gotham
+		StatusLabel.Text = ""
+		StatusLabel.TextColor3 = Library.Colors.TextColor
+		StatusLabel.TextScaled = true
+		StatusLabel.TextTransparency = 0.25
+		StatusLabel.ZIndex = 6
 
 		TextBox.Parent = AuthFunction
 		TextBox.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -2800,20 +2818,27 @@ function Library:CreateWindow(setup)
 		setup.KeySystemInfo.CodeId = game:GetService('HttpService'):GenerateGUID(false);
 		setup.KeySystemInfo.AntiSpam = false;
 
-        LButton.MouseButton1Click:Connect(function()
-            if setup.KeySystemInfo.AntiSpam then return end;
-            setup.KeySystemInfo.AntiSpam = true;
+		LButton.MouseButton1Click:Connect(function()
+			if setup.KeySystemInfo.AntiSpam then return end;
+			setup.KeySystemInfo.AntiSpam = true;
 
-            local verify = setup.KeySystemInfo.OnLogin(TextBox.Text);
+			StatusLabel.Text = "Verifying..."
+			local verify = false
+			local ok, res = pcall(function()
+				return setup.KeySystemInfo.OnLogin(TextBox.Text)
+			end)
+			verify = ok and res == true
 
 			if verify then
 				setup.KeySystemInfo.Finished:Fire(setup.KeySystemInfo.CodeId)
+				StatusLabel.Text = "Key accepted"
 				return TextBox.Text;
 			end;
 
-            setup.KeySystemInfo.AntiSpam = false;
-            TextBox.Text = "";
-        end)
+			setup.KeySystemInfo.AntiSpam = false;
+			StatusLabel.Text = "Invalid key"
+			TextBox.Text = "";
+		end)
 
 
 		GButton.MouseButton1Click:Connect(setup.KeySystemInfo.OnGetKey)
