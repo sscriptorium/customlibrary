@@ -2576,6 +2576,10 @@ function Library:CreateWindow(setup)
                 end
                 local okValid, usedId = _tryCheckWithIds((savedKey:gsub("^%s*(.-)%s$", "%1")))
                 if okValid then
+                    pcall(function()
+                        local gg = (Library.env and Library.env()) and Library.env() or _G
+                        gg.script_key = savedKey
+                    end)
                     pcall(function() luarmorApi.load_script() end)
                     setup.KeySystem = false
                     local gg = (Library.env and Library.env()) or _G
@@ -2614,6 +2618,10 @@ function Library:CreateWindow(setup)
                     Library.SaveSystem:Set("Luarmor.Key", key)
                     Library.SaveSystem:Set("Luarmor.Key.Valid", true)
                     if usedId then Library.SaveSystem:Set("Luarmor.ScriptId", usedId) end
+                    pcall(function()
+                        local gg = (Library.env and Library.env()) and Library.env() or _G
+                        gg.script_key = key
+                    end)
                     pcall(function() luarmorApi.load_script() end)
                     local gg = (Library.env and Library.env()) or _G
                     gg.AcrylicKeyAccepted = true
