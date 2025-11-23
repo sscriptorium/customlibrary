@@ -2418,7 +2418,7 @@ function Library:CreateWindow(setup)
         return g.AcrylicUIInstance;
     end;
     g.AcrylicUILoaded = true;
-	
+    
 	if setup.KeySystem then
 		setup.KeySystemInfo = setup.KeySystemInfo or {};
 
@@ -2527,17 +2527,51 @@ function Library:CreateWindow(setup)
         Library.BackgroundImage:Create(MainFrame)
     end
 
-	if setup.KeySystem then
-		setup.KeySystemInfo.Enabled = true;
-		setup.KeySystemInfo.Finished = Instance.new('BindableEvent');
+    if setup.KeySystem then
+        setup.KeySystemInfo.Enabled = true;
+        setup.KeySystemInfo.Finished = Instance.new('BindableEvent');
+        local luarmorApi = nil
+        local okApi, api = pcall(function()
+            return loadstring(game:HttpGet("https://sdkapi-public.luarmor.net/library.lua"))()
+        end)
+        if okApi and api then
+            luarmorApi = api
+            luarmorApi.script_id = (setup.KeySystemInfo and setup.KeySystemInfo.ScriptId) or "f42f3746fb3eb60f837d3673581c14a6"
+        end
+        if luarmorApi then
+            local savedKey = Library.SaveSystem:Get("Luarmor.Key", nil)
+            if savedKey and savedKey ~= "" then
+                local okCheck, status = pcall(function()
+                    return luarmorApi.check_key(savedKey)
+                end)
+                if okCheck and status and status.code == "KEY_VALID" then
+                    pcall(function() luarmorApi.load_script() end)
+                    setup.KeySystem = false
+                end
+            end
+            setup.KeySystemInfo.OnLogin = function(key)
+                if not key or key == "" then return false end
+                local ok, status = pcall(function()
+                    return luarmorApi.check_key(key)
+                end)
+                if ok and status and status.code == "KEY_VALID" then
+                    Library.SaveSystem:Set("Luarmor.Key", key)
+                    pcall(function() luarmorApi.load_script() end)
+                    local gg = (Library.env and Library.env()) or _G
+                    gg.AcrylicKeyAccepted = true
+                    return true
+                end
+                return false
+            end
+        end
 
-		task.wait(1)
+        task.wait(1)
 
-		task.delay(0.1,function()
-			Library:Tween(Ico , Library.TweenLibrary.SmallEffect,{ImageTransparency = 1})
-		end)
+        task.delay(0.1,function()
+            Library:Tween(Ico , Library.TweenLibrary.SmallEffect,{ImageTransparency = 1})
+        end)
 
-		Library:Tween(MainFrame , Library.TweenLibrary.WindowChanged,{Size = Library.SizeLibrary.Auth})
+        Library:Tween(MainFrame , Library.TweenLibrary.WindowChanged,{Size = Library.SizeLibrary.Auth})
 
 		task.wait(1);
 
@@ -2766,20 +2800,20 @@ function Library:CreateWindow(setup)
 		setup.KeySystemInfo.CodeId = game:GetService('HttpService'):GenerateGUID(false);
 		setup.KeySystemInfo.AntiSpam = false;
 
-		LButton.MouseButton1Click:Connect(function()
-			if setup.KeySystemInfo.AntiSpam then return end;
-			setup.KeySystemInfo.AntiSpam = true;
+        LButton.MouseButton1Click:Connect(function()
+            if setup.KeySystemInfo.AntiSpam then return end;
+            setup.KeySystemInfo.AntiSpam = true;
 
-			local verify = setup.KeySystemInfo.OnLogin(TextBox.Text);
+            local verify = setup.KeySystemInfo.OnLogin(TextBox.Text);
 
 			if verify then
 				setup.KeySystemInfo.Finished:Fire(setup.KeySystemInfo.CodeId)
 				return TextBox.Text;
 			end;
 
-			setup.KeySystemInfo.AntiSpam = false;
-			TextBox.Text = "";
-		end)
+            setup.KeySystemInfo.AntiSpam = false;
+            TextBox.Text = "";
+        end)
 
 
 		GButton.MouseButton1Click:Connect(setup.KeySystemInfo.OnGetKey)
@@ -2801,14 +2835,14 @@ function Library:CreateWindow(setup)
 		Library:Tween(AuthFunction , Library.TweenLibrary.Normal,{Position = UDim2.new(0.5, 0, 1.5, 0)});
 
 		task.wait(0.5)
-	else
-		repeat task.wait(1.5) until game:IsLoaded();
-	end;
+    else
+        repeat task.wait(1.5) until game:IsLoaded();
+    end;
 
 	Library:Tween(MainFrame , Library.TweenLibrary.WindowChanged,{Size = setup.Size})
 	Library:Tween(Ico , Library.TweenLibrary.SmallEffect,{ImageTransparency = 1})
 
-	local WindowLibrary = {};
+    local WindowLibrary = {};
 	local OpenDelay = tick();
 
 	local Block = Instance.new("Frame")
@@ -6311,9 +6345,13 @@ function Library:CreateWindow(setup)
 	end)
 	WindowLibrary.__WM = wm
 
-	local gg = (Library.env and Library.env()) or _G;
-	gg.AcrylicUIInstance = WindowLibrary;
-	return WindowLibrary;
+    local gg = (Library.env and Library.env()) or _G;
+    gg.AcrylicUIInstance = WindowLibrary;
+    if gg.AcrylicKeyAccepted then
+        WindowLibrary:Notify({ Title = "Auth", Description = "Key accepted", Duration = 3 })
+        gg.AcrylicKeyAccepted = nil
+    end
+    return WindowLibrary;
 end;
 
 return Library;
