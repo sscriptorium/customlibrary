@@ -2536,30 +2536,84 @@ function Library:CreateWindow(setup)
         end)
         if okApi and api then
             luarmorApi = api
-            luarmorApi.script_id = (setup.KeySystemInfo and setup.KeySystemInfo.ScriptId) or "f42f3746fb3eb60f837d3673581c14a6"
+            local function _readScriptIdFromConfig()
+                if isfile and readfile and isfile('uilibrary.txt') then
+                    local content = readfile('uilibrary.txt')
+                    for line in string.gmatch(content, "[^\r\n]+") do
+                        local k, v = string.match(line, "^%s*(%w+)%s*=%s*(.+)%s*$")
+                        if k == 'ScriptId' and v and v ~= '' then
+                            return v
+                        end
+                    end
+                end
+                return nil
+            end
+            local cfgId = _readScriptIdFromConfig()
+            local setupId = (setup.KeySystemInfo and setup.KeySystemInfo.ScriptId) or nil
+            local defaultId = "f42f3746fb3eb60f837d3673581c14a6"
+            luarmorApi.script_id = cfgId or setupId or Library.SaveSystem:Get("Luarmor.ScriptId", defaultId)
         end
         if luarmorApi then
             local savedKey = Library.SaveSystem:Get("Luarmor.Key", nil)
             if savedKey and savedKey ~= "" then
-                local okCheck, status = pcall(function()
-                    return luarmorApi.check_key(savedKey)
-                end)
-                if okCheck and status and status.code == "KEY_VALID" then
+                local function _tryCheckWithIds(key)
+                    local candidates = {}
+                    table.insert(candidates, luarmorApi.script_id)
+                    table.insert(candidates, "faede9a9a8c81995c8fc8a8935377883")
+                    table.insert(candidates, "f42f3746fb3eb60f837d3673581c14a6")
+                    for _, id in ipairs(candidates) do
+                        if id and id ~= '' then
+                            luarmorApi.script_id = id
+                            local okCheck, status = pcall(function()
+                                return luarmorApi.check_key(key)
+                            end)
+                            if okCheck and status and status.code == "KEY_VALID" then
+                                return true, id
+                            end
+                        end
+                    end
+                    return false, nil
+                end
+                local okValid, usedId = _tryCheckWithIds((savedKey:gsub("^%s*(.-)%s$", "%1")))
+                if okValid then
                     pcall(function() luarmorApi.load_script() end)
                     setup.KeySystem = false
                     local gg = (Library.env and Library.env()) or _G
                     gg.AcrylicKeyAccepted = true
                     Library.SaveSystem:Set("Luarmor.Key.Valid", true)
+                    if usedId then Library.SaveSystem:Set("Luarmor.ScriptId", usedId) end
                 end
             end
             setup.KeySystemInfo.OnLogin = function(key)
                 if not key or key == "" then return false end
-                local ok, status = pcall(function()
-                    return luarmorApi.check_key(key)
-                end)
-                if ok and status and status.code == "KEY_VALID" then
+                key = (tostring(key or ""):gsub("^%s*(.-)%s$", "%1"))
+                local function _tryCheckLogin(k)
+                    local candidates = {}
+                    table.insert(candidates, luarmorApi.script_id)
+                    table.insert(candidates, (setup.KeySystemInfo and setup.KeySystemInfo.ScriptId) or nil)
+                    table.insert(candidates, Library.SaveSystem:Get("Luarmor.ScriptId", nil))
+                    table.insert(candidates, "faede9a9a8c81995c8fc8a8935377883")
+                    table.insert(candidates, "f42f3746fb3eb60f837d3673581c14a6")
+                    local used = nil
+                    for _, id in ipairs(candidates) do
+                        if id and id ~= '' then
+                            luarmorApi.script_id = id
+                            local ok, status = pcall(function()
+                                return luarmorApi.check_key(k)
+                            end)
+                            if ok and status and status.code == "KEY_VALID" then
+                                used = id
+                                return true, used
+                            end
+                        end
+                    end
+                    return false, nil
+                end
+                local valid, usedId = _tryCheckLogin(key)
+                if valid then
                     Library.SaveSystem:Set("Luarmor.Key", key)
                     Library.SaveSystem:Set("Luarmor.Key.Valid", true)
+                    if usedId then Library.SaveSystem:Set("Luarmor.ScriptId", usedId) end
                     pcall(function() luarmorApi.load_script() end)
                     local gg = (Library.env and Library.env()) or _G
                     gg.AcrylicKeyAccepted = true
